@@ -25,6 +25,11 @@ permissions:
   contents: write
   packages: write
 
+# bash -eo pipefail: a failing command on the left of a pipe fails the step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   changestag:
     permissions:

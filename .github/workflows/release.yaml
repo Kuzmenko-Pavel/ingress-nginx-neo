@@ -40,6 +40,11 @@ concurrency:
   group: release
   cancel-in-progress: false
 
+# bash -eo pipefail: a failing command on the left of a pipe fails the step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   preflight:
     name: Preflight
@@ -64,7 +69,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
         run: |
-          if ! echo "${RELEASE_TAG}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+          if ! grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' <<< "${RELEASE_TAG}"; then
             echo "::error::tag '${RELEASE_TAG}' does not match vX.Y.Z"
             exit 1
           fi
@@ -122,7 +127,7 @@ jobs:
           if [ ${bad} -ne 0 ]; then exit 1; fi
 
           # Releases are cut from commits merged into main (or a release-* branch).
-          if ! git branch -r --contains "${COMMIT_SHA}" | grep -qE '^\s*origin/(main|release-.+)$'; then
+          if ! git branch -r --contains "${COMMIT_SHA}" | grep -E '^\s*origin/(main|release-.+)$' > /dev/null; then
             echo "::error::${COMMIT_SHA} is not on origin/main or origin/release-*"
             exit 1
           fi
@@ -192,7 +197,7 @@ jobs:
               echo "::error::chart ${CHART_VERSION} is already published; bump charts/ingress-nginx/Chart.yaml version"
               fail=1
             fi
-          elif ! echo "${OUT}" | grep -qiE 'not found|manifest unknown|denied'; then
+          elif ! grep -qiE 'not found|manifest unknown|denied' <<< "${OUT}"; then
             echo "::error::cannot query chart ${CHART_VERSION}: ${OUT}"
             fail=1
           fi
@@ -416,7 +421,7 @@ jobs:
           (cd "$(dirname "${CHART_FILE}")" && sha256sum "$(basename "${CHART_FILE}")" > "$(basename "${CHART_FILE}").sha256")
 
           helm push "${CHART_FILE}" "${CHARTS_OCI}" 2>&1 | tee "${RUNNER_TEMP}/helm-push.log"
-          DIGEST=$(grep -oE 'sha256:[a-f0-9]{64}' "${RUNNER_TEMP}/helm-push.log" | tail -1)
+          DIGEST=$(grep -oE 'sha256:[a-f0-9]{64}' "${RUNNER_TEMP}/helm-push.log" | tail -1 || true)
           if [ -z "${DIGEST}" ]; then echo "::error::no digest in helm push output"; exit 1; fi
 
           cosign sign --yes "${CHARTS_OCI#oci://}/ingress-nginx@${DIGEST}"

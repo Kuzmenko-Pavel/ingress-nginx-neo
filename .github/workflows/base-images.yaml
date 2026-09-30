@@ -56,6 +56,11 @@ concurrency:
   group: base-images-${{ inputs.ref || github.ref }}
   cancel-in-progress: false
 
+# bash -eo pipefail: a failing command on the left of a pipe fails the step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   plan:
     name: Plan
