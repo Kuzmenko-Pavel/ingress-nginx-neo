@@ -148,6 +148,8 @@ git push origin feature/<short-name>
 - Do not commit registry/tag/digest edits to `charts/ingress-nginx/values.yaml`: the release
   workflow patches it at runtime only. The committed file keeps generic defaults.
 - Do not force-push and do not rewrite history.
+- Commit messages and PR descriptions contain no AI attribution: no `Co-Authored-By`,
+  `Claude-Session` or "Generated with Claude Code" trailers/footers.
 - Keep the Go module path `k8s.io/ingress-nginx`.
 - Never overwrite a published image tag or chart version; bump the version instead.
 - Do not reintroduce `registry.k8s.io/ingress-nginx/nginx` or a separately pinned base image
