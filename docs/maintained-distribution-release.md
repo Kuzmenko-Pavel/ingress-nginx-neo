@@ -65,6 +65,22 @@ The NGINX base takes a long time to compile (tens of minutes per architecture on
 GitHub runner). CI builds it only when `images/nginx/**` changes or its tag is not published
 yet.
 
+### Security backports
+
+The base is built on nginx 1.27.1, a branch that no longer receives upstream fixes. Security
+fixes are backported as numbered patches (`NN_nginx-1.27.1-CVE-YYYY-NNNNN.patch`); each patch
+header names the upstream nginx commit it is derived from. Patches 35–40 are taken unchanged
+from [chainguard-forks/ingress-nginx](https://github.com/chainguard-forks/ingress-nginx), which
+maintains the same 1.27.1 line and is a good source for further backports until nginx is moved
+to a maintained branch.
+
+Patch 37 (CVE-2026-49975) has two consequences worth knowing:
+
+- **`max_headers` (default 1000):** requests with more header lines are rejected with 400.
+- **ABI:** it adds a field to `ngx_http_headers_in_t` (embedded in `ngx_http_request_t`). All
+  modules in this image are built against the patched headers; third-party dynamic modules
+  built against stock nginx 1.27.1 headers are not compatible and must be rebuilt.
+
 ## Release model
 
 A release is produced by pushing a Git tag from a commit on `main` (or `release-*`):
