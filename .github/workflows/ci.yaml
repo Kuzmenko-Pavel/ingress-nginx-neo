@@ -240,15 +240,21 @@ jobs:
           # Use the local docker image store so a locally built base image is picked up.
           BUILDX_BUILDER: default
         run: |
+          set -o pipefail
           echo "building images..."
           make BASE_IMAGE="${{ steps.base.outputs.image }}" clean-image build image image-chroot
           make -C test/e2e-image image
           # The chart's default kube-webhook-certgen image (values.yaml) may not be published yet;
           # build it from this revision so the chart tests use it (run-chart-test.sh loads it).
-          make -C images build NAME=kube-webhook-certgen PLATFORMS=linux/amd64 OUTPUT=--load
+          # IMAGE/TAG are passed explicitly: this step's REGISTRY/TAG env would otherwise override
+          # the Makefile defaults and tag it ingress-controller/kube-webhook-certgen:1.0.0-dev.
+          CERTGEN_REPO="ghcr.io/kuzmenko-pavel/ingress-nginx/kube-webhook-certgen"
+          CERTGEN_TAG="$(cat images/kube-webhook-certgen/TAG)"
+          make -C images build NAME=kube-webhook-certgen PLATFORMS=linux/amd64 OUTPUT=--load \
+            IMAGE="${CERTGEN_REPO}" TAG="${CERTGEN_TAG}"
 
           echo "creating images cache..."
-          CERTGEN_IMAGE="ghcr.io/kuzmenko-pavel/ingress-nginx/kube-webhook-certgen:$(cat images/kube-webhook-certgen/TAG)"
+          CERTGEN_IMAGE="${CERTGEN_REPO}:${CERTGEN_TAG}"
           IMAGES="nginx-ingress-controller:e2e ingress-controller/controller:1.0.0-dev ingress-controller/controller-chroot:1.0.0-dev ${CERTGEN_IMAGE}"
           if [ "${{ steps.base.outputs.build }}" = "true" ]; then
             # Not published yet: ship it to the e2e jobs, run-kind-e2e.sh loads it into kind.
