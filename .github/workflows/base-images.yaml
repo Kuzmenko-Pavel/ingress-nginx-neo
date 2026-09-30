@@ -230,19 +230,20 @@ jobs:
       - name: Create multi-platform tag
         id: publish
         env:
-          IMAGE: ${{ needs.plan.outputs.nginx-image }}
+          # Not IMAGE: the Makefiles read IMAGE (repository without tag) from the environment.
+          REF: ${{ needs.plan.outputs.nginx-image }}
         run: |
           # Re-check right before tagging: never overwrite a published tag.
-          rc=0; hack/image-exists.sh "${IMAGE}" || rc=$?
-          if [ ${rc} -ne 1 ]; then echo "::error::${IMAGE} already exists or registry query failed (rc=${rc})"; exit 1; fi
+          rc=0; hack/image-exists.sh "${REF}" || rc=$?
+          if [ ${rc} -ne 1 ]; then echo "::error::${REF} already exists or registry query failed (rc=${rc})"; exit 1; fi
 
           make -C images/nginx manifest \
             REGISTRY="${REGISTRY}" \
             DIGESTS="$(cat "${RUNNER_TEMP}"/digests/* | tr '\n' ' ')"
 
-          DIGEST=$(docker buildx imagetools inspect "${IMAGE}" --format '{{json .Manifest}}' | jq -r .digest)
+          DIGEST=$(docker buildx imagetools inspect "${REF}" --format '{{json .Manifest}}' | jq -r .digest)
           echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-          echo "Published \`${IMAGE}@${DIGEST}\` (${{ needs.plan.outputs.platforms }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "Published \`${REF}@${DIGEST}\` (${{ needs.plan.outputs.platforms }})" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Sign
         run: cosign sign --yes "${{ needs.plan.outputs.nginx-image }}@${{ steps.publish.outputs.digest }}"
@@ -290,7 +291,8 @@ jobs:
 
       - name: Build and push
         env:
-          IMAGE: ${{ needs.plan.outputs.test-runner-image }}
+          # Not IMAGE: the Makefiles read IMAGE (repository without tag) from the environment.
+          REF: ${{ needs.plan.outputs.test-runner-image }}
           PLATFORMS: ${{ needs.plan.outputs.platforms }}
         run: |
           # The runner is built FROM the NGINX base, which must provide every platform.
@@ -299,6 +301,6 @@ jobs:
 
           make -C images/test-runner push REGISTRY="${REGISTRY}" PLATFORMS="${PLATFORMS}"
 
-          DIGEST=$(docker buildx imagetools inspect "${IMAGE}" --format '{{json .Manifest}}' | jq -r .digest)
-          cosign sign --yes "${IMAGE}@${DIGEST}"
-          echo "Published \`${IMAGE}@${DIGEST}\` (${PLATFORMS})" >> "$GITHUB_STEP_SUMMARY"
+          DIGEST=$(docker buildx imagetools inspect "${REF}" --format '{{json .Manifest}}' | jq -r .digest)
+          cosign sign --yes "${REF}@${DIGEST}"
+          echo "Published \`${REF}@${DIGEST}\` (${PLATFORMS})" >> "$GITHUB_STEP_SUMMARY"
