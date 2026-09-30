@@ -224,7 +224,7 @@ Settings required or recommended for this repository:
 | *Settings → Actions → General* | Workflow permissions: *Read repository contents* (workflows request `packages`/`contents`/`id-token` write explicitly). Optionally *Require actions to be pinned to a full-length commit SHA*. |
 | *Settings → Environments → `release`* | Required reviewers (manual approval before publishing); deployment tags `v*`. |
 | *Settings → Secrets and variables → Actions → Variables* | `ENABLE_ARM64=true` to publish arm64 (optional). |
-| *Settings → Rules → Rulesets* | Tag ruleset for `v*`: restrict creation, update and deletion to maintainers. Branch ruleset for `main`: pull request required, required status checks, no force-push. |
+| *Settings → Rules → Rulesets* | Tag ruleset for `v*`: restrict creation, update and deletion to maintainers. Branch ruleset for `main`: pull request required, no force-push, required status checks **`CI result`** and **`Images result`** (aggregate jobs of `ci.yaml` / `images.yaml` that always report, even when path filters skip every other job; do not require individual matrix jobs). |
 | *Settings → General → Releases* | Enable release immutability. |
 
 CI pulls the NGINX base anonymously, so the `nginx` package must be public for pull

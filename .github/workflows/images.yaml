@@ -1,11 +1,11 @@
 name: Container Images
 
 on:
+  # No path filters for pull requests: the 'Images result' job must always report because
+  # it is a required status check. The 'changes' job decides which image jobs run.
   pull_request:
     branches:
       - "*"
-    paths:
-      - 'images/**'
 
   push:
     branches:
@@ -16,6 +16,10 @@ on:
 permissions:
   contents: write
   packages: write
+
+concurrency:
+  group: images-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PLATFORMS: linux/amd64
@@ -159,3 +163,31 @@ jobs:
     - name: image test
       run: |
         cd images/ && make NAME=kube-webhook-certgen test test-e2e
+
+  # Single required status check for branch protection. Always runs (also when every
+  # other job was skipped by the path filters) and fails if any job failed or was
+  # cancelled; skipped jobs count as passed.
+  result:
+    name: Images result
+    if: always()
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - cfssl
+      - custom-error-pages
+      - e2e-test-echo
+      - ext-auth-example-authsvc
+      - fastcgi-helloserver
+      - go-grpc-greeter-server
+      - httpbun
+      - kube-webhook-certgen
+    steps:
+      - name: Check image results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "${RESULTS}" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          if echo "${RESULTS}" | jq -e 'to_entries | any(.value.result == "failure" or .value.result == "cancelled")' > /dev/null; then
+            echo "::error::at least one job failed or was cancelled"
+            exit 1
+          fi

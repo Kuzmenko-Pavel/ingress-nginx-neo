@@ -1,15 +1,11 @@
 name: CI
 
 on:
+  # No path filters for pull requests: the 'CI result' job must always report because it
+  # is a required status check. The 'changes' job decides which jobs actually run.
   pull_request:
     branches:
       - "*"
-    paths-ignore:
-      - 'docs/**'
-      - 'deploy/**'
-      - '**.md'
-      - 'images/**' # Images changes should be tested on their own workflow
-      - '!images/nginx/**'
 
   push:
     branches:
@@ -379,3 +375,32 @@ jobs:
     with:
       k8s-version: ${{ matrix.k8s }}
       variation: "CHROOT"
+
+  # Single required status check for branch protection. Always runs (also when every
+  # other job was skipped by the path filters) and fails if any job failed or was
+  # cancelled; skipped jobs count as passed.
+  result:
+    name: CI result
+    if: always()
+    runs-on: ubuntu-latest
+    needs:
+      - changes
+      - base-image-tag
+      - lua-lint
+      - test-go
+      - verify-docs
+      - build
+      - chart-lint
+      - chart-test
+      - kubernetes
+      - kubernetes-chroot
+    steps:
+      - name: Check CI results
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "${RESULTS}" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          if echo "${RESULTS}" | jq -e 'to_entries | any(.value.result == "failure" or .value.result == "cancelled")' > /dev/null; then
+            echo "::error::at least one job failed or was cancelled"
+            exit 1
+          fi
