@@ -97,6 +97,25 @@ jobs:
             exit 1
           fi
 
+          # Committed chart values must reference the images this release publishes; only the
+          # digests are filled in at packaging time.
+          VALUES=charts/ingress-nginx/values.yaml
+          expect() {
+            local path=$1 want=$2 got
+            got="$(yq "${path}" "${VALUES}")"
+            if [ "${got}" != "${want}" ]; then
+              echo "::error::${VALUES} ${path} is '${got}', expected '${want}'"
+              return 1
+            fi
+          }
+          bad=0
+          expect '.global.image.registry' "${REGISTRY%%/*}" || bad=1
+          expect '.controller.image.image' "${REGISTRY#*/}/controller" || bad=1
+          expect '.controller.image.tag' "${RELEASE_TAG}" || bad=1
+          expect '.controller.admissionWebhooks.patch.image.image' "${REGISTRY#*/}/kube-webhook-certgen" || bad=1
+          expect '.controller.admissionWebhooks.patch.image.tag' "${CERTGEN_TAG}" || bad=1
+          if [ ${bad} -ne 0 ]; then exit 1; fi
+
           # Releases are cut from commits merged into main (or a release-* branch).
           if ! git branch -r --contains "${COMMIT_SHA}" | grep -qE '^\s*origin/(main|release-.+)$'; then
             echo "::error::${COMMIT_SHA} is not on origin/main or origin/release-*"
@@ -312,22 +331,17 @@ jobs:
             cosign sign --yes "${REGISTRY}/kube-webhook-certgen@${{ steps.digests.outputs.certgen }}"
           fi
 
-      - name: Patch chart values (packaging only, not committed)
+      - name: Pin image digests in chart values (packaging only, not committed)
         env:
           CONTROLLER_DIGEST: ${{ steps.digests.outputs.controller }}
           CHROOT_DIGEST: ${{ steps.digests.outputs.chroot }}
           CERTGEN_DIGEST: ${{ steps.digests.outputs.certgen }}
         run: |
+          # Registry, image names and tags come from the committed values (verified in preflight).
           VALUES="charts/ingress-nginx/values.yaml"
-          yq e -i ".controller.image.registry = \"ghcr.io\""                                                         "${VALUES}"
-          yq e -i ".controller.image.image = \"kuzmenko-pavel/ingress-nginx/controller\""                            "${VALUES}"
-          yq e -i ".controller.image.tag = \"${RELEASE_TAG}\""                                                       "${VALUES}"
-          yq e -i ".controller.image.digest = \"${CONTROLLER_DIGEST}\""                                              "${VALUES}"
-          yq e -i ".controller.image.digestChroot = \"${CHROOT_DIGEST}\""                                            "${VALUES}"
-          yq e -i ".controller.admissionWebhooks.patch.image.registry = \"ghcr.io\""                                 "${VALUES}"
-          yq e -i ".controller.admissionWebhooks.patch.image.image = \"kuzmenko-pavel/ingress-nginx/kube-webhook-certgen\"" "${VALUES}"
-          yq e -i ".controller.admissionWebhooks.patch.image.tag = \"${CERTGEN_TAG}\""                               "${VALUES}"
-          yq e -i ".controller.admissionWebhooks.patch.image.digest = \"${CERTGEN_DIGEST}\""                         "${VALUES}"
+          yq e -i ".controller.image.digest = \"${CONTROLLER_DIGEST}\""                       "${VALUES}"
+          yq e -i ".controller.image.digestChroot = \"${CHROOT_DIGEST}\""                     "${VALUES}"
+          yq e -i ".controller.admissionWebhooks.patch.image.digest = \"${CERTGEN_DIGEST}\""  "${VALUES}"
 
       - name: Helm lint and template
         run: |

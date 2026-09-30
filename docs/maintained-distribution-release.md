@@ -87,6 +87,8 @@ A release is produced by pushing a Git tag from a commit on `main` (or `release-
 
 ```bash
 # charts/ingress-nginx/Chart.yaml: appVersion: 1.15.2, version: <new chart version>
+# charts/ingress-nginx/values.yaml: controller.image.tag: v1.15.2,
+#   controller.admissionWebhooks.patch.image.tag: <images/kube-webhook-certgen/TAG>
 git tag v1.15.2
 git push origin v1.15.2
 ```
@@ -97,6 +99,9 @@ git push origin v1.15.2
    belongs):
    - the tag is `vX.Y.Z` and the tagged commit is on `main` / `release-*`;
    - `Chart.yaml` `appVersion` equals the tag without `v`;
+   - `values.yaml` references our images: `global.image.registry` is `ghcr.io`, the controller
+     and kube-webhook-certgen image names are ours, `controller.image.tag` equals the tag and the
+     certgen tag equals `images/kube-webhook-certgen/TAG`;
    - `controller:vX.Y.Z`, `controller-chroot:vX.Y.Z` and the chart version are not published
      yet;
    - `kube-webhook-certgen` is rebuilt only if its `TAG` is new.
@@ -107,8 +112,8 @@ git push origin v1.15.2
      digest, with SBOM and provenance attestations;
    - `make -C images push NAME=kube-webhook-certgen` (when new);
    - signs every published image with keyless cosign;
-   - patches `charts/ingress-nginx/values.yaml` **in the workspace only** with GHCR
-     registry, tags and digests, then runs `helm lint` / `helm template`;
+   - pins the published image digests into `charts/ingress-nginx/values.yaml` **in the
+     workspace only**, then runs `helm lint` / `helm template`;
    - pushes the chart to `oci://ghcr.io/kuzmenko-pavel/charts` and signs it;
    - creates the GitHub Release with provenance, digests, the packaged chart and its
      checksum.
@@ -278,5 +283,8 @@ git push origin feature/my-change
 ```
 
 - `main` is the source of truth; changes land via PR into `main`.
-- Committed chart values (`charts/ingress-nginx/values.yaml`) keep generic defaults; the
-  release workflow patches registry, tags and digests at packaging time only.
+- Committed chart values (`charts/ingress-nginx/values.yaml`) reference this distribution's
+  images with the release tags and empty digests; the release workflow pins the digests at
+  packaging time only. Installing the chart from a git checkout therefore uses our images by tag.
+  `defaultBackend` stays on the upstream image (`registry.k8s.io/defaultbackend-amd64`), so
+  `global.image.registry` does not apply to it.

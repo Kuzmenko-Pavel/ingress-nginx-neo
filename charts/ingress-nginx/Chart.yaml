@@ -3,6 +3,7 @@ annotations:
     - Update Ingress-Nginx version controller-v1.15.2
     - Backport nginx fixes for CVE-2026-42945, CVE-2026-9256, CVE-2026-49975, CVE-2026-42055, CVE-2026-48142, CVE-2026-42533
     - Allow setting ttlSecondsAfterFinished for the admission webhook createSecret and patch Jobs
+    - Default images come from ghcr.io/kuzmenko-pavel/ingress-nginx; defaultBackend stays on registry.k8s.io
   artifacthub.io/prerelease: "false"
 apiVersion: v2
 appVersion: 1.15.2

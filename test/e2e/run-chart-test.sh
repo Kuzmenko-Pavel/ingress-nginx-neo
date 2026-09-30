@@ -90,6 +90,13 @@ echo "[dev-env] copying docker images to cluster..."
 
 kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes=${KIND_WORKERS} ${REGISTRY}/controller:${TAG}
 
+# The chart installs kube-webhook-certgen from its default values. Preload it when it was built
+# locally (CI builds it from the current revision), otherwise it is pulled from the registry.
+CERTGEN_IMAGE=${CERTGEN_IMAGE:-ghcr.io/kuzmenko-pavel/ingress-nginx/kube-webhook-certgen:$(cat "$DIR"/../../images/kube-webhook-certgen/TAG)}
+if docker image inspect "${CERTGEN_IMAGE}" > /dev/null 2>&1; then
+  kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes=${KIND_WORKERS} "${CERTGEN_IMAGE}"
+fi
+
 if [ "${SKIP_CERT_MANAGER_CREATION:-false}" = "false" ]; then
   echo "[dev-env] deploying cert-manager..."
 
