@@ -50,7 +50,7 @@ if [ "$missing" = true ]; then
 fi
 
 BASEDIR=$(dirname "$0")
-NGINX_BASE_IMAGE=$(cat $BASEDIR/../../NGINX_BASE)
+NGINX_BASE_IMAGE=${NGINX_BASE_IMAGE:-$("$BASEDIR"/../../hack/nginx-base-image.sh)}
 HTTPBUN_IMAGE=$(cat $BASEDIR/HTTPBUN_IMAGE)
 
 echo -e "${BGREEN}Granting permissions to ingress-nginx e2e service account...${NC}"

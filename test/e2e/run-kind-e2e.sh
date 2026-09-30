@@ -45,7 +45,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 export TAG=1.0.0-dev
 export ARCH=${ARCH:-amd64}
 export REGISTRY=ingress-controller
-NGINX_BASE_IMAGE=${NGINX_BASE_IMAGE:-$(cat "$DIR"/../../NGINX_BASE)}
+NGINX_BASE_IMAGE=${NGINX_BASE_IMAGE:-$("$DIR"/../../hack/nginx-base-image.sh)}
 export NGINX_BASE_IMAGE=$NGINX_BASE_IMAGE
 export DOCKER_CLI_EXPERIMENTAL=enabled
 export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/kind-config-$KIND_CLUSTER_NAME}"
@@ -111,5 +111,10 @@ echo "[dev-env] copying docker images to cluster..."
 
 kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" nginx-ingress-controller:e2e
 kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" "${REGISTRY}"/controller:"${TAG}"
+# The e2e suite deploys pods from the NGINX base image. Preload it when it exists locally
+# (e.g. built from images/nginx in CI before it is published), otherwise it is pulled.
+if docker image inspect "${NGINX_BASE_IMAGE}" > /dev/null 2>&1; then
+  kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" "${NGINX_BASE_IMAGE}"
+fi
 echo "[dev-env] running e2e tests..."
 make -C "${DIR}"/../../ e2e-test

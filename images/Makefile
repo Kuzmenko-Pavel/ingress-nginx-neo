@@ -15,15 +15,17 @@
 NAME ?=
 
 BUILDER ?= ingress-nginx
-PLATFORMS ?= linux/amd64,linux/arm,linux/arm64
-REGISTRY ?= us-central1-docker.pkg.dev/k8s-staging-images/ingress-nginx
+PLATFORMS ?= linux/amd64
+REGISTRY ?= ghcr.io/kuzmenko-pavel/ingress-nginx
 IMAGE ?= $(REGISTRY)/$(NAME)
 TAG ?= $(shell cat $(NAME)/TAG)
 
 DIR = $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-BASE_IMAGE ?= $(shell cat $(DIR)/../NGINX_BASE)
+BASE_IMAGE ?= $(shell $(DIR)/../hack/nginx-base-image.sh)
 GOLANG_VERSION ?= $(shell cat $(DIR)/../GOLANG_VERSION)
 EXTRAARGS ?= $(shell cat $(NAME)/EXTRAARGS)
+# Extra docker buildx flags (e.g. "--sbom=true --provenance=mode=max").
+BUILDX_ARGS ?=
 
 .PHONY: builder
 builder:
@@ -41,6 +43,7 @@ build: builder
 		--build-arg BASE_IMAGE=$(BASE_IMAGE) \
 		--build-arg GOLANG_VERSION=$(GOLANG_VERSION) \
 		$(EXTRAARGS) \
+		$(BUILDX_ARGS) \
 		$(NAME)/rootfs \
 		--tag $(IMAGE):$(TAG) \
 		$(OUTPUT)

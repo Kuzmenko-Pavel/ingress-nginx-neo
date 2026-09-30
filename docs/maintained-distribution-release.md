@@ -4,7 +4,8 @@ This repository is a self-maintained distribution based on the ingress-nginx cod
 It is developed and released independently, with its own runtime artifacts published to
 GitHub Container Registry (GHCR). It is not a contribution fork: pull requests are not
 sent to `kubernetes/ingress-nginx`, and the project is free to evolve its Go code, Lua
-code, nginx templates, Helm chart, Dockerfiles, GitHub Actions, and documentation.
+code, nginx templates, the NGINX base image, Helm chart, Dockerfiles, GitHub Actions, and
+documentation.
 
 ## Ownership model
 
@@ -12,57 +13,217 @@ code, nginx templates, Helm chart, Dockerfiles, GitHub Actions, and documentatio
 - `main` in this repository is the single source of truth.
 - Feature work happens on branches and is merged into `main` via pull requests **within
   this repository**. Pull requests are never opened against `kubernetes/ingress-nginx`.
-- The maintainer owns all runtime code, chart, build logic, and release process.
+- The maintainer owns all runtime code, the NGINX base image, chart, build logic, and
+  release process. Nothing is pulled from `registry.k8s.io/ingress-nginx` at release time.
+
+## Artifacts
+
+| Artifact | Location | Version source |
+|----------|----------|----------------|
+| Controller image | `ghcr.io/kuzmenko-pavel/ingress-nginx/controller` | release tag `vX.Y.Z` |
+| Controller-chroot image | `ghcr.io/kuzmenko-pavel/ingress-nginx/controller-chroot` | release tag `vX.Y.Z` |
+| kube-webhook-certgen | `ghcr.io/kuzmenko-pavel/ingress-nginx/kube-webhook-certgen` | `images/kube-webhook-certgen/TAG` |
+| Helm chart (OCI) | `oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx` | `charts/ingress-nginx/Chart.yaml` `.version` |
+| NGINX base image | `ghcr.io/kuzmenko-pavel/ingress-nginx/nginx` | `images/nginx/TAG` |
+| e2e test runner | `ghcr.io/kuzmenko-pavel/ingress-nginx/e2e-test-runner` | `images/test-runner/TAG` |
+
+**Published tags are immutable.** Workflows never overwrite an existing image tag or chart
+version; every content change needs a new version. The only exception is the explicit
+`force` input of the release workflow, meant to recover from a partially failed release.
+
+## NGINX base image
+
+The controller and controller-chroot images are built `FROM` the NGINX base image built
+from `images/nginx` (nginx, LuaJIT, modules and the patches in
+`images/nginx/rootfs/patches`).
+
+`images/nginx/TAG` is the **single source of truth** for its version.
+`hack/nginx-base-image.sh` prints the reference every consumer uses
+(`ghcr.io/kuzmenko-pavel/ingress-nginx/nginx:<TAG>`): the root `Makefile`, `images/Makefile`,
+the test runner, the e2e scripts, CI and the release workflow. There is no separately pinned
+digest to keep in sync; the digest used by a release is recorded in the release notes and
+in the controller image label `org.opencontainers.image.base.name`.
+
+### Changing nginx (patches, modules, versions)
+
+1. Change `images/nginx/rootfs/**` (for example add a patch to
+   `images/nginx/rootfs/patches/`; `build.sh` applies all of them in lexical order).
+2. Bump `images/nginx/TAG`. CI fails a pull request that changes `images/nginx/rootfs`
+   without a TAG bump.
+3. Change the controller side (template, Go, Lua) in the **same pull request** if it depends
+   on the new nginx behaviour. CI builds the base image from source for that pull request and
+   runs unit, chart and e2e tests on top of it, so the controller and its base are always
+   tested together.
+4. After merge, the **Base Images** workflow publishes the new tag. A release also publishes
+   it first if it is missing, so `main` is releasable right after the merge.
+
+Rebasing the patches onto a new `NGINX_VERSION` (in `images/nginx/rootfs/build.sh`) is the
+maintainer's responsibility: bump the version, rebase or drop every file in `patches/`,
+bump `images/nginx/TAG`, and let CI run the full e2e suite.
+
+The NGINX base takes a long time to compile (tens of minutes per architecture on a standard
+GitHub runner). CI builds it only when `images/nginx/**` changes or its tag is not published
+yet.
 
 ## Release model
 
-A release is produced by pushing a Git tag, then GitHub Actions builds and publishes the
-artifacts. Tags use plain SemVer:
+A release is produced by pushing a Git tag from a commit on `main` (or `release-*`):
 
 ```bash
-git tag v1.15.1
-git push origin v1.15.1
+# charts/ingress-nginx/Chart.yaml: appVersion: 1.15.2, version: <new chart version>
+git tag v1.15.2
+git push origin v1.15.2
 ```
 
-The workflow `.github/workflows/release.yaml` will:
+`.github/workflows/release.yaml` runs three jobs:
 
-1. Determine versions from the Git tag (release tag) and repository files (`certgen`, `chart`)
-2. Build and push the controller and controller-chroot images using the project's native
-   build logic: `make release REGISTRY=ghcr.io/kuzmenko-pavel/ingress-nginx` (multi-arch
-   `linux/amd64,linux/arm,linux/arm64` via Docker Buildx)
-3. Build and push `kube-webhook-certgen` natively: `cd images && make push NAME=kube-webhook-certgen REGISTRY=...`
-4. Resolve image digests and patch `charts/ingress-nginx/values.yaml` with GHCR registry,
-   tags (and digests when available) for packaging
-5. Run `helm lint` and `helm template` validation
-6. Package and push the Helm chart as an OCI artifact (`oci://ghcr.io/kuzmenko-pavel/charts`)
-7. Create a GitHub Release with a provenance block, image digest table, and chart attachment
-
-Auxiliary images (`images/**`) and the `nginx` base image are built and published natively
-by `.github/workflows/images.yaml` on changes under `images/`, pushed to the same GHCR
-namespace via `make`. There is no custom build-push wrapper — all image builds go through
-the repository `Makefile` / `images/Makefile`.
+1. **Preflight** (runs in the `release` environment, which is where a manual approval gate
+   belongs):
+   - the tag is `vX.Y.Z` and the tagged commit is on `main` / `release-*`;
+   - `Chart.yaml` `appVersion` equals the tag without `v`;
+   - `controller:vX.Y.Z`, `controller-chroot:vX.Y.Z` and the chart version are not published
+     yet;
+   - `kube-webhook-certgen` is rebuilt only if its `TAG` is new.
+2. **NGINX base**: calls `base-images.yaml`, which publishes `nginx:<images/nginx/TAG>` if it
+   does not exist (no-op otherwise).
+3. **Build and publish**:
+   - `make release` builds controller and controller-chroot on the base image pinned by
+     digest, with SBOM and provenance attestations;
+   - `make -C images push NAME=kube-webhook-certgen` (when new);
+   - signs every published image with keyless cosign;
+   - patches `charts/ingress-nginx/values.yaml` **in the workspace only** with GHCR
+     registry, tags and digests, then runs `helm lint` / `helm template`;
+   - pushes the chart to `oci://ghcr.io/kuzmenko-pavel/charts` and signs it;
+   - creates the GitHub Release with provenance, digests, the packaged chart and its
+     checksum.
 
 ### Manual trigger
 
-The workflow can also be run from the GitHub Actions UI (`workflow_dispatch`) with an
-explicit `tag` input and an optional `upstream_base` input (a base upstream tag/commit to
-record in the release provenance).
+`workflow_dispatch` takes an existing `tag`, an optional `upstream_base` (recorded in the
+release notes) and `force`. Use `force` only to re-run a release that failed after
+publishing some artifacts; it allows the controller tag and chart version to be pushed again.
+
+## Architectures
+
+| Platform | Status |
+|----------|--------|
+| `linux/amd64` | always built |
+| `linux/arm64` | opt-in |
+| `linux/arm` (armv7) | not supported |
+
+### Enabling arm64 in this repository
+
+Set the repository variable `ENABLE_ARM64` to `true`
+(*Settings → Secrets and variables → Actions → Variables*). From then on:
+
+- **Base Images** builds the NGINX base on a native `ubuntu-24.04-arm` runner (no QEMU) and
+  merges both architectures into one tag;
+- **Release** builds controller, chroot and certgen for `linux/amd64,linux/arm64` (these are
+  cross-compiled Go binaries plus a thin image layer, so QEMU is sufficient).
+
+Because published tags are immutable, arm64 applies to **new** tags only. If the current
+`images/nginx/TAG` is published for amd64 only, bump it (and `images/test-runner/TAG` for the
+test runner), otherwise the release preflight fails with an explicit message. `Base Images`
+can also be run manually with the `arm64` input.
+
+### Building arm64 images yourself
+
+Users who need arm64 while it is disabled here can build the whole chain into their own
+registry. Every Makefile takes `REGISTRY` and `PLATFORMS`; the base image repository is
+overridden with `NGINX_BASE_REPOSITORY`.
+
+```bash
+export REGISTRY=registry.example.com/ingress-nginx
+export NGINX_BASE_REPOSITORY=${REGISTRY}/nginx
+
+# 1. NGINX base (build on an arm64 host, or add linux/amd64 for a multi-arch tag)
+make -C images/nginx push REGISTRY=${REGISTRY} PLATFORMS=linux/arm64
+
+# 2. Controller + chroot on top of it (Go binaries are cross-compiled)
+make release REGISTRY=${REGISTRY} TAG=v1.15.2 \
+  PLATFORMS="arm64" BUILDX_PLATFORMS=linux/arm64
+
+# 3. Admission webhook cert generator
+make -C images push NAME=kube-webhook-certgen REGISTRY=${REGISTRY} PLATFORMS=linux/arm64
+
+# 4. Point the chart at your registry
+helm install ingress-nginx oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx \
+  --set controller.image.registry=registry.example.com \
+  --set controller.image.image=ingress-nginx/controller \
+  --set controller.image.tag=v1.15.2 --set controller.image.digest= \
+  --set controller.admissionWebhooks.patch.image.registry=registry.example.com \
+  --set controller.admissionWebhooks.patch.image.image=ingress-nginx/kube-webhook-certgen \
+  --set controller.admissionWebhooks.patch.image.digest=
+```
+
+Compiling the NGINX base under QEMU emulation takes hours; use a native arm64 machine.
+
+## Workflows
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `release.yaml` | tag `vX.Y.Z`, manual | Release (see above). |
+| `base-images.yaml` | push to `main` under `images/nginx/**`, `images/test-runner/**`; manual; called by release | Publishes the NGINX base and the e2e test runner when their tags are new. |
+| `images.yaml` + `zz-tmpl-images.yaml` | changes under `images/**` | Builds/tests auxiliary images; pushes them on `main` when their `TAG` changes. |
+| `ci.yaml` + `zz-tmpl-k8s-e2e.yaml` | pull requests, push to `main` | Lint, unit, chart and kind e2e tests. |
+| `vulnerability-scans.yaml` | weekly, on release | Trivy scan of the three latest controller releases. |
 
 ## Versioning policy
 
 - Releases use plain SemVer tags, e.g. `v1.15.1`, `v1.15.2`, `v1.16.0` — no vendor suffixes.
-- The Helm chart version uses plain SemVer, e.g. `4.15.1`, set in
-  `charts/ingress-nginx/Chart.yaml` `.version`.
-- Image tags always match the release tag.
+- Controller image tags equal the release tag; `Chart.yaml` `appVersion` equals the tag
+  without `v` (enforced).
+- The Helm chart uses its own plain SemVer version in `Chart.yaml` `.version` and must be
+  bumped for every release (enforced: a published version is never overwritten).
+- `images/*/TAG` versions the base, test runner, certgen and auxiliary images.
 - When the base upstream commit/tag is known, record it in the release notes (via the
   `upstream_base` input or an `UPSTREAM_BASE` file at the repository root).
 
-## Provenance
+## Provenance and verification
 
-Provenance is captured in two places:
+- OCI labels: `org.opencontainers.image.source`, `.revision`, `.version`, and
+  `.base.name` (the NGINX base reference with digest) on the controller image.
+- SBOM and SLSA provenance attestations are attached to the controller, chroot, certgen and
+  NGINX base images (`docker buildx build --sbom=true --provenance=mode=max`).
+- Images, the NGINX base, the test runner and the chart are signed with keyless cosign
+  (GitHub Actions OIDC; no long-lived keys).
 
-- OCI image labels: `org.opencontainers.image.source`, `.revision`, `.version`.
-- GitHub Release notes: repository, commit SHA, and the optional upstream base reference.
+```bash
+IMAGE=ghcr.io/kuzmenko-pavel/ingress-nginx/controller:v1.15.2
+
+cosign verify "${IMAGE}" \
+  --certificate-identity-regexp '^https://github.com/Kuzmenko-Pavel/ingress-nginx/\.github/workflows/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+docker buildx imagetools inspect "${IMAGE}" --format '{{ json .SBOM }}'
+docker buildx imagetools inspect "${IMAGE}" --format '{{ json .Provenance }}'
+```
+
+## GitHub settings
+
+Settings required or recommended for this repository:
+
+| Where | Setting |
+|-------|---------|
+| Package settings of each GHCR package (profile → *Packages* → package → *Package settings*) | *Change visibility → Public* (irreversible). *Manage Actions access*: add `Kuzmenko-Pavel/ingress-nginx` with **Write** (or *Inherit access from source repository*). Applies to `controller`, `controller-chroot`, `kube-webhook-certgen`, `nginx`, `e2e-test-runner` and `charts/ingress-nginx`. New packages are created on the first push; make them public right after. |
+| *Settings → Actions → General* | Workflow permissions: *Read repository contents* (workflows request `packages`/`contents`/`id-token` write explicitly). Optionally *Require actions to be pinned to a full-length commit SHA*. |
+| *Settings → Environments → `release`* | Required reviewers (manual approval before publishing); deployment tags `v*`. |
+| *Settings → Secrets and variables → Actions → Variables* | `ENABLE_ARM64=true` to publish arm64 (optional). |
+| *Settings → Rules → Rulesets* | Tag ruleset for `v*`: restrict creation, update and deletion to maintainers. Branch ruleset for `main`: pull request required, required status checks, no force-push. |
+| *Settings → General → Releases* | Enable release immutability. |
+
+CI pulls the NGINX base anonymously, so the `nginx` package must be public for pull
+requests to reuse it instead of rebuilding.
+
+## First-time bootstrap
+
+1. Merge the change that introduces `base-images.yaml`; the push to `main` publishes
+   `nginx:<images/nginx/TAG>` and then `e2e-test-runner:<images/test-runner/TAG>`
+   (or run **Base Images** manually with `images: all`).
+2. Make both new packages public and grant the repository write access (see above).
+3. Switch the e2e test runner references (`build/run-in-docker.sh`,
+   `test/e2e-image/Makefile`, `test/e2e/run-chart-test.sh`) from `registry.k8s.io` to the
+   published runner.
 
 ## Optional upstream reference
 
@@ -76,32 +237,6 @@ git fetch upstream-archive --tags
 git cherry-pick <commit-sha>
 ```
 
-## GHCR artifacts
-
-| Artifact | Location |
-|----------|----------|
-| Controller image | `ghcr.io/kuzmenko-pavel/ingress-nginx/controller` |
-| Controller-chroot image | `ghcr.io/kuzmenko-pavel/ingress-nginx/controller-chroot` |
-| kube-webhook-certgen | `ghcr.io/kuzmenko-pavel/ingress-nginx/kube-webhook-certgen` |
-| Helm chart (OCI) | `ghcr.io/kuzmenko-pavel/charts/ingress-nginx` |
-
-Install via the OCI Helm chart:
-
-```bash
-helm install ingress-nginx \
-  oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx \
-  --version 4.15.1 \
-  --namespace ingress-nginx \
-  --create-namespace
-```
-
-Verify an image digest:
-
-```bash
-docker buildx imagetools inspect \
-  ghcr.io/kuzmenko-pavel/ingress-nginx/controller:v1.15.1
-```
-
 ## Local development workflow
 
 ```bash
@@ -112,6 +247,5 @@ git push origin feature/my-change
 ```
 
 - `main` is the source of truth; changes land via PR into `main`.
-- Committed chart values (`charts/ingress-nginx/values.yaml`) may be changed in the future
-  when the maintained distribution requires it; the release workflow may additionally patch
-  them at runtime for packaging convenience.
+- Committed chart values (`charts/ingress-nginx/values.yaml`) keep generic defaults; the
+  release workflow patches registry, tags and digests at packaging time only.

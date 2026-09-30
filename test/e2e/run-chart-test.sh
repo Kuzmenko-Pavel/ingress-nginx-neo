@@ -51,7 +51,7 @@ export ARCH=${ARCH:-amd64}
 export REGISTRY=ingress-controller
 
 BASEDIR=$(dirname "$0")
-NGINX_BASE_IMAGE=$(cat $BASEDIR/../../NGINX_BASE)
+NGINX_BASE_IMAGE=${NGINX_BASE_IMAGE:-$("$BASEDIR"/../../hack/nginx-base-image.sh)}
 
 echo "Running e2e with nginx base image ${NGINX_BASE_IMAGE}"
 

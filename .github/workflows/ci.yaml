@@ -43,6 +43,8 @@ jobs:
       go: ${{ steps.filter.outputs.go }}
       charts: ${{ steps.filter.outputs.charts }}
       baseimage: ${{ steps.filter.outputs.baseimage }}
+      baseimagesrc: ${{ steps.filter.outputs.baseimagesrc }}
+      baseimagetag: ${{ steps.filter.outputs.baseimagetag }}
 
     steps:
 
@@ -61,18 +63,35 @@ jobs:
               - 'rootfs/**/*'
               - 'TAG'
               - 'test/e2e/**/*'
-              - 'NGINX_BASE'
+              - 'hack/nginx-base-image.sh'
             charts:
               - 'charts/ingress-nginx/Chart.yaml'
               - 'charts/ingress-nginx/**/*'
-              - 'NGINX_BASE'
             baseimage:
-              - 'NGINX_BASE'
               - 'images/nginx/**'
+              - 'hack/nginx-base-image.sh'
+            baseimagesrc:
+              - 'images/nginx/rootfs/**'
+            baseimagetag:
+              - 'images/nginx/TAG'
             docs:
               - '**/*.md'
             lua:
               - '**/*.lua'
+
+  base-image-tag:
+    name: NGINX base / tag bump
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.baseimagesrc == 'true'
+    steps:
+      # Published base image tags are immutable (see hack/nginx-base-image.sh), so a change
+      # to the image sources must come with a new images/nginx/TAG.
+      - name: Require images/nginx/TAG bump
+        if: needs.changes.outputs.baseimagetag != 'true'
+        run: |
+          echo "::error::images/nginx/rootfs changed but images/nginx/TAG was not bumped"
+          exit 1
 
   lua-lint:
     runs-on: ubuntu-latest
@@ -176,30 +195,50 @@ jobs:
           chmod +x ./kubectl
           sudo mv ./kubectl /usr/local/bin/kubectl
 
-      - name: Build NGINX Base image
-        if: |
-          needs.changes.outputs.baseimage == 'true'
+      - name: Resolve NGINX base image
+        id: base
         run: |
-            export TAG=$(cat images/nginx/TAG)
-            cd images/nginx/rootfs && docker buildx build --platform=${{ env.PLATFORMS }} --load -t registry.k8s.io/ingress-nginx/nginx:${TAG} .
+          BASE_IMAGE="$(hack/nginx-base-image.sh)"
+          echo "image=${BASE_IMAGE}" >> "$GITHUB_OUTPUT"
+
+          # Build the base from source when it changed or is not published yet (e.g. a new
+          # images/nginx/TAG before the Base Images workflow ran); otherwise pull it.
+          if [ "${{ needs.changes.outputs.baseimage }}" = "true" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            rc=0; hack/image-exists.sh "${BASE_IMAGE}" || rc=$?
+            case ${rc} in
+              0) echo "build=false" >> "$GITHUB_OUTPUT" ;;
+              1) echo "build=true" >> "$GITHUB_OUTPUT" ;;
+              *) exit 1 ;;
+            esac
+          fi
+
+      - name: Build NGINX Base image
+        if: steps.base.outputs.build == 'true'
+        run: |
+          cd images/nginx/rootfs && docker buildx build --platform=${{ env.PLATFORMS }} --load -t "${{ steps.base.outputs.image }}" .
 
       - name: Build images
         env:
           TAG: 1.0.0-dev
           ARCH: amd64
           REGISTRY: ingress-controller
+          # Use the local docker image store so a locally built base image is picked up.
+          BUILDX_BUILDER: default
         run: |
           echo "building images..."
-          export TAGNGINX=$(cat images/nginx/TAG)
-          make BASE_IMAGE=registry.k8s.io/ingress-nginx/nginx:${TAGNGINX} clean-image build image image-chroot
+          make BASE_IMAGE="${{ steps.base.outputs.image }}" clean-image build image image-chroot
           make -C test/e2e-image image
 
           echo "creating images cache..."
-          docker save \
-            nginx-ingress-controller:e2e \
-            ingress-controller/controller:1.0.0-dev \
-            ingress-controller/controller-chroot:1.0.0-dev \
-            | gzip > docker.tar.gz
+          IMAGES="nginx-ingress-controller:e2e ingress-controller/controller:1.0.0-dev ingress-controller/controller-chroot:1.0.0-dev"
+          if [ "${{ steps.base.outputs.build }}" = "true" ]; then
+            # Not published yet: ship it to the e2e jobs, run-kind-e2e.sh loads it into kind.
+            IMAGES="${IMAGES} ${{ steps.base.outputs.image }}"
+          fi
+          # shellcheck disable=SC2086 # IMAGES is a space separated list
+          docker save ${IMAGES} | gzip > docker.tar.gz
 
       - name: cache
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
