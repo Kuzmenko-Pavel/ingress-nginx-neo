@@ -39,7 +39,7 @@ shift
 if ! OUT=$(docker buildx imagetools inspect "${REF}" --format '{{json .Manifest}}' 2>&1); then
   # GHCR answers "denied" / 403 for packages that do not exist yet; a real permission problem
   # surfaces later as a failed push, so it cannot lead to an overwrite.
-  if echo "${OUT}" | grep -qiE 'not found|manifest unknown|name unknown|denied|403 Forbidden'; then
+  if grep -qiE 'not found|manifest unknown|name unknown|denied|403 Forbidden' <<< "${OUT}"; then
     echo "${REF}: not published" >&2
     exit 1
   fi

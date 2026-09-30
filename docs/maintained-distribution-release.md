@@ -178,7 +178,7 @@ Digests stay pinned, so the mirror must preserve them (`crane copy` / `skopeo co
 | `base-images.yaml` | push to `main` under `images/nginx/**`, `images/test-runner/**`; manual; called by release | Publishes the NGINX base and the e2e test runner when their tags are new. |
 | `images.yaml` + `zz-tmpl-images.yaml` | changes under `images/**` | Builds/tests auxiliary images; pushes them on `main` when their `TAG` changes. |
 | `ci.yaml` + `zz-tmpl-k8s-e2e.yaml` | pull requests, push to `main` | Lint, unit, chart and kind e2e tests. |
-| `vulnerability-scans.yaml` | weekly, on release | Trivy scan of the three latest controller releases. |
+| `vulnerability-scans.yaml` | weekly, after Release, manual | Trivy scan of every published image of the latest release (controller, chroot, certgen, custom-error-pages, NGINX base). Fixable vulnerabilities only; one code-scanning category `trivy-<image>` per image, so a newer release's scan closes fixed alerts. |
 
 ## Supported Kubernetes versions
 
