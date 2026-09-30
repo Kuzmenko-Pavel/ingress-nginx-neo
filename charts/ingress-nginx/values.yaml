@@ -1036,13 +1036,16 @@ defaultBackend:
   enabled: false
   name: defaultbackend
   image:
-    # -- The default backend image is not built by this distribution; it is pulled from upstream.
-    registry: registry.k8s.io
-    image: defaultbackend-amd64
+    # registry: ghcr.io
+    # -- Default backend image: custom-error-pages from this distribution (404 for unknown hosts/paths, /healthz, /metrics).
+    image: kuzmenko-pavel/ingress-nginx/custom-error-pages
     ## for backwards compatibility consider setting the full image url via the repository value below
     ## use *either* current default registry/image or repository format or installing chart by providing the values.yaml will fail
     ## repository:
-    tag: "1.5"
+    # -- Image tag; equals images/custom-error-pages/TAG (checked by the release workflow).
+    tag: v1.3.0
+    # -- Image digest. Empty in git: the released chart pins the digest of the published image.
+    digest: ""
     pullPolicy: IfNotPresent
     runAsNonRoot: true
     # nobody user -> uid 65534

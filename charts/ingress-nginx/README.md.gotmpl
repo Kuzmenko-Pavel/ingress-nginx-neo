@@ -1,5 +1,5 @@
 {{ template "chart.header" . }}
-[ingress-nginx](https://github.com/kubernetes/ingress-nginx) Ingress controller for Kubernetes using NGINX as a reverse proxy and load balancer
+[ingress-nginx](https://github.com/Kuzmenko-Pavel/ingress-nginx) Ingress controller for Kubernetes using NGINX as a reverse proxy and load balancer (self-maintained distribution of the retired `kubernetes/ingress-nginx`)
 
 {{ template "chart.versionBadge" . }}{{ template "chart.typeBadge" . }}{{ template "chart.appVersionBadge" . }}
 
@@ -9,20 +9,37 @@ This chart bootstraps an ingress-nginx deployment on a [Kubernetes](http://kuber
 
 {{ template "chart.requirementsSection" . }}
 
-## Get Repo Info
-
-```console
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
-```
-
 ## Install Chart
 
-**Important:** only helm3 is supported
+The chart is published as an OCI artifact (Helm 3.8+). All default images are published by this
+distribution for `linux/amd64` and `linux/arm64`, signed with cosign, and pinned by digest in the
+packaged chart; no image overrides are needed.
 
 ```console
-helm install [RELEASE_NAME] ingress-nginx/ingress-nginx
+helm install [RELEASE_NAME] oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx \
+  --version {{ template "chart.version" . }} \
+  --namespace ingress-nginx --create-namespace
 ```
+
+Show the chart or its default values:
+
+```console
+helm show chart oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx --version {{ template "chart.version" . }}
+helm show values oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx --version {{ template "chart.version" . }}
+```
+
+### Migrating from the kubernetes/ingress-nginx chart
+
+Chart name, values and resources are the same; only the chart source and the default images change:
+
+```console
+helm upgrade [RELEASE_NAME] oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx \
+  --version {{ template "chart.version" . }} --reuse-values
+```
+
+Remove image overrides you set yourself (`global.image.registry`, `controller.image.*`,
+`controller.admissionWebhooks.patch.image.*`, `defaultBackend.image.*`) unless they point to a
+mirror of this distribution's images.
 
 The command deploys ingress-nginx on the Kubernetes cluster in the default configuration.
 

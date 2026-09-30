@@ -1,6 +1,6 @@
 # ingress-nginx
 
-[ingress-nginx](https://github.com/kubernetes/ingress-nginx) Ingress controller for Kubernetes using NGINX as a reverse proxy and load balancer
+[ingress-nginx](https://github.com/Kuzmenko-Pavel/ingress-nginx) Ingress controller for Kubernetes using NGINX as a reverse proxy and load balancer (self-maintained distribution of the retired `kubernetes/ingress-nginx`)
 
 ![Version: 4.15.2](https://img.shields.io/badge/Version-4.15.2-informational?style=flat-square) ![AppVersion: 1.15.2](https://img.shields.io/badge/AppVersion-1.15.2-informational?style=flat-square)
 
@@ -12,20 +12,37 @@ This chart bootstraps an ingress-nginx deployment on a [Kubernetes](http://kuber
 
 Kubernetes: `>=1.21.0-0`
 
-## Get Repo Info
-
-```console
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
-```
-
 ## Install Chart
 
-**Important:** only helm3 is supported
+The chart is published as an OCI artifact (Helm 3.8+). All default images are published by this
+distribution for `linux/amd64` and `linux/arm64`, signed with cosign, and pinned by digest in the
+packaged chart; no image overrides are needed.
 
 ```console
-helm install [RELEASE_NAME] ingress-nginx/ingress-nginx
+helm install [RELEASE_NAME] oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx \
+  --version 4.15.2 \
+  --namespace ingress-nginx --create-namespace
 ```
+
+Show the chart or its default values:
+
+```console
+helm show chart oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx --version 4.15.2
+helm show values oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx --version 4.15.2
+```
+
+### Migrating from the kubernetes/ingress-nginx chart
+
+Chart name, values and resources are the same; only the chart source and the default images change:
+
+```console
+helm upgrade [RELEASE_NAME] oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx \
+  --version 4.15.2 --reuse-values
+```
+
+Remove image overrides you set yourself (`global.image.registry`, `controller.image.*`,
+`controller.admissionWebhooks.patch.image.*`, `defaultBackend.image.*`) unless they point to a
+mirror of this distribution's images.
 
 The command deploys ingress-nginx on the Kubernetes cluster in the default configuration.
 
@@ -530,15 +547,15 @@ metadata:
 | defaultBackend.extraVolumeMounts | list | `[]` |  |
 | defaultBackend.extraVolumes | list | `[]` |  |
 | defaultBackend.image.allowPrivilegeEscalation | bool | `false` |  |
-| defaultBackend.image.image | string | `"defaultbackend-amd64"` |  |
+| defaultBackend.image.digest | string | `""` | Image digest. Empty in git: the released chart pins the digest of the published image. |
+| defaultBackend.image.image | string | `"kuzmenko-pavel/ingress-nginx/custom-error-pages"` | Default backend image: custom-error-pages from this distribution (404 for unknown hosts/paths, /healthz, /metrics). |
 | defaultBackend.image.pullPolicy | string | `"IfNotPresent"` |  |
 | defaultBackend.image.readOnlyRootFilesystem | bool | `true` |  |
-| defaultBackend.image.registry | string | `"registry.k8s.io"` | The default backend image is not built by this distribution; it is pulled from upstream. |
 | defaultBackend.image.runAsGroup | int | `65534` |  |
 | defaultBackend.image.runAsNonRoot | bool | `true` |  |
 | defaultBackend.image.runAsUser | int | `65534` |  |
 | defaultBackend.image.seccompProfile.type | string | `"RuntimeDefault"` |  |
-| defaultBackend.image.tag | string | `"1.5"` |  |
+| defaultBackend.image.tag | string | `"v1.3.0"` | Image tag; equals images/custom-error-pages/TAG (checked by the release workflow). |
 | defaultBackend.labels | object | `{}` | Labels to be added to the default backend resources |
 | defaultBackend.livenessProbe.failureThreshold | int | `3` |  |
 | defaultBackend.livenessProbe.initialDelaySeconds | int | `30` |  |

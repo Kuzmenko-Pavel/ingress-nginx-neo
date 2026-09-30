@@ -5,9 +5,10 @@ name: Base Images
 # already published is never rebuilt or overwritten, so every content change needs a TAG
 # bump (enforced for images/nginx by ci.yaml).
 #
-# Architectures: linux/amd64 always; linux/arm64 when the `arm64` input is true or the
-# repository variable ENABLE_ARM64 is "true". Each architecture of the NGINX base is built
-# on a native runner (no QEMU) and merged into one multi-platform tag.
+# Architectures: the NGINX base is published for linux/amd64 and linux/arm64 (each built on a
+# native runner, no QEMU, merged into one multi-platform tag). Set the repository variable
+# DISABLE_ARM64 to "true" to publish linux/amd64 only. The e2e test runner is CI tooling and
+# is published for linux/amd64 only.
 
 on:
   push:
@@ -28,9 +29,9 @@ on:
           - test-runner
         default: all
       arm64:
-        description: 'Also build linux/arm64 (defaults to the ENABLE_ARM64 repository variable)'
+        description: 'Also build linux/arm64'
         type: boolean
-        default: false
+        default: true
 
   workflow_call:
     inputs:
@@ -39,7 +40,7 @@ on:
         default: nginx
       arm64:
         type: boolean
-        default: false
+        default: true
       ref:
         description: 'Git ref to build from (defaults to the caller ref)'
         type: string
@@ -86,7 +87,8 @@ jobs:
         id: plan
         env:
           IMAGES: ${{ inputs.images || 'all' }}
-          ARM64: ${{ inputs.arm64 || vars.ENABLE_ARM64 == 'true' }}
+          # push: repository default; workflow_dispatch / workflow_call: the arm64 input.
+          ARM64: ${{ (github.event_name == 'push' && vars.DISABLE_ARM64 != 'true') || (github.event_name != 'push' && inputs.arm64) }}
         run: |
           if [ "${ARM64}" = "true" ]; then
             PLATFORMS="linux/amd64 linux/arm64"
@@ -101,22 +103,22 @@ jobs:
 
           # Prints "true" when the image has to be published.
           plan() {
-            local name=$1 ref=$2 rc=0
+            local name=$1 ref=$2 platforms=$3 rc=0
             if [ "${IMAGES}" != "all" ] && [ "${IMAGES}" != "${name}" ]; then
               echo false; return
             fi
-            # shellcheck disable=SC2086 # PLATFORMS is a space separated list
-            hack/image-exists.sh "${ref}" ${PLATFORMS} || rc=$?
+            # shellcheck disable=SC2086 # platforms is a space separated list
+            hack/image-exists.sh "${ref}" ${platforms} || rc=$?
             case ${rc} in
               0) echo "::notice::${ref} is already published, skipping" >&2; echo false ;;
               1) echo true ;;
-              3) echo "::error::${ref} is published without all of: ${PLATFORMS}. Published tags are immutable; bump the TAG to add a platform." >&2; exit 1 ;;
+              3) echo "::error::${ref} is published without all of: ${platforms}. Published tags are immutable; bump the TAG to add a platform." >&2; exit 1 ;;
               *) exit 1 ;;
             esac
           }
 
-          NGINX=$(plan nginx "${NGINX_IMAGE}")
-          RUNNER=$(plan test-runner "${RUNNER_IMAGE}")
+          NGINX=$(plan nginx "${NGINX_IMAGE}" "${PLATFORMS}")
+          RUNNER=$(plan test-runner "${RUNNER_IMAGE}" linux/amd64)
 
           {
             echo "nginx=${NGINX}"
@@ -270,10 +272,6 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
-      - name: Set up QEMU
-        if: contains(needs.plan.outputs.platforms, 'arm64')
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
         with:
@@ -293,7 +291,8 @@ jobs:
         env:
           # Not IMAGE: the Makefiles read IMAGE (repository without tag) from the environment.
           REF: ${{ needs.plan.outputs.test-runner-image }}
-          PLATFORMS: ${{ needs.plan.outputs.platforms }}
+          # CI tooling: amd64 only (GitHub-hosted CI runs on amd64).
+          PLATFORMS: linux/amd64
         run: |
           # The runner is built FROM the NGINX base, which must provide every platform.
           # shellcheck disable=SC2086 # one argument per platform

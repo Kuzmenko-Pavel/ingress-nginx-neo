@@ -82,6 +82,8 @@ jobs:
     uses: ./.github/workflows/zz-tmpl-images.yaml
     with:
       name: custom-error-pages
+      # Default backend of the chart: published (multi-arch, signed) by release.yaml.
+      publish: false
     secrets: inherit
 
   e2e-test-echo:

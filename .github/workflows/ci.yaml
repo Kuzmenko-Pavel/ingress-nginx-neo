@@ -72,6 +72,9 @@ jobs:
             charts:
               - 'charts/ingress-nginx/Chart.yaml'
               - 'charts/ingress-nginx/**/*'
+              - 'deploy/static/**'
+              - 'hack/generate-deploy-scripts.sh'
+              - 'hack/manifest-templates/**'
             baseimage:
               - 'images/nginx/**'
               - 'hack/nginx-base-image.sh'
@@ -309,6 +312,21 @@ jobs:
         run: |
           helm-docs --chart-search-root charts
           git diff --exit-code charts/ingress-nginx/README.md
+
+      - name: Check static deploy manifests
+        env:
+          KUBECTL_VERSION: v1.35.3
+          KUBECTL_SHA256: fd31c7d7129260e608f6faf92d5984c3267ad0b5ead3bced2fe125686e286ad6
+        run: |
+          # deploy/static is generated from the chart; the kubectl version pins the kustomize output.
+          curl -fsSLo "${RUNNER_TEMP}/kubectl" "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          echo "${KUBECTL_SHA256}  ${RUNNER_TEMP}/kubectl" | sha256sum --check --strict
+          chmod +x "${RUNNER_TEMP}/kubectl"
+          KUSTOMIZE="${RUNNER_TEMP}/kubectl kustomize" hack/generate-deploy-scripts.sh
+          if ! git diff --exit-code deploy/static; then
+            echo "::error::deploy/static is out of date; run: KUSTOMIZE='kubectl kustomize' hack/generate-deploy-scripts.sh"
+            exit 1
+          fi
 
       - name: Run tests
         run: helm unittest charts/ingress-nginx --file "tests/**/*_test.yaml"

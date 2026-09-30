@@ -10,9 +10,12 @@ Images:
 * ghcr.io/kuzmenko-pavel/ingress-nginx/controller:v1.15.2
 * ghcr.io/kuzmenko-pavel/ingress-nginx/controller-chroot:v1.15.2
 * ghcr.io/kuzmenko-pavel/ingress-nginx/kube-webhook-certgen:v1.6.10
+* ghcr.io/kuzmenko-pavel/ingress-nginx/custom-error-pages:v1.3.0 (chart default backend)
 * NGINX base: ghcr.io/kuzmenko-pavel/ingress-nginx/nginx:v2.2.10
 
-Digests, signatures (cosign keyless) and SBOM/provenance are listed in the GitHub Release.
+All images are published for `linux/amd64` and `linux/arm64`. Digests, signatures (cosign
+keyless) and SBOM/provenance are listed in the GitHub Release, together with static manifests
+per provider (`deploy-<provider>.yaml`).
 
 ### Security
 
@@ -33,6 +36,9 @@ Go:
 
 ### Behaviour changes
 
+* The Helm chart defaults to this distribution's images (`ghcr.io/kuzmenko-pavel/ingress-nginx`);
+  the default backend (when enabled) is `custom-error-pages` instead of `defaultbackend-amd64`.
+
 * Requests with more than 1000 header lines are rejected with HTTP 400 (`max_headers`).
 * The NGINX base is ABI-incompatible with third-party dynamic modules built against stock nginx 1.27.1.
 
@@ -40,7 +46,8 @@ Go:
 
 * NGINX base image, e2e test runner and all release artifacts are built by this repository's
   GitHub Actions; images and chart are signed with cosign and carry SBOM and provenance.
-* Default architecture `linux/amd64`; `linux/arm64` is opt-in (`ENABLE_ARM64`).
+* `linux/amd64` and `linux/arm64` for every image (the NGINX base is built on native runners).
+* Static manifests per provider are generated from the chart and attached to the release.
 * CI tests Kubernetes 1.34, 1.35 and 1.36 (EKS standard support window).
 
 **Full Changelog**: https://github.com/Kuzmenko-Pavel/ingress-nginx/compare/v1.15.1...v1.15.2

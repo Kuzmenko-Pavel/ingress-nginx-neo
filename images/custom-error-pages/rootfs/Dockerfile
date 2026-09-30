@@ -14,7 +14,11 @@
 
 ARG GOLANG_VERSION
 
-FROM golang:${GOLANG_VERSION}-alpine3.23 AS builder
+# Cross-compile on the build platform; only the final stage is per target platform.
+FROM --platform=$BUILDPLATFORM golang:${GOLANG_VERSION}-alpine3.23 AS builder
+
+ARG TARGETOS
+ARG TARGETARCH
 
 RUN apk update \
     && apk upgrade && apk add git
@@ -24,7 +28,7 @@ WORKDIR /go/src/k8s.io/ingress-nginx/images/custom-error-pages
 COPY . .
 
 RUN go get . && \
-    CGO_ENABLED=0 go build -a -installsuffix cgo \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -installsuffix cgo \
 	-ldflags "-s -w" \
 	-o nginx-errors .
 

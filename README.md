@@ -30,13 +30,50 @@ Do not use in multi-tenant Kubernetes production installations. This project ass
 users who can create Ingress objects are administrators of the cluster. See the
 [FAQ](docs/faq.md) for more.
 
-## Install (Helm, OCI)
+## Install
+
+Everything needed is published here: images for `linux/amd64` and `linux/arm64` (including AWS
+Graviton), signed with cosign, and a chart that references them by digest. No image overrides
+or builds are required.
+
+**Helm (OCI):**
 
 ```bash
 helm install ingress-nginx \
   oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx \
-  --version 4.15.1 \
+  --version 4.15.2 \
   --namespace ingress-nginx --create-namespace
+```
+
+**Static manifests** (attached to every [release](https://github.com/Kuzmenko-Pavel/ingress-nginx/releases)):
+
+```bash
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx/releases/download/v1.15.2/deploy-cloud.yaml
+```
+
+Providers: `aws`, `aws-nlb-with-tls-termination`, `baremetal`, `cloud`, `do`, `exoscale`,
+`kind`, `oracle`, `scw`.
+
+**Migrating from `kubernetes/ingress-nginx`:** the chart name, values and resources are the same;
+only the chart source and the default images change.
+
+```bash
+helm upgrade ingress-nginx oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx \
+  --version 4.15.2 --namespace ingress-nginx --reuse-values
+```
+
+Remove any image overrides you set yourself (`global.image.registry`, `controller.image.*`,
+`controller.admissionWebhooks.patch.image.*`, `defaultBackend.image.*`) unless they point to a
+mirror of these images; otherwise the chart defaults to this distribution's images.
+
+**Supported Kubernetes versions:** 1.34, 1.35, 1.36 (the Amazon EKS standard support window).
+
+**Verify an image:**
+
+```bash
+cosign verify ghcr.io/kuzmenko-pavel/ingress-nginx/controller:v1.15.2 \
+  --certificate-identity-regexp '^https://github.com/Kuzmenko-Pavel/ingress-nginx/\.github/workflows/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
 ## Published artifacts
@@ -46,7 +83,9 @@ helm install ingress-nginx \
 | Controller image | `ghcr.io/kuzmenko-pavel/ingress-nginx/controller` |
 | Controller-chroot image | `ghcr.io/kuzmenko-pavel/ingress-nginx/controller-chroot` |
 | kube-webhook-certgen | `ghcr.io/kuzmenko-pavel/ingress-nginx/kube-webhook-certgen` |
+| Default backend (custom-error-pages) | `ghcr.io/kuzmenko-pavel/ingress-nginx/custom-error-pages` |
 | Helm chart (OCI) | `oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx` |
+| Static manifests | GitHub Release assets `deploy-<provider>.yaml` |
 
 Release and versioning details: [`docs/maintained-distribution-release.md`](docs/maintained-distribution-release.md).
 Releases use plain SemVer tags (`vX.Y.Z`); image tags match the release tag.

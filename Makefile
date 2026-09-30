@@ -246,7 +246,7 @@ show-version:
 	echo -n $(TAG)
 
 BUILDER ?= ingress-nginx
-# amd64 is the only default release architecture. arm64 is opt-in, e.g.:
+# Local default: amd64 only. The release workflow builds amd64 + arm64, e.g.:
 #   make release PLATFORMS="amd64 arm64" BUILDX_PLATFORMS=linux/amd64,linux/arm64
 # The base image (BASE_IMAGE) must be published for every requested platform.
 PLATFORMS ?= amd64
