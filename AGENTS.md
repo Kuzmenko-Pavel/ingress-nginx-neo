@@ -107,7 +107,8 @@ Workflows in `.github/workflows/`:
   pinned in `.github/actions/setup-kind`.
 - `golangci-lint.yml`, `junit-reports.yaml`, `depreview.yaml`, `scorecards.yml`,
   `perftest.yaml` — lint/reporting/security/perf, all self-owned.
-- `vulnerability-scans.yaml` — Trivy scans of our published GHCR images / our `v*` tags.
+- `vulnerability-scans.yaml` — Trivy scan (fixable vulnerabilities only) of every published image of
+  the latest release, weekly and after `release.yaml`; one code-scanning category per image.
 
 Published artifacts:
 

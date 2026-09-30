@@ -69,7 +69,7 @@ var _ = framework.DescribeSetting("use-proxy-protocol", func() {
 		_, err = conn.Write([]byte(header))
 		assert.Nil(ginkgo.GinkgoT(), err, "unexpected error writing header")
 
-		_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: proxy-protocol\r\n\r\n"))
+		_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: proxy-protocol\r\nConnection: close\r\n\r\n"))
 		assert.Nil(ginkgo.GinkgoT(), err, "unexpected error writing request")
 
 		data, err := io.ReadAll(conn)
@@ -106,7 +106,7 @@ var _ = framework.DescribeSetting("use-proxy-protocol", func() {
 		_, err = conn.Write([]byte(header))
 		assert.Nil(ginkgo.GinkgoT(), err, "unexpected error writing header")
 
-		_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: proxy-protocol\r\n\r\n"))
+		_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: proxy-protocol\r\nConnection: close\r\n\r\n"))
 		assert.Nil(ginkgo.GinkgoT(), err, "unexpected error writing request")
 
 		data, err := io.ReadAll(conn)
@@ -148,7 +148,7 @@ var _ = framework.DescribeSetting("use-proxy-protocol", func() {
 		tlsConn := tls.Client(conn, tlsConfig)
 		defer tlsConn.Close()
 
-		_, err = tlsConn.Write([]byte("GET / HTTP/1.1\r\nHost: proxy-protocol\r\n\r\n"))
+		_, err = tlsConn.Write([]byte("GET / HTTP/1.1\r\nHost: proxy-protocol\r\nConnection: close\r\n\r\n"))
 		assert.Nil(ginkgo.GinkgoT(), err, "writing HTTP request")
 
 		data, err := io.ReadAll(tlsConn)
@@ -218,7 +218,7 @@ var _ = framework.DescribeSetting("use-proxy-protocol", func() {
 		_, err = conn.Write([]byte(header))
 		assert.Nil(ginkgo.GinkgoT(), err, "unexpected error writing header")
 
-		_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: proxy-protocol\r\n\r\n"))
+		_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: proxy-protocol\r\nConnection: close\r\n\r\n"))
 		assert.Nil(ginkgo.GinkgoT(), err, "unexpected error writing request")
 
 		_, err = io.ReadAll(conn)
@@ -258,7 +258,7 @@ var _ = framework.DescribeSetting("use-proxy-protocol", func() {
 			_, err = conn.Write([]byte(header))
 			assert.Nil(ginkgo.GinkgoT(), err, "unexpected error writing header")
 
-			_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: proxy-protocol\r\nX-Forwarded-For: 192.168.0.111\r\n\r\n"))
+			_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: proxy-protocol\r\nConnection: close\r\nX-Forwarded-For: 192.168.0.111\r\n\r\n"))
 			assert.Nil(ginkgo.GinkgoT(), err, "unexpected error writing request")
 
 			data, err := io.ReadAll(conn)
@@ -297,7 +297,7 @@ var _ = framework.DescribeSetting("use-proxy-protocol", func() {
 			_, err = conn.Write([]byte(header))
 			assert.Nil(ginkgo.GinkgoT(), err, "unexpected error writing header")
 
-			_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: proxy-protocol\r\nX-Forwarded-For: 192.168.0.111\r\n\r\n"))
+			_, err = conn.Write([]byte("GET / HTTP/1.1\r\nHost: proxy-protocol\r\nConnection: close\r\nX-Forwarded-For: 192.168.0.111\r\n\r\n"))
 			assert.Nil(ginkgo.GinkgoT(), err, "unexpected error writing request")
 
 			data, err := io.ReadAll(conn)
