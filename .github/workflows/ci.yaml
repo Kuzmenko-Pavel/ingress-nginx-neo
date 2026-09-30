@@ -376,12 +376,13 @@ jobs:
       k8s-version: ${{ matrix.k8s }}
       variation: "CHROOT"
 
-  # Single required status check for branch protection. Always runs (also when every
-  # other job was skipped by the path filters) and fails if any job failed or was
-  # cancelled; skipped jobs count as passed.
+  # Single required status check for branch protection. Runs even when the path filters
+  # skipped every other job, and fails if any job failed or was cancelled; skipped jobs count
+  # as passed. It does not run when the whole workflow run was cancelled (e.g. superseded by
+  # a newer push), so a superseded run does not report a failure.
   result:
     name: CI result
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     needs:
       - changes
