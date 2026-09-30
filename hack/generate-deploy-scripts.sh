@@ -19,10 +19,14 @@ if [ -n "$DEBUG" ]; then
 fi
 
 #set -o errexit
+set -o errexit
 set -o nounset
 set -o pipefail
 
-K8S_VERSION="1.22"
+# Oldest Kubernetes minor in the supported window (see docs/maintained-distribution-release.md).
+K8S_VERSION="${K8S_VERSION:-1.34}"
+# kustomize build command; "kubectl kustomize" works as well (used in CI, where kubectl is available).
+KUSTOMIZE="${KUSTOMIZE:-kustomize build}"
 
 DIR=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd -P)
 
@@ -51,7 +55,7 @@ do
   sed -i.bak '/app.kubernetes.io\/managed-by: Helm/d' $MANIFEST
   sed -i.bak '/helm.sh/d' $MANIFEST
 
-  kustomize --load-restrictor=LoadRestrictionsNone build . > ${OUTPUT_DIR}/deploy.yaml
+  ${KUSTOMIZE} --load-restrictor=LoadRestrictionsNone . > ${OUTPUT_DIR}/deploy.yaml
   rm $MANIFEST $MANIFEST.bak
   cd ~-
   # automatically generate the (unsupported) kustomization.yaml for each target

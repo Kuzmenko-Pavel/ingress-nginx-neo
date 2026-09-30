@@ -13,6 +13,10 @@ on:
       platforms-publish:
         type: string
         default: linux/amd64
+      publish:
+        description: 'Push the image on main when its TAG changes (false for images published by release.yaml)'
+        type: boolean
+        default: true
 
 env:
   PLATFORMS: ${{ inputs.platforms-test }}
@@ -20,6 +24,11 @@ env:
 permissions:
   contents: write
   packages: write
+
+# bash -eo pipefail: a failing command on the left of a pipe fails the step.
+defaults:
+  run:
+    shell: bash
 
 jobs:
   changestag:
@@ -71,7 +80,7 @@ jobs:
     name: Push
     needs: changestag
     if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changestag.outputs.tag == 'true')
+      (inputs.publish && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changestag.outputs.tag == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: write

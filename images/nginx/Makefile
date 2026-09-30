@@ -13,7 +13,7 @@
 # limitations under the License.
 
 BUILDER ?= ingress-nginx
-# amd64 is the only default architecture. arm64 is opt-in (PLATFORMS=linux/arm64 or
+# Local default: amd64 only. CI publishes amd64 + arm64 (PLATFORMS=linux/arm64 or
 # linux/amd64,linux/arm64); CI builds each architecture on a native runner and merges
 # the results with the `manifest` target.
 PLATFORMS ?= linux/amd64

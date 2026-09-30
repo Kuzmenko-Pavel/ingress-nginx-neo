@@ -85,8 +85,9 @@ Google Cloud Build (`cloudbuild.yaml`, removed here); the release workflow drive
 
 The NGINX base image (`images/nginx`) is ours: `images/nginx/TAG` is the single source of
 its version and `hack/nginx-base-image.sh` derives the reference used by the Makefiles, e2e
-scripts, CI and release. Default architecture is `linux/amd64`; `linux/arm64` is opt-in via
-the repository variable `ENABLE_ARM64=true`; armv7 is not supported. Details:
+scripts, CI and release. Published images are multi-platform `linux/amd64` + `linux/arm64`
+(the repository variable `DISABLE_ARM64=true` temporarily limits them to amd64; the e2e test
+runner is amd64 only); armv7 is not supported. Details:
 `docs/maintained-distribution-release.md`.
 
 Workflows in `.github/workflows/`:
@@ -95,8 +96,9 @@ Workflows in `.github/workflows/`:
   `release` environment (tag format, `appVersion` == tag, tagged commit on `main`, no
   overwrite of published controller tag / chart version), NGINX base via `base-images.yaml`
   (no-op if published), `make release` on the base pinned by digest with SBOM + provenance,
-  certgen only when its `TAG` is new, cosign keyless signing, `values.yaml` patched in the
-  workspace only, chart OCI to `oci://ghcr.io/kuzmenko-pavel/charts`, GitHub Release via `gh`.
+  certgen only when its `TAG` is new, cosign keyless signing, image digests pinned into
+  `values.yaml` in the workspace only, chart OCI to `oci://ghcr.io/kuzmenko-pavel/charts`,
+  GitHub Release via `gh`.
 - `base-images.yaml` — NGINX base (per-arch native runners, merged by digest) and e2e test
   runner; publishes only tags that are not published yet. Also called by `release.yaml`.
 - `images.yaml` + `zz-tmpl-images.yaml` — aux images, pushed to GHCR via `GITHUB_TOKEN`.
@@ -117,6 +119,8 @@ Published artifacts:
 | Helm chart (OCI) | `oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx` |
 | NGINX base | `ghcr.io/kuzmenko-pavel/ingress-nginx/nginx` |
 | e2e test runner | `ghcr.io/kuzmenko-pavel/ingress-nginx/e2e-test-runner` |
+| custom-error-pages (default backend) | `ghcr.io/kuzmenko-pavel/ingress-nginx/custom-error-pages` |
+| Static manifests | GitHub Release assets `deploy-<provider>.yaml` |
 
 ## Versioning
 
@@ -147,8 +151,15 @@ git push origin feature/<short-name>
   'kubernetes/ingress-nginx'` guards, DockerHub secrets (`DOCKERHUB_*`), `PROJECT_WRITER`
   (k8s org project board), krew-index publishing, or pushes to `registry.k8s.io` /
   `ingressnginx/*`. (`registry.k8s.io/.../nginx` as a *base image pull* in `ci.yaml` is fine.)
-- Do not commit registry/tag/digest edits to `charts/ingress-nginx/values.yaml`: the release
-  workflow patches it at runtime only. The committed file keeps generic defaults.
+- `charts/ingress-nginx/values.yaml` references this distribution's images:
+  `global.image.registry: ghcr.io`, `controller.image.image: kuzmenko-pavel/ingress-nginx/controller`
+  with `tag` = the release tag, and `admissionWebhooks.patch.image` = our kube-webhook-certgen with
+  `tag` = `images/kube-webhook-certgen/TAG`, and `defaultBackend.image` = our custom-error-pages
+  with `tag` = `images/custom-error-pages/TAG` (the release preflight enforces this). Keep the
+  committed `digest` / `digestChroot` fields empty; the release workflow pins digests at packaging
+  time only. A user must be able to `helm install` the chart with no image overrides.
+- `deploy/static` is generated (`KUSTOMIZE='kubectl kustomize' hack/generate-deploy-scripts.sh`);
+  regenerate it with the chart, CI fails when it is stale. Releases attach digest-pinned copies.
 - Do not force-push and do not rewrite history.
 - Commit messages and PR descriptions contain no AI attribution: no `Co-Authored-By`,
   `Claude-Session` or "Generated with Claude Code" trailers/footers.

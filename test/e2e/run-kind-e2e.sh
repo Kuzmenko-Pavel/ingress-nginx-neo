@@ -116,5 +116,12 @@ kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" "
 if docker image inspect "${NGINX_BASE_IMAGE}" > /dev/null 2>&1; then
   kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" "${NGINX_BASE_IMAGE}"
 fi
+# The admission/validations namespace overlays install the chart's default kube-webhook-certgen.
+# Preload it when it was built locally (CI builds it from the current revision), otherwise it is
+# pulled from the registry.
+CERTGEN_IMAGE=${CERTGEN_IMAGE:-ghcr.io/kuzmenko-pavel/ingress-nginx/kube-webhook-certgen:$(cat "${DIR}"/../../images/kube-webhook-certgen/TAG)}
+if docker image inspect "${CERTGEN_IMAGE}" > /dev/null 2>&1; then
+  kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" "${CERTGEN_IMAGE}"
+fi
 echo "[dev-env] running e2e tests..."
 make -C "${DIR}"/../../ e2e-test
