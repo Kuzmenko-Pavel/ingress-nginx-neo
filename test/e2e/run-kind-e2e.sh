@@ -63,7 +63,7 @@ echo "Running e2e with nginx base image ${NGINX_BASE_IMAGE}"
 if [ "${SKIP_CLUSTER_CREATION}" = "false" ]; then
   echo "[dev-env] creating Kubernetes cluster with kind"
 
-  export K8S_VERSION=${K8S_VERSION:-v1.35.1@sha256:05d7bcdefbda08b4e038f644c4df690cdac3fba8b06f8289f30e10026720a1ab}
+  export K8S_VERSION=${K8S_VERSION:-v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed}
 
   # delete the cluster if it exists
   if kind get clusters | grep "${KIND_CLUSTER_NAME}"; then

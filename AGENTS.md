@@ -101,6 +101,8 @@ Workflows in `.github/workflows/`:
   runner; publishes only tags that are not published yet. Also called by `release.yaml`.
 - `images.yaml` + `zz-tmpl-images.yaml` — aux images, pushed to GHCR via `GITHUB_TOKEN`.
 - `ci.yaml` + `zz-tmpl-k8s-e2e.yaml` — lint, unit, build, chart lint/test, kind e2e matrix.
+  The Kubernetes matrix follows the EKS standard support window (1.34–1.36); kind is
+  pinned in `.github/actions/setup-kind`.
 - `golangci-lint.yml`, `junit-reports.yaml`, `depreview.yaml`, `scorecards.yml`,
   `perftest.yaml` — lint/reporting/security/perf, all self-owned.
 - `vulnerability-scans.yaml` — Trivy scans of our published GHCR images / our `v*` tags.

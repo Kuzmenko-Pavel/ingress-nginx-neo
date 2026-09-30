@@ -168,6 +168,21 @@ Compiling the NGINX base under QEMU emulation takes hours; use a native arm64 ma
 | `ci.yaml` + `zz-tmpl-k8s-e2e.yaml` | pull requests, push to `main` | Lint, unit, chart and kind e2e tests. |
 | `vulnerability-scans.yaml` | weekly, on release | Trivy scan of the three latest controller releases. |
 
+## Supported Kubernetes versions
+
+Supported and tested Kubernetes minor versions follow the Amazon EKS **standard support**
+window (currently 1.34, 1.35, 1.36). CI runs the e2e, chart and certgen matrices only
+against these versions, using the latest `kindest/node` patch images of the pinned kind
+release.
+
+When EKS adds or retires a version in standard support:
+
+1. bump kind in `.github/actions/setup-kind/action.yml` (`version` and the `sha256` of
+   `kind-linux-amd64`) if the new node image needs a newer kind;
+2. update the `k8s` matrices in `ci.yaml` and `images.yaml`;
+3. update the default `K8S_VERSION` in `build/dev-env.sh`, `test/e2e/run-kind-e2e.sh` and
+   `test/e2e/run-chart-test.sh` (newest supported version, pinned by digest).
+
 ## Versioning policy
 
 - Releases use plain SemVer tags, e.g. `v1.15.1`, `v1.15.2`, `v1.16.0` — no vendor suffixes.
