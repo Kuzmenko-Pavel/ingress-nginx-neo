@@ -1,0 +1,27 @@
+name: Set up kind
+description: >
+  Installs a pinned, checksum-verified kind binary. The node images used by the e2e
+  matrices (kindest/node) are built per kind release, so kind and the Kubernetes versions
+  tested in CI are bumped together.
+
+inputs:
+  version:
+    description: kind release
+    default: v0.33.0
+  sha256:
+    description: sha256 of kind-linux-amd64 for that release
+    default: aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d
+
+runs:
+  using: composite
+  steps:
+    - name: Install kind ${{ inputs.version }}
+      shell: bash
+      env:
+        KIND_VERSION: ${{ inputs.version }}
+        KIND_SHA256: ${{ inputs.sha256 }}
+      run: |
+        curl -fsSLo "${RUNNER_TEMP}/kind" "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+        echo "${KIND_SHA256}  ${RUNNER_TEMP}/kind" | sha256sum --check --strict
+        sudo install -m 0755 "${RUNNER_TEMP}/kind" /usr/local/bin/kind
+        kind version

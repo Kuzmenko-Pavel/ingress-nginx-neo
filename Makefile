@@ -58,9 +58,9 @@ ifneq ($(PLATFORM),)
 	PLATFORM_FLAG="--platform"
 endif
 
-REGISTRY ?= us-central1-docker.pkg.dev/k8s-staging-images/ingress-nginx
+REGISTRY ?= ghcr.io/kuzmenko-pavel/ingress-nginx
 
-BASE_IMAGE ?= $(shell cat NGINX_BASE)
+BASE_IMAGE ?= $(shell hack/nginx-base-image.sh)
 
 GOARCH=$(ARCH)
 
@@ -246,8 +246,13 @@ show-version:
 	echo -n $(TAG)
 
 BUILDER ?= ingress-nginx
-PLATFORMS ?= amd64 arm arm64
-BUILDX_PLATFORMS ?= linux/amd64,linux/arm,linux/arm64
+# amd64 is the only default release architecture. arm64 is opt-in, e.g.:
+#   make release PLATFORMS="amd64 arm64" BUILDX_PLATFORMS=linux/amd64,linux/arm64
+# The base image (BASE_IMAGE) must be published for every requested platform.
+PLATFORMS ?= amd64
+BUILDX_PLATFORMS ?= linux/amd64
+# Extra docker buildx flags for release builds (e.g. "--sbom=true --provenance=mode=max").
+BUILDX_ARGS ?=
 
 .PHONY: release # Build a multi-arch docker image
 release: builder clean
@@ -263,6 +268,7 @@ release: builder clean
 		--pull \
 		--progress plain \
 		--platform $(BUILDX_PLATFORMS) \
+		$(BUILDX_ARGS) \
 		--build-arg BASE_IMAGE="$(BASE_IMAGE)" \
 		--build-arg VERSION="$(TAG)" \
 		--build-arg COMMIT_SHA="$(COMMIT_SHA)" \
@@ -275,7 +281,8 @@ release: builder clean
 		--push \
 		--pull \
 		--progress plain \
-		--platform $(BUILDX_PLATFORMS)  \
+		--platform $(BUILDX_PLATFORMS) \
+		$(BUILDX_ARGS) \
 		--build-arg BASE_IMAGE="$(BASE_IMAGE)" \
 		--build-arg VERSION="$(TAG)" \
 		--build-arg COMMIT_SHA="$(COMMIT_SHA)" \

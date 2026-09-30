@@ -52,6 +52,19 @@ jobs:
 
       - name: Build
         run: |
+          # Images built FROM the NGINX base need it published. It is missing only between a
+          # new images/nginx/TAG and its first publication by base-images.yaml, so defer the
+          # build instead of failing on an image that does not exist yet.
+          if grep -q 'BASE_IMAGE' "images/${{ inputs.name }}/rootfs/Dockerfile"; then
+            BASE_IMAGE="$(hack/nginx-base-image.sh)"
+            rc=0; hack/image-exists.sh "${BASE_IMAGE}" || rc=$?
+            case ${rc} in
+              0) ;;
+              1) echo "::warning::${BASE_IMAGE} is not published yet; skipping the ${{ inputs.name }} build until base-images.yaml publishes it"
+                 exit 0 ;;
+              *) exit 1 ;;
+            esac
+          fi
           cd images/ && make NAME=${{ inputs.name }} build
 
   image-push:

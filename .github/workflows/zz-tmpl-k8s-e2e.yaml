@@ -27,6 +27,9 @@ jobs:
         with:
           name: docker.tar.gz
 
+      - name: Set up kind
+        uses: ./.github/actions/setup-kind
+
       - name: Create Kubernetes ${{ inputs.k8s-version }} cluster
         id: kind
         run: |

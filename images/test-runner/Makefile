@@ -13,13 +13,13 @@
 # limitations under the License.
 
 BUILDER ?= ingress-nginx
-PLATFORMS ?= linux/amd64,linux/arm64
-REGISTRY ?= us-central1-docker.pkg.dev/k8s-staging-images/ingress-nginx
+PLATFORMS ?= linux/amd64
+REGISTRY ?= ghcr.io/kuzmenko-pavel/ingress-nginx
 IMAGE ?= $(REGISTRY)/e2e-test-runner
 TAG ?= $(shell cat TAG)
 
 DIR = $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-BASE_IMAGE ?= $(shell cat $(DIR)/../../NGINX_BASE)
+BASE_IMAGE ?= $(shell $(DIR)/../../hack/nginx-base-image.sh)
 GOLANG_VERSION ?= $(shell cat $(DIR)/../../GOLANG_VERSION)
 
 .PHONY: builder

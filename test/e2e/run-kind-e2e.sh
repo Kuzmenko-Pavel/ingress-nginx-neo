@@ -45,7 +45,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 export TAG=1.0.0-dev
 export ARCH=${ARCH:-amd64}
 export REGISTRY=ingress-controller
-NGINX_BASE_IMAGE=${NGINX_BASE_IMAGE:-$(cat "$DIR"/../../NGINX_BASE)}
+NGINX_BASE_IMAGE=${NGINX_BASE_IMAGE:-$("$DIR"/../../hack/nginx-base-image.sh)}
 export NGINX_BASE_IMAGE=$NGINX_BASE_IMAGE
 export DOCKER_CLI_EXPERIMENTAL=enabled
 export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/kind-config-$KIND_CLUSTER_NAME}"
@@ -63,7 +63,7 @@ echo "Running e2e with nginx base image ${NGINX_BASE_IMAGE}"
 if [ "${SKIP_CLUSTER_CREATION}" = "false" ]; then
   echo "[dev-env] creating Kubernetes cluster with kind"
 
-  export K8S_VERSION=${K8S_VERSION:-v1.35.1@sha256:05d7bcdefbda08b4e038f644c4df690cdac3fba8b06f8289f30e10026720a1ab}
+  export K8S_VERSION=${K8S_VERSION:-v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed}
 
   # delete the cluster if it exists
   if kind get clusters | grep "${KIND_CLUSTER_NAME}"; then
@@ -111,5 +111,10 @@ echo "[dev-env] copying docker images to cluster..."
 
 kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" nginx-ingress-controller:e2e
 kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" "${REGISTRY}"/controller:"${TAG}"
+# The e2e suite deploys pods from the NGINX base image. Preload it when it exists locally
+# (e.g. built from images/nginx in CI before it is published), otherwise it is pulled.
+if docker image inspect "${NGINX_BASE_IMAGE}" > /dev/null 2>&1; then
+  kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" "${NGINX_BASE_IMAGE}"
+fi
 echo "[dev-env] running e2e tests..."
 make -C "${DIR}"/../../ e2e-test

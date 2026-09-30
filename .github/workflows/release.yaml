@@ -1,5 +1,16 @@
 name: Release
 
+# Publishes a release from a vX.Y.Z tag: controller + controller-chroot, kube-webhook-certgen
+# (when its tag is new), the NGINX base image (when images/nginx/TAG is new), the Helm chart
+# (OCI) and a GitHub Release. Images and the chart are signed with keyless cosign and carry
+# SBOM + provenance attestations.
+#
+# Architectures: linux/amd64; linux/arm64 in addition when the repository variable
+# ENABLE_ARM64 is "true".
+#
+# The `preflight` job runs in the `release` environment: configure required reviewers on it
+# to get a manual approval gate before anything is published.
+
 on:
   push:
     tags:
@@ -7,36 +18,218 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v1.15.1)'
+        description: 'Existing release tag to (re)publish, e.g. v1.15.2'
         required: true
       upstream_base:
         description: 'Optional upstream base tag/commit for provenance (e.g. v1.15.0)'
         required: false
+      force:
+        description: 'Re-publish a controller tag / chart version that already exists (recovery after a partial failure)'
+        type: boolean
+        default: false
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 env:
   REGISTRY: ghcr.io/kuzmenko-pavel/ingress-nginx
   CHARTS_OCI: oci://ghcr.io/kuzmenko-pavel/charts
+  HELM_VERSION: v3.17.0
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build and publish
+  preflight:
+    name: Preflight
     runs-on: ubuntu-latest
-
+    environment: release
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      release_tag: ${{ steps.versions.outputs.release_tag }}
+      chart_version: ${{ steps.versions.outputs.chart_version }}
+      certgen_tag: ${{ steps.versions.outputs.certgen_tag }}
+      certgen_publish: ${{ steps.checks.outputs.certgen_publish }}
+      commit_sha: ${{ steps.versions.outputs.commit_sha }}
+      upstream_base: ${{ steps.versions.outputs.upstream_base }}
+      arm64: ${{ steps.versions.outputs.arm64 }}
     steps:
+      - name: Resolve release tag
+        id: tag
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          if ! echo "${RELEASE_TAG}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::tag '${RELEASE_TAG}' does not match vX.Y.Z"
+            exit 1
+          fi
+          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: refs/tags/${{ steps.tag.outputs.release_tag }}
           fetch-depth: 0
 
+      - name: Determine versions
+        id: versions
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.release_tag }}
+          UPSTREAM_BASE_INPUT: ${{ inputs.upstream_base }}
+          ARM64: ${{ vars.ENABLE_ARM64 == 'true' }}
+        run: |
+          CHART_VERSION="$(yq '.version' charts/ingress-nginx/Chart.yaml)"
+          APP_VERSION="$(yq '.appVersion' charts/ingress-nginx/Chart.yaml)"
+          CERTGEN_TAG="$(cat images/kube-webhook-certgen/TAG)"
+          COMMIT_SHA="$(git rev-parse HEAD)"
+
+          UPSTREAM_BASE="${UPSTREAM_BASE_INPUT}"
+          if [ -z "${UPSTREAM_BASE}" ] && [ -f UPSTREAM_BASE ]; then
+            UPSTREAM_BASE="$(cat UPSTREAM_BASE)"
+          fi
+
+          # The chart must describe exactly this release.
+          if [ "${APP_VERSION}" != "${RELEASE_TAG#v}" ]; then
+            echo "::error::charts/ingress-nginx/Chart.yaml appVersion '${APP_VERSION}' does not match tag '${RELEASE_TAG}'"
+            exit 1
+          fi
+
+          # Releases are cut from commits merged into main (or a release-* branch).
+          if ! git branch -r --contains "${COMMIT_SHA}" | grep -qE '^\s*origin/(main|release-.+)$'; then
+            echo "::error::${COMMIT_SHA} is not on origin/main or origin/release-*"
+            exit 1
+          fi
+
+          {
+            echo "release_tag=${RELEASE_TAG}"
+            echo "chart_version=${CHART_VERSION}"
+            echo "certgen_tag=${CERTGEN_TAG}"
+            echo "commit_sha=${COMMIT_SHA}"
+            echo "upstream_base=${UPSTREAM_BASE:-(not recorded)}"
+            echo "arm64=${ARM64}"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Release | \`${RELEASE_TAG}\` |"
+            echo "| Chart | \`${CHART_VERSION}\` |"
+            echo "| certgen | \`${CERTGEN_TAG}\` |"
+            echo "| NGINX base | \`$(hack/nginx-base-image.sh)\` |"
+            echo "| Commit | \`${COMMIT_SHA}\` |"
+            echo "| arm64 | ${ARM64} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check published artifacts
+        id: checks
+        env:
+          RELEASE_TAG: ${{ steps.versions.outputs.release_tag }}
+          CHART_VERSION: ${{ steps.versions.outputs.chart_version }}
+          CERTGEN_TAG: ${{ steps.versions.outputs.certgen_tag }}
+          FORCE: ${{ inputs.force == true }}
+        run: |
+          fail=0
+
+          # Controller tags and chart versions are immutable unless explicitly forced.
+          for image in controller controller-chroot; do
+            rc=0; hack/image-exists.sh "${REGISTRY}/${image}:${RELEASE_TAG}" || rc=$?
+            case ${rc} in
+              0) if [ "${FORCE}" = "true" ]; then echo "::warning::overwriting ${image}:${RELEASE_TAG} (force)"; else echo "::error::${REGISTRY}/${image}:${RELEASE_TAG} is already published"; fail=1; fi ;;
+              1) ;;
+              *) fail=1 ;;
+            esac
+          done
+
+          if OUT=$(helm show chart "${CHARTS_OCI}/ingress-nginx" --version "${CHART_VERSION}" 2>&1); then
+            if [ "${FORCE}" = "true" ]; then
+              echo "::warning::overwriting chart ${CHART_VERSION} (force)"
+            else
+              echo "::error::chart ${CHART_VERSION} is already published; bump charts/ingress-nginx/Chart.yaml version"
+              fail=1
+            fi
+          elif ! echo "${OUT}" | grep -qiE 'not found|manifest unknown|denied'; then
+            echo "::error::cannot query chart ${CHART_VERSION}: ${OUT}"
+            fail=1
+          fi
+
+          # certgen is released only when images/kube-webhook-certgen/TAG is new.
+          rc=0; hack/image-exists.sh "${REGISTRY}/kube-webhook-certgen:${CERTGEN_TAG}" || rc=$?
+          case ${rc} in
+            0) echo "certgen_publish=false" >> "$GITHUB_OUTPUT"; echo "::notice::kube-webhook-certgen:${CERTGEN_TAG} already published, reusing it" ;;
+            1) echo "certgen_publish=true" >> "$GITHUB_OUTPUT" ;;
+            *) fail=1 ;;
+          esac
+
+          exit ${fail}
+
+  base:
+    name: NGINX base
+    needs: preflight
+    uses: ./.github/workflows/base-images.yaml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    with:
+      images: nginx
+      arm64: ${{ needs.preflight.outputs.arm64 == 'true' }}
+      ref: refs/tags/${{ needs.preflight.outputs.release_tag }}
+
+  publish:
+    name: Build and publish
+    needs:
+      - preflight
+      - base
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write     # GitHub Release
+      packages: write     # GHCR images and chart
+      id-token: write     # keyless cosign signing
+    env:
+      RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
+      CHART_VERSION: ${{ needs.preflight.outputs.chart_version }}
+      CERTGEN_TAG: ${{ needs.preflight.outputs.certgen_tag }}
+      COMMIT_SHA: ${{ needs.preflight.outputs.commit_sha }}
+      BUILDX_ARGS: --sbom=true --provenance=mode=max
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: refs/tags/${{ needs.preflight.outputs.release_tag }}
+
+      - name: Select platforms
+        id: platforms
+        run: |
+          if [ "${{ needs.preflight.outputs.arm64 }}" = "true" ]; then
+            echo "arch=amd64 arm64" >> "$GITHUB_OUTPUT"
+            echo "buildx=linux/amd64,linux/arm64" >> "$GITHUB_OUTPUT"
+          else
+            echo "arch=amd64" >> "$GITHUB_OUTPUT"
+            echo "buildx=linux/amd64" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        if: needs.preflight.outputs.arm64 == 'true'
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
         with:
           version: latest
 
@@ -45,169 +238,174 @@ jobs:
         run: echo "version=$(cat GOLANG_VERSION)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
           go-version: ${{ steps.golang.outputs.version }}
           check-latest: true
 
-      - name: Login to GHCR
-        uses: docker/login-action@v3
+      - name: Set up Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Determine versions
-        id: versions
+      - name: Resolve NGINX base image
+        id: base
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            RELEASE_TAG="${{ github.event.inputs.tag }}"
-          else
-            RELEASE_TAG="${{ github.ref_name }}"
-          fi
+          BASE="$(hack/nginx-base-image.sh)"
+          PLATFORMS="${{ steps.platforms.outputs.buildx }}"
+          # shellcheck disable=SC2086 # one argument per platform
+          hack/image-exists.sh "${BASE}" ${PLATFORMS//,/ }
+          DIGEST=$(docker buildx imagetools inspect "${BASE}" --format '{{json .Manifest}}' | jq -r .digest)
+          echo "image=${BASE}@${DIGEST}" >> "$GITHUB_OUTPUT"
 
-          if ! echo "${RELEASE_TAG}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "ERROR: tag '${RELEASE_TAG}' does not match vX.Y.Z format"
-            exit 1
-          fi
-
-          CERTGEN_TAG="$(cat images/kube-webhook-certgen/TAG)"
-          CHART_VERSION="$(grep '^version:' charts/ingress-nginx/Chart.yaml | awk '{print $2}')"
-          COMMIT_SHA="$(git rev-parse HEAD)"
-
-          UPSTREAM_BASE="${{ github.event.inputs.upstream_base }}"
-          if [ -z "${UPSTREAM_BASE}" ] && [ -f UPSTREAM_BASE ]; then
-            UPSTREAM_BASE="$(cat UPSTREAM_BASE)"
-          fi
-          if [ -z "${UPSTREAM_BASE}" ]; then
-            UPSTREAM_BASE="(not recorded)"
-          fi
-
-          echo "release_tag=${RELEASE_TAG}"   >> "$GITHUB_OUTPUT"
-          echo "certgen_tag=${CERTGEN_TAG}"   >> "$GITHUB_OUTPUT"
-          echo "chart_version=${CHART_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "commit_sha=${COMMIT_SHA}"     >> "$GITHUB_OUTPUT"
-          echo "upstream_base=${UPSTREAM_BASE}" >> "$GITHUB_OUTPUT"
-
-          echo "--- Version summary ---"
-          echo "Release       : ${RELEASE_TAG}"
-          echo "certgen       : ${CERTGEN_TAG}"
-          echo "Chart         : ${CHART_VERSION}"
-          echo "Commit        : ${COMMIT_SHA}"
-          echo "Upstream base : ${UPSTREAM_BASE}"
-
-      - name: Build and push controller + chroot (native make release)
+      - name: Build and push controller + chroot
         run: |
           make release \
             REGISTRY="${REGISTRY}" \
-            TAG="${{ steps.versions.outputs.release_tag }}" \
-            COMMIT_SHA="${{ steps.versions.outputs.commit_sha }}" \
-            BUILD_ID="${{ github.run_id }}"
+            TAG="${RELEASE_TAG}" \
+            COMMIT_SHA="${COMMIT_SHA}" \
+            BUILD_ID="${{ github.run_id }}" \
+            BASE_IMAGE="${{ steps.base.outputs.image }}" \
+            PLATFORMS="${{ steps.platforms.outputs.arch }}" \
+            BUILDX_PLATFORMS="${{ steps.platforms.outputs.buildx }}" \
+            BUILDX_ARGS="${BUILDX_ARGS}"
 
-      - name: Build and push kube-webhook-certgen (native images make push)
+      - name: Build and push kube-webhook-certgen
+        if: needs.preflight.outputs.certgen_publish == 'true'
         run: |
-          cd images && make push \
+          make -C images push \
             NAME=kube-webhook-certgen \
             REGISTRY="${REGISTRY}" \
-            TAG="${{ steps.versions.outputs.certgen_tag }}"
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: v3.17.0
-
-      - name: Install yq
-        run: |
-          YQ_VERSION="v4.44.3"
-          wget -qO /usr/local/bin/yq \
-            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
-          chmod +x /usr/local/bin/yq
+            TAG="${CERTGEN_TAG}" \
+            PLATFORMS="${{ steps.platforms.outputs.buildx }}" \
+            BUILDX_ARGS="${BUILDX_ARGS}"
 
       - name: Resolve image digests
         id: digests
         run: |
-          RELEASE_TAG="${{ steps.versions.outputs.release_tag }}"
-          CERTGEN_TAG="${{ steps.versions.outputs.certgen_tag }}"
-          dig() { docker buildx imagetools inspect "$1" --format '{{ .Manifest.Digest }}' 2>/dev/null || true; }
-          echo "controller=$(dig "${REGISTRY}/controller:${RELEASE_TAG}")"             >> "$GITHUB_OUTPUT"
-          echo "chroot=$(dig "${REGISTRY}/controller-chroot:${RELEASE_TAG}")"          >> "$GITHUB_OUTPUT"
-          echo "certgen=$(dig "${REGISTRY}/kube-webhook-certgen:${CERTGEN_TAG}")"      >> "$GITHUB_OUTPUT"
+          digest() {
+            local d
+            d=$(docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r .digest)
+            case "${d}" in sha256:*) echo "${d}" ;; *) echo "::error::cannot resolve digest of $1" >&2; return 1 ;; esac
+          }
+          {
+            echo "controller=$(digest "${REGISTRY}/controller:${RELEASE_TAG}")"
+            echo "chroot=$(digest "${REGISTRY}/controller-chroot:${RELEASE_TAG}")"
+            echo "certgen=$(digest "${REGISTRY}/kube-webhook-certgen:${CERTGEN_TAG}")"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Patch chart values for GHCR
+      - name: Sign images
         run: |
-          RELEASE_TAG="${{ steps.versions.outputs.release_tag }}"
-          CERTGEN_TAG="${{ steps.versions.outputs.certgen_tag }}"
-          CONTROLLER_DIGEST="${{ steps.digests.outputs.controller }}"
-          CHROOT_DIGEST="${{ steps.digests.outputs.chroot }}"
-          CERTGEN_DIGEST="${{ steps.digests.outputs.certgen }}"
+          cosign sign --yes "${REGISTRY}/controller@${{ steps.digests.outputs.controller }}"
+          cosign sign --yes "${REGISTRY}/controller-chroot@${{ steps.digests.outputs.chroot }}"
+          if [ "${{ needs.preflight.outputs.certgen_publish }}" = "true" ]; then
+            cosign sign --yes "${REGISTRY}/kube-webhook-certgen@${{ steps.digests.outputs.certgen }}"
+          fi
+
+      - name: Patch chart values (packaging only, not committed)
+        env:
+          CONTROLLER_DIGEST: ${{ steps.digests.outputs.controller }}
+          CHROOT_DIGEST: ${{ steps.digests.outputs.chroot }}
+          CERTGEN_DIGEST: ${{ steps.digests.outputs.certgen }}
+        run: |
           VALUES="charts/ingress-nginx/values.yaml"
-
-          yq e -i ".controller.image.registry = \"ghcr.io\""                                                  "${VALUES}"
-          yq e -i ".controller.image.image = \"kuzmenko-pavel/ingress-nginx/controller\""                     "${VALUES}"
-          yq e -i ".controller.image.tag = \"${RELEASE_TAG}\""                                                "${VALUES}"
-          yq e -i ".controller.admissionWebhooks.patch.image.registry = \"ghcr.io\""                          "${VALUES}"
+          yq e -i ".controller.image.registry = \"ghcr.io\""                                                         "${VALUES}"
+          yq e -i ".controller.image.image = \"kuzmenko-pavel/ingress-nginx/controller\""                            "${VALUES}"
+          yq e -i ".controller.image.tag = \"${RELEASE_TAG}\""                                                       "${VALUES}"
+          yq e -i ".controller.image.digest = \"${CONTROLLER_DIGEST}\""                                              "${VALUES}"
+          yq e -i ".controller.image.digestChroot = \"${CHROOT_DIGEST}\""                                            "${VALUES}"
+          yq e -i ".controller.admissionWebhooks.patch.image.registry = \"ghcr.io\""                                 "${VALUES}"
           yq e -i ".controller.admissionWebhooks.patch.image.image = \"kuzmenko-pavel/ingress-nginx/kube-webhook-certgen\"" "${VALUES}"
-          yq e -i ".controller.admissionWebhooks.patch.image.tag = \"${CERTGEN_TAG}\""                        "${VALUES}"
+          yq e -i ".controller.admissionWebhooks.patch.image.tag = \"${CERTGEN_TAG}\""                               "${VALUES}"
+          yq e -i ".controller.admissionWebhooks.patch.image.digest = \"${CERTGEN_DIGEST}\""                         "${VALUES}"
 
-          if [ -n "${CONTROLLER_DIGEST}" ]; then yq e -i ".controller.image.digest = \"${CONTROLLER_DIGEST}\""                           "${VALUES}"; fi
-          if [ -n "${CHROOT_DIGEST}" ];     then yq e -i ".controller.image.digestChroot = \"${CHROOT_DIGEST}\""                         "${VALUES}"; fi
-          if [ -n "${CERTGEN_DIGEST}" ];    then yq e -i ".controller.admissionWebhooks.patch.image.digest = \"${CERTGEN_DIGEST}\""      "${VALUES}"; fi
-
-      - name: Helm lint
-        run: helm lint charts/ingress-nginx
-
-      - name: Helm template validation
+      - name: Helm lint and template
         run: |
-          helm template ingress-nginx charts/ingress-nginx > /tmp/rendered.yaml
-          echo "Rendered $(wc -l < /tmp/rendered.yaml) lines"
+          helm lint charts/ingress-nginx
+          helm template ingress-nginx charts/ingress-nginx > "${RUNNER_TEMP}/rendered.yaml"
+          grep -q "ghcr.io/kuzmenko-pavel/ingress-nginx/controller:${RELEASE_TAG}@${{ steps.digests.outputs.controller }}" "${RUNNER_TEMP}/rendered.yaml"
 
-      - name: Package Helm chart
-        id: helm_package
+      - name: Package and push chart
+        id: chart
         run: |
-          CHART_VERSION="${{ steps.versions.outputs.chart_version }}"
-          helm package charts/ingress-nginx --destination /tmp/helm-pkg
-          CHART_FILE="/tmp/helm-pkg/ingress-nginx-${CHART_VERSION}.tgz"
-          sha256sum "${CHART_FILE}" > "${CHART_FILE}.sha256"
-          echo "chart_file=${CHART_FILE}"          >> "$GITHUB_OUTPUT"
-          echo "chart_sha256=${CHART_FILE}.sha256" >> "$GITHUB_OUTPUT"
+          helm package charts/ingress-nginx --destination "${RUNNER_TEMP}/helm-pkg"
+          CHART_FILE="${RUNNER_TEMP}/helm-pkg/ingress-nginx-${CHART_VERSION}.tgz"
+          (cd "$(dirname "${CHART_FILE}")" && sha256sum "$(basename "${CHART_FILE}")" > "$(basename "${CHART_FILE}").sha256")
 
-      - name: Push Helm chart to GHCR OCI
-        run: |
-          helm push "${{ steps.helm_package.outputs.chart_file }}" "${CHARTS_OCI}"
+          helm push "${CHART_FILE}" "${CHARTS_OCI}" 2>&1 | tee "${RUNNER_TEMP}/helm-push.log"
+          DIGEST=$(grep -oE 'sha256:[a-f0-9]{64}' "${RUNNER_TEMP}/helm-push.log" | tail -1)
+          if [ -z "${DIGEST}" ]; then echo "::error::no digest in helm push output"; exit 1; fi
+
+          cosign sign --yes "${CHARTS_OCI#oci://}/ingress-nginx@${DIGEST}"
+
+          echo "file=${CHART_FILE}" >> "$GITHUB_OUTPUT"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.versions.outputs.release_tag }}
-          name: "ingress-nginx ${{ steps.versions.outputs.release_tag }}"
-          body: |
-            ## Maintained ingress-nginx Distribution Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHART_FILE: ${{ steps.chart.outputs.file }}
+        run: |
+          IDENTITY='^https://github.com/${{ github.repository }}/\.github/workflows/'
+          cat > "${RUNNER_TEMP}/notes.md" <<EOF
+          ## ingress-nginx ${RELEASE_TAG}
 
-            Self-maintained distribution based on ingress-nginx codebase.
+          Self-maintained distribution based on the ingress-nginx codebase.
 
-            ### Provenance
+          ### Provenance
 
-            - Repository: `${{ github.repository }}`
-            - Commit: `${{ steps.versions.outputs.commit_sha }}`
-            - Upstream base: `${{ steps.versions.outputs.upstream_base }}`
+          - Repository: \`${{ github.repository }}\`
+          - Commit: \`${COMMIT_SHA}\`
+          - Upstream base: \`${{ needs.preflight.outputs.upstream_base }}\`
+          - NGINX base image: \`${{ steps.base.outputs.image }}\`
+          - Platforms: \`${{ steps.platforms.outputs.buildx }}\`
 
-            ### Container images
+          ### Container images
 
-            | Image | Tag | Digest |
-            |-------|-----|--------|
-            | `ghcr.io/kuzmenko-pavel/ingress-nginx/controller` | `${{ steps.versions.outputs.release_tag }}` | `${{ steps.digests.outputs.controller }}` |
-            | `ghcr.io/kuzmenko-pavel/ingress-nginx/controller-chroot` | `${{ steps.versions.outputs.release_tag }}` | `${{ steps.digests.outputs.chroot }}` |
-            | `ghcr.io/kuzmenko-pavel/ingress-nginx/kube-webhook-certgen` | `${{ steps.versions.outputs.certgen_tag }}` | `${{ steps.digests.outputs.certgen }}` |
+          | Image | Tag | Digest |
+          |-------|-----|--------|
+          | \`${REGISTRY}/controller\` | \`${RELEASE_TAG}\` | \`${{ steps.digests.outputs.controller }}\` |
+          | \`${REGISTRY}/controller-chroot\` | \`${RELEASE_TAG}\` | \`${{ steps.digests.outputs.chroot }}\` |
+          | \`${REGISTRY}/kube-webhook-certgen\` | \`${CERTGEN_TAG}\` | \`${{ steps.digests.outputs.certgen }}\` |
 
-            ### Helm chart
+          ### Helm chart
 
-            ```bash
-            helm install ingress-nginx \
-              oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx \
-              --version ${{ steps.versions.outputs.chart_version }} \
-              --namespace ingress-nginx --create-namespace
-            ```
-          files: |
-            ${{ steps.helm_package.outputs.chart_file }}
-            ${{ steps.helm_package.outputs.chart_sha256 }}
-          fail_on_unmatched_files: true
+          Chart \`${CHART_VERSION}\`, digest \`${{ steps.chart.outputs.digest }}\`.
+
+          \`\`\`bash
+          helm install ingress-nginx ${CHARTS_OCI}/ingress-nginx \\
+            --version ${CHART_VERSION} \\
+            --namespace ingress-nginx --create-namespace
+          \`\`\`
+
+          ### Verification
+
+          Images and the chart are signed with keyless cosign (GitHub OIDC) and carry SBOM and
+          provenance attestations.
+
+          \`\`\`bash
+          cosign verify ${REGISTRY}/controller@${{ steps.digests.outputs.controller }} \\
+            --certificate-identity-regexp '${IDENTITY}' \\
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          \`\`\`
+          EOF
+
+          if gh release view "${RELEASE_TAG}" > /dev/null 2>&1; then
+            gh release edit "${RELEASE_TAG}" --title "ingress-nginx ${RELEASE_TAG}" --notes-file "${RUNNER_TEMP}/notes.md"
+            gh release upload "${RELEASE_TAG}" "${CHART_FILE}" "${CHART_FILE}.sha256" --clobber
+          else
+            gh release create "${RELEASE_TAG}" --verify-tag \
+              --title "ingress-nginx ${RELEASE_TAG}" \
+              --notes-file "${RUNNER_TEMP}/notes.md" \
+              "${CHART_FILE}" "${CHART_FILE}.sha256"
+          fi

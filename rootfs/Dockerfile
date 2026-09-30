@@ -16,18 +16,20 @@ ARG BASE_IMAGE
 
 FROM ${BASE_IMAGE}
 
+ARG BASE_IMAGE
 ARG TARGETARCH
 ARG VERSION
 ARG COMMIT_SHA
 ARG BUILD_ID=UNSET
 
 LABEL org.opencontainers.image.title="NGINX Ingress Controller for Kubernetes"
-LABEL org.opencontainers.image.documentation="https://kubernetes.github.io/ingress-nginx/"
-LABEL org.opencontainers.image.source="https://github.com/kubernetes/ingress-nginx"
-LABEL org.opencontainers.image.vendor="The Kubernetes Authors"
+LABEL org.opencontainers.image.documentation="https://github.com/Kuzmenko-Pavel/ingress-nginx/tree/main/docs"
+LABEL org.opencontainers.image.source="https://github.com/Kuzmenko-Pavel/ingress-nginx"
+LABEL org.opencontainers.image.vendor="Kuzmenko-Pavel/ingress-nginx"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.revision="${COMMIT_SHA}"
+LABEL org.opencontainers.image.base.name="${BASE_IMAGE}"
 
 LABEL build_id="${BUILD_ID}"
 

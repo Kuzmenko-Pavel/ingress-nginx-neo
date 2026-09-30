@@ -13,10 +13,27 @@
 # limitations under the License.
 
 BUILDER ?= ingress-nginx
-PLATFORMS ?= linux/amd64,linux/arm,linux/arm64
-REGISTRY ?= us-central1-docker.pkg.dev/k8s-staging-images/ingress-nginx
+# amd64 is the only default architecture. arm64 is opt-in (PLATFORMS=linux/arm64 or
+# linux/amd64,linux/arm64); CI builds each architecture on a native runner and merges
+# the results with the `manifest` target.
+PLATFORMS ?= linux/amd64
+REGISTRY ?= ghcr.io/kuzmenko-pavel/ingress-nginx
 IMAGE ?= $(REGISTRY)/nginx
 TAG ?= $(shell cat TAG)
+SOURCE ?= https://github.com/Kuzmenko-Pavel/ingress-nginx
+# Extra docker buildx flags (e.g. "--sbom=true --provenance=mode=max").
+BUILDX_ARGS ?=
+# push-by-digest: file receiving buildx metadata (contains containerimage.digest).
+METADATA_FILE ?= metadata.json
+# manifest: space separated list of per-platform digests (sha256:...).
+DIGESTS ?=
+
+LABELS = \
+	--label org.opencontainers.image.title="ingress-nginx nginx base" \
+	--label org.opencontainers.image.description="NGINX base image for ingress-nginx" \
+	--label org.opencontainers.image.source="$(SOURCE)" \
+	--label org.opencontainers.image.licenses="Apache-2.0" \
+	--label org.opencontainers.image.version="$(TAG)"
 
 .PHONY: builder
 builder:
@@ -28,6 +45,7 @@ build: builder
 	docker buildx build \
 		--builder $(BUILDER) \
 		--platform $(PLATFORMS) \
+		$(LABELS) \
 		rootfs \
 		--tag $(IMAGE):$(TAG)
 
@@ -39,9 +57,35 @@ push: build
 	docker buildx build \
 		--builder $(BUILDER) \
 		--platform $(PLATFORMS) \
+		$(LABELS) \
+		$(BUILDX_ARGS) \
 		rootfs \
 		--tag $(IMAGE):$(TAG) \
 		--push
+
+# Build a single platform and push it untagged (by digest). Used by CI to build every
+# architecture on its own native runner; the digests are combined by `manifest`.
+.PHONY: push-by-digest
+push-by-digest: build
+	docker buildx build \
+		--builder $(BUILDER) \
+		--platform $(PLATFORMS) \
+		$(LABELS) \
+		$(BUILDX_ARGS) \
+		rootfs \
+		--metadata-file $(METADATA_FILE) \
+		--output type=image,name=$(IMAGE),push-by-digest=true,name-canonical=true,push=true
+
+# Create the tagged multi-platform index from per-platform digests.
+.PHONY: manifest
+manifest:
+	test -n "$(DIGESTS)"
+	docker buildx imagetools create \
+		--annotation "index:org.opencontainers.image.source=$(SOURCE)" \
+		--annotation "index:org.opencontainers.image.description=NGINX base image for ingress-nginx" \
+		--annotation "index:org.opencontainers.image.licenses=Apache-2.0" \
+		--tag $(IMAGE):$(TAG) \
+		$(foreach d,$(DIGESTS),$(IMAGE)@$(d))
 
 .PHONY: clean
 clean:
