@@ -8,7 +8,7 @@ pinned tools. Workflows authenticate with `GITHUB_TOKEN` only and sign with cosi
 
 | Workflow | Trigger | Make targets |
 |----------|---------|--------------|
-| `ci.yaml` | pull requests; pushes to `main` and `release-*` | see below |
+| `ci.yaml` | pull requests; pushes to `main` and `release-*`; manually | see below |
 | `deps.yaml` | called by `ci.yaml` and `release.yaml` | `docker-publish-deps`, `docker-publish-deps-manifest` or `docker-build-deps docker-save` |
 | `release.yaml` | push of a `v*` tag | `release-verify`, `docker-publish`, `docker-promote`, `docker-sign`, `code-build-plugin`, `code-sign-plugin`, `helm-package`, `helm-publish`, `manifests-generate`, `release-notes`, `release-publish`, `docs-publish`, `release-finalize` |
 | `security.yaml` | weekly, after a release, manually | `security-container-scan` (Trivy, one code-scanning category per image) |
@@ -20,19 +20,19 @@ pinned tools. Workflows authenticate with `GITHUB_TOKEN` only and sign with cosi
 
 | Job | Command | Runs |
 |-----|---------|------|
-| Dependency images | `deps.yaml` | always; publishes missing `src-*` images on `main` |
+| Dependency images | `deps.yaml` | always; publishes missing `src-*` images on pushes to `main` and manual runs on `main` |
 | Lint | `make docker-load code-lint` (+ `make code-lint-commits BASE=<base>` on pull requests) | always |
 | Unit tests | `make docker-load test-unit test-unit-lua` | always |
 | Generated files | `make docs-verify helm-docs-verify` | always |
 | Helm chart | `make helm-lint helm-test` | always |
-| Docs | `make docs-build` | docs or CI changes; always on pushes |
+| Docs | `make docs-build` | docs or CI changes; always outside pull requests |
 | Dependency scan | `make security-dependency-scan` | always |
-| Build images | `make docker-load docker-build docker-build-e2e docker-save` | code, chart, image or CI changes; always on pushes |
+| Build images | `make docker-load docker-build docker-build-e2e docker-save` | code, chart, image or CI changes; always outside pull requests |
 | E2E | `make docker-load test-e2e SKIP_BUILD=1 K8S_VERSION=… E2E_VARIANT=…` | every Kubernetes version × `default`, `chroot` |
 | Chart e2e | `make docker-load test-e2e-chart SKIP_BUILD=1 K8S_VERSION=…` | every Kubernetes version |
-| kube-webhook-certgen e2e | `make test-e2e-certgen` | certgen changes; always on pushes |
+| kube-webhook-certgen e2e | `make test-e2e-certgen` | certgen changes; always outside pull requests |
 | **CI result** | `make ci-result` | always (not when the run is cancelled) |
-| Publish latest | `make publish-guard docker-publish docker-promote docker-sign helm-package helm-publish CHANNEL=latest`, `make code-build-plugin CHANNEL=latest` | pushes to `main` after CI result passed |
+| Publish latest | `make publish-guard docker-publish docker-promote docker-sign helm-package helm-publish CHANNEL=latest`, `make code-build-plugin CHANNEL=latest` | pushes to `main` and manual runs on `main`, after CI result passed |
 | Publish docs (latest) | `make docs-publish CHANNEL=latest` | after Publish latest |
 
 The Kubernetes matrix comes from `make -s print-k8s-versions`, the dependency image platforms from
