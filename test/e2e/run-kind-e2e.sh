@@ -1,127 +1,90 @@
-#!/bin/bash
-
-# Copyright 2019 The Kubernetes Authors.
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Run the controller e2e suite on a fresh kind cluster. Called by `make test-e2e`,
+# which builds the images and passes every reference below.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-cleanup() {
-  if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
-    kind "export" logs --name ${KIND_CLUSTER_NAME} "${ARTIFACTS}/logs" || true
-  fi
+: "${KIND:?}" "${KUBECTL:?}" "${KIND_CLUSTER_NAME:?}" "${K8S_VERSION:?}" "${E2E_IMAGE:?}" "${LOAD_IMAGES:?}"
+: "${E2E_VARIANT:?}" "${E2E_IMAGE_REGISTRY:?}" "${E2E_IMAGE_PREFIX:?}" "${E2E_IMAGE_TAG:?}"
+: "${NGINX_BASE_IMAGE:?}" "${E2E_ECHO_IMAGE:?}" "${E2E_HTTPBUN_IMAGE:?}" "${E2E_FASTCGI_IMAGE:?}" "${E2E_CFSSL_IMAGE:?}"
+: "${E2E_NODES:?}"
+FOCUS="${FOCUS:-}"
+E2E_CHECK_LEAKS="${E2E_CHECK_LEAKS:-}"
+DEBUG="${DEBUG:-false}"
 
-  kind delete cluster \
-    --verbosity="${KIND_LOG_LEVEL}" \
-    --name "${KIND_CLUSTER_NAME}"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPORTS_DIR="${REPORTS_DIR:-${DIR}/../junitreports}"
+export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/kind-config-${KIND_CLUSTER_NAME}}"
+
+cleanup() {
+  "$KIND" delete cluster --name "${KIND_CLUSTER_NAME}"
 }
 
-DEBUG=${DEBUG:=false}
-
-if [ "${DEBUG}" = "true" ]; then
+if [[ "${DEBUG}" == "true" ]]; then
   set -x
-  KIND_LOG_LEVEL="6"
+  echo "DEBUG=true: the cluster ${KIND_CLUSTER_NAME} is kept"
 else
   trap cleanup EXIT
 fi
 
-KIND_LOG_LEVEL="1"
-IS_CHROOT="${IS_CHROOT:-false}"
-export KIND_CLUSTER_NAME=${KIND_CLUSTER_NAME:-ingress-nginx-dev}
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-# Use 1.0.0-dev to make sure we use the latest configuration in the helm template
-export TAG=1.0.0-dev
-export ARCH=${ARCH:-amd64}
-export REGISTRY=ingress-controller
-NGINX_BASE_IMAGE=${NGINX_BASE_IMAGE:-$("$DIR"/../../hack/nginx-base-image.sh)}
-export NGINX_BASE_IMAGE=$NGINX_BASE_IMAGE
-export DOCKER_CLI_EXPERIMENTAL=enabled
-export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/kind-config-$KIND_CLUSTER_NAME}"
-SKIP_INGRESS_IMAGE_CREATION="${SKIP_INGRESS_IMAGE_CREATION:-false}"
-SKIP_E2E_IMAGE_CREATION="${SKIP_E2E_IMAGE_CREATION:=false}"
-SKIP_CLUSTER_CREATION="${SKIP_CLUSTER_CREATION:-false}"
+echo "creating kind cluster ${KIND_CLUSTER_NAME} (kindest/node:${K8S_VERSION})"
+if "$KIND" get clusters | grep -qx "${KIND_CLUSTER_NAME}"; then
+  "$KIND" delete cluster --name "${KIND_CLUSTER_NAME}"
+fi
+"$KIND" create cluster \
+  --name "${KIND_CLUSTER_NAME}" \
+  --config "${DIR}/kind.yaml" \
+  --retain \
+  --image "kindest/node:${K8S_VERSION}"
+"$KUBECTL" get nodes -o wide
 
-if ! command -v kind --version &> /dev/null; then
-  echo "kind is not installed. Use the package manager or visit the official site https://kind.sigs.k8s.io/"
-  exit 1
+workers="$("$KIND" get nodes --name "${KIND_CLUSTER_NAME}" | grep worker | paste -sd, -)"
+for image in ${LOAD_IMAGES}; do
+  echo "loading ${image}"
+  "$KIND" load docker-image --name "${KIND_CLUSTER_NAME}" --nodes "${workers}" "${image}"
+done
+
+echo "granting permissions to the e2e service account"
+"$KUBECTL" create serviceaccount ingress-nginx-e2e
+"$KUBECTL" create clusterrolebinding permissive-binding \
+  --clusterrole=cluster-admin \
+  --user=admin \
+  --user=kubelet \
+  --serviceaccount=default:ingress-nginx-e2e
+
+echo "starting the e2e test pod"
+status=0
+"$KUBECTL" run e2e \
+  --rm \
+  --attach \
+  --restart=Never \
+  --image="${E2E_IMAGE}" \
+  --image-pull-policy=IfNotPresent \
+  --env="E2E_NODES=${E2E_NODES}" \
+  --env="FOCUS=${FOCUS}" \
+  --env="E2E_CHECK_LEAKS=${E2E_CHECK_LEAKS}" \
+  --env="E2E_VARIANT=${E2E_VARIANT}" \
+  --env="E2E_IMAGE_REGISTRY=${E2E_IMAGE_REGISTRY}" \
+  --env="E2E_IMAGE_PREFIX=${E2E_IMAGE_PREFIX}" \
+  --env="E2E_IMAGE_TAG=${E2E_IMAGE_TAG}" \
+  --env="NGINX_BASE_IMAGE=${NGINX_BASE_IMAGE}" \
+  --env="E2E_ECHO_IMAGE=${E2E_ECHO_IMAGE}" \
+  --env="E2E_HTTPBUN_IMAGE=${E2E_HTTPBUN_IMAGE}" \
+  --env="E2E_FASTCGI_IMAGE=${E2E_FASTCGI_IMAGE}" \
+  --env="E2E_CFSSL_IMAGE=${E2E_CFSSL_IMAGE}" \
+  --overrides='{ "apiVersion": "v1", "spec": { "serviceAccountName": "ingress-nginx-e2e" } }' || status=$?
+
+# The suite stores its junit report in a ConfigMap.
+report="report-e2e-test-suite.xml.gz"
+mkdir -p "${REPORTS_DIR}"
+if "$KUBECTL" get configmap "${report}" >/dev/null 2>&1; then
+  "$KUBECTL" get configmap "${report}" -o "jsonpath={.binaryData['${report//./\\.}']}" |
+    base64 -d | gunzip >"${REPORTS_DIR}/${report%.gz}"
+  echo "junit report: ${REPORTS_DIR}/${report%.gz}"
 fi
 
-echo "Running e2e with nginx base image ${NGINX_BASE_IMAGE}"
-
-if [ "${SKIP_CLUSTER_CREATION}" = "false" ]; then
-  echo "[dev-env] creating Kubernetes cluster with kind"
-
-  export K8S_VERSION=${K8S_VERSION:-v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed}
-
-  # delete the cluster if it exists
-  if kind get clusters | grep "${KIND_CLUSTER_NAME}"; then
-    kind delete cluster --name "${KIND_CLUSTER_NAME}"
-  fi
-
-  kind create cluster \
-    --verbosity="${KIND_LOG_LEVEL}" \
-    --name "${KIND_CLUSTER_NAME}" \
-    --config "${DIR}"/kind.yaml \
-    --retain \
-    --image "kindest/node:${K8S_VERSION}"
-
-  echo "Kubernetes cluster:"
-  kubectl get nodes -o wide
-fi
-
-if [ "${SKIP_INGRESS_IMAGE_CREATION}" = "false" ]; then
-  echo "[dev-env] building image"
-  if [ "${IS_CHROOT}" = "true" ]; then
-    make BASE_IMAGE="${NGINX_BASE_IMAGE}" -C "${DIR}"/../../ clean-image build image-chroot
-    docker tag ${REGISTRY}/controller-chroot:${TAG} ${REGISTRY}/controller:${TAG}
-  else
-    make BASE_IMAGE="${NGINX_BASE_IMAGE}" -C "${DIR}"/../../ clean-image build image
-  fi
-
-  echo "[dev-env] .. done building controller images"
-fi
-
-if [ "${SKIP_E2E_IMAGE_CREATION}" = "false" ]; then
-  if ! command -v ginkgo &> /dev/null; then
-    go install github.com/onsi/ginkgo/v2/ginkgo@v2.28.1
-  fi
-
-  echo "[dev-env] .. done building controller images"
-  echo "[dev-env] now building e2e-image.."
-  make -C "${DIR}"/../e2e-image image
-  echo "[dev-env] ..done building e2e-image"
-fi
-
-# Preload images used in e2e tests
-KIND_WORKERS=$(kind get nodes --name="${KIND_CLUSTER_NAME}" | grep worker | awk '{printf (NR>1?",":"") $1}')
-
-echo "[dev-env] copying docker images to cluster..."
-
-kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" nginx-ingress-controller:e2e
-kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" "${REGISTRY}"/controller:"${TAG}"
-# The e2e suite deploys pods from the NGINX base image. Preload it when it exists locally
-# (e.g. built from images/nginx in CI before it is published), otherwise it is pulled.
-if docker image inspect "${NGINX_BASE_IMAGE}" > /dev/null 2>&1; then
-  kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" "${NGINX_BASE_IMAGE}"
-fi
-# The admission/validations namespace overlays install the chart's default kube-webhook-certgen.
-# Preload it when it was built locally (CI builds it from the current revision), otherwise it is
-# pulled from the registry.
-CERTGEN_IMAGE=${CERTGEN_IMAGE:-ghcr.io/kuzmenko-pavel/ingress-nginx/kube-webhook-certgen:$(cat "${DIR}"/../../images/kube-webhook-certgen/TAG)}
-if docker image inspect "${CERTGEN_IMAGE}" > /dev/null 2>&1; then
-  kind load docker-image --name="${KIND_CLUSTER_NAME}" --nodes="${KIND_WORKERS}" "${CERTGEN_IMAGE}"
-fi
-echo "[dev-env] running e2e tests..."
-make -C "${DIR}"/../../ e2e-test
+exit "${status}"

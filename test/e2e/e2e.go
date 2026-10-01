@@ -61,6 +61,10 @@ func RunE2ETests(t *testing.T) {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
+	if err := framework.CheckImages(); err != nil {
+		t.Fatal(err)
+	}
+
 	if os.Getenv("KUBECTL_PATH") != "" {
 		framework.KubectlPath = os.Getenv("KUBECTL_PATH")
 		framework.Logf("Using kubectl path '%s'", framework.KubectlPath)

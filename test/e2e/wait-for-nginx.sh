@@ -23,7 +23,25 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 export NAMESPACE=$1
 export NAMESPACE_OVERLAY=$2
-export IS_CHROOT=$3
+
+# Images under test, passed by `make test-e2e` into the e2e pod.
+: "${E2E_IMAGE_REGISTRY:?}" "${E2E_IMAGE_PREFIX:?}" "${E2E_IMAGE_TAG:?}" "${E2E_VARIANT:?}"
+case "${E2E_VARIANT}" in
+  default) CHROOT=false ;;
+  chroot) CHROOT=true ;;
+  *) echo "E2E_VARIANT must be default or chroot, got ${E2E_VARIANT}" >&2; exit 1 ;;
+esac
+
+IMAGE_ARGS=(
+  --set "global.image.registry=${E2E_IMAGE_REGISTRY}"
+  --set "controller.image.image=${E2E_IMAGE_PREFIX}/controller"
+  --set "controller.image.tag=${E2E_IMAGE_TAG}"
+  --set "controller.image.chroot=${CHROOT}"
+  --set "controller.admissionWebhooks.patch.image.image=${E2E_IMAGE_PREFIX}/kube-webhook-certgen"
+  --set "controller.admissionWebhooks.patch.image.tag=${E2E_IMAGE_TAG}"
+  --set "defaultBackend.image.image=${E2E_IMAGE_PREFIX}/custom-error-pages"
+  --set "defaultBackend.image.tag=${E2E_IMAGE_TAG}"
+)
 
 echo "deploying NGINX Ingress controller in namespace $NAMESPACE"
 
@@ -52,18 +70,13 @@ if [[ ! -z "$NAMESPACE_OVERLAY" && -d "$DIR/namespace-overlays/$NAMESPACE_OVERLA
     echo "Namespace overlay $NAMESPACE_OVERLAY is being used for namespace $NAMESPACE"
     helm install nginx-ingress ${DIR}/charts/ingress-nginx-neo \
         --namespace=$NAMESPACE \
-        --values "$DIR/namespace-overlays/$NAMESPACE_OVERLAY/values.yaml"
+        --values "$DIR/namespace-overlays/$NAMESPACE_OVERLAY/values.yaml" \
+        "${IMAGE_ARGS[@]}"
 else
-    cat << EOF | helm install nginx-ingress ${DIR}/charts/ingress-nginx-neo --namespace=$NAMESPACE --values -
+    cat << EOF | helm install nginx-ingress ${DIR}/charts/ingress-nginx-neo --namespace=$NAMESPACE --values - "${IMAGE_ARGS[@]}"
 # TODO: remove the need to use fullnameOverride
 fullnameOverride: nginx-ingress
 controller:
-  image:
-    repository: ingress-controller/controller
-    chroot: ${IS_CHROOT}
-    tag: 1.0.0-dev
-    digest:
-    digestChroot:
   scope:
     enabled: true
   config:
@@ -102,8 +115,6 @@ controller:
     - name: coredump
       hostPath:
         path: /tmp/coredump
-
-${OTEL_MODULE}
 
 rbac:
   create: true

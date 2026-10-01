@@ -43,12 +43,6 @@ const HTTPBunService = "httpbun"
 // NipService name of external service using nip.io
 const NIPService = "external-nip"
 
-// HTTPBunImage is the default image that is used to deploy HTTPBun with the framework
-var HTTPBunImage = os.Getenv("HTTPBUN_IMAGE")
-
-// EchoImage is the default image to be used by the echo service
-const EchoImage = "registry.k8s.io/ingress-nginx/e2e-test-echo:v1.2.9@sha256:9920d084b452b38ee663005a455aa7ed12c15afa512741ea9596e206a189bdf0" //#nosec G101
-
 // TODO: change all Deployment functions to use these options
 // in order to reduce complexity and have a unified API across the
 // framework
@@ -433,7 +427,7 @@ func (f *Framework) NewGRPCBinDeployment() {
 					Containers: []corev1.Container{
 						{
 							Name:  name,
-							Image: "moul/grpcbin",
+							Image: GRPCBinImage,
 							Env:   []corev1.EnvVar{},
 							Ports: []corev1.ContainerPort{
 								{

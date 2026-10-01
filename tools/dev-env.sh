@@ -1,111 +1,53 @@
-#!/bin/bash
-
-# Copyright 2018 The Kubernetes Authors.
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# Create (or reuse) the development kind cluster, load the locally built
+# images and install the staged chart. The controller listens on localhost:80
+# and localhost:443. Called by `make dev-env-up`.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Usage: tools/dev-env.sh <staged chart dir>
 
-if [ -n "$DEBUG" ]; then
-	set -x
-fi
+set -euo pipefail
 
-set -o errexit
-set -o nounset
-set -o pipefail
+chart="${1:?usage: $0 <staged chart dir>}"
+: "${KIND:?}" "${KUBECTL:?}" "${HELM:?}" "${KIND_CLUSTER_NAME:?}" "${K8S_VERSION:?}"
+: "${RELEASE_NAME:?}" "${NAMESPACE:?}" "${LOAD_IMAGES:?}" "${IMAGE_REGISTRY:?}" "${IMAGE_PREFIX:?}" "${IMAGE_TAG:?}"
 
-DIR=$(cd $(dirname "${BASH_SOURCE}") && pwd -P)
+export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/kind-config-${KIND_CLUSTER_NAME}}"
+dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-export TAG=1.0.0-dev
-export REGISTRY=${REGISTRY:-ingress-controller}
-
-DEV_IMAGE=${REGISTRY}/controller:${TAG}
-
-if ! command -v kind &> /dev/null; then
-  echo "kind is not installed"
-  echo "Use a package manager (i.e 'brew install kind') or visit the official site https://kind.sigs.k8s.io"
-  exit 1
-fi
-
-if ! command -v kubectl &> /dev/null; then
-  echo "Please install kubectl 1.24.0 or higher"
-  exit 1
-fi
-
-if ! command -v helm &> /dev/null; then
-  echo "Please install helm"
-  exit 1
-fi
-
-function ver { printf "%d%03d%03d" $(echo "$1" | tr '.' ' '); }
-
-HELM_VERSION=$(helm version 2>&1 | cut -f1 -d"," | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') || true
-echo $HELM_VERSION
-if [[ $(ver $HELM_VERSION) -lt $(ver "3.10.0") ]]; then
-  echo "Please upgrade helm to v3.10.0 or higher"
-  exit 1
-fi
-
-KUBE_CLIENT_VERSION=$(kubectl version --client -oyaml 2>/dev/null | grep "minor:" | awk '{print $2}' | tr -d '"') || true
-if [[ ${KUBE_CLIENT_VERSION} -lt 24 ]]; then
-  echo "Please update kubectl to 1.24.2 or higher"
-  exit 1
-fi
-
-echo "[dev-env] building image"
-make build image
-docker tag "${REGISTRY}/controller:${TAG}" "${DEV_IMAGE}"
-
-export K8S_VERSION=${K8S_VERSION:-v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed}
-
-KIND_CLUSTER_NAME="ingress-nginx-dev"
-
-if ! kind get clusters -q | grep -q ${KIND_CLUSTER_NAME}; then
-  echo "[dev-env] creating Kubernetes cluster with kind"
-  kind create cluster --name ${KIND_CLUSTER_NAME} --image "kindest/node:${K8S_VERSION}" --config ${DIR}/kind.yaml
+if "$KIND" get clusters | grep -qx "${KIND_CLUSTER_NAME}"; then
+  echo "using the existing kind cluster ${KIND_CLUSTER_NAME}"
 else
-  echo "[dev-env] using existing Kubernetes kind cluster"
+  "$KIND" create cluster --name "${KIND_CLUSTER_NAME}" --image "kindest/node:${K8S_VERSION}" \
+    --config "${dir}/kind-dev.yaml" --wait 2m
 fi
 
-echo "[dev-env] copying docker images to cluster..."
-kind load docker-image --name="${KIND_CLUSTER_NAME}" "${DEV_IMAGE}"
+for image in ${LOAD_IMAGES}; do
+  "$KIND" load docker-image --name "${KIND_CLUSTER_NAME}" "${image}"
+done
 
-echo "[dev-env] deploying NGINX Ingress controller..."
-kubectl create namespace ingress-nginx &> /dev/null || true
+"$HELM" upgrade --install "${RELEASE_NAME}" "${chart}" \
+  --namespace "${NAMESPACE}" --create-namespace \
+  --set "global.image.registry=${IMAGE_REGISTRY}" \
+  --set "controller.image.image=${IMAGE_PREFIX}/controller" \
+  --set "controller.image.tag=${IMAGE_TAG}" \
+  --set "controller.image.pullPolicy=Never" \
+  --set "controller.admissionWebhooks.patch.image.image=${IMAGE_PREFIX}/kube-webhook-certgen" \
+  --set "controller.admissionWebhooks.patch.image.tag=${IMAGE_TAG}" \
+  --set "controller.admissionWebhooks.patch.image.pullPolicy=Never" \
+  --set-string "controller.config.worker-processes=1" \
+  --set-string "controller.podLabels.deploy-date=$(date +%s)" \
+  --set "controller.updateStrategy.type=RollingUpdate" \
+  --set "controller.updateStrategy.rollingUpdate.maxUnavailable=1" \
+  --set "controller.hostPort.enabled=true" \
+  --set "controller.terminationGracePeriodSeconds=0" \
+  --set "controller.service.type=NodePort" \
+  --wait --timeout 5m
 
-cat << EOF | helm template ingress-nginx ${DIR}/../charts/ingress-nginx --namespace=ingress-nginx --values - | kubectl apply -n ingress-nginx -f -
-controller:
-  image:
-    repository: ${REGISTRY}/controller
-    tag: ${TAG}
-    digest:
-  config:
-    worker-processes: "1"
-  podLabels:
-    deploy-date: "$(date +%s)"
-  updateStrategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 1
-  hostPort:
-    enabled: true
-  terminationGracePeriodSeconds: 0
-  service:
-    type: NodePort
-EOF
+cat <<MESSAGE
 
-cat <<EOF
-
-Kubernetes cluster ready and ingress-nginx listening in localhost using ports 80 and 443
-
-To delete the dev cluster execute: 'kind delete cluster --name ingress-nginx-dev'
-
-EOF
+The kind cluster ${KIND_CLUSTER_NAME} is ready; the controller listens on localhost:80 and localhost:443.
+kubeconfig: ${KUBECONFIG}
+Rebuild and redeploy: make dev-env-up    Delete the cluster: make dev-env-down
+MESSAGE
