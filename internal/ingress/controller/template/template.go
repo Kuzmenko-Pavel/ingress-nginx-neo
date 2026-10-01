@@ -582,7 +582,7 @@ func shouldApplyGlobalAuth(input interface{}, globalExternalAuthURL string) bool
 		klog.Errorf("expected an '*ingress.Location' type but %T was returned", input)
 	}
 
-	if (location.ExternalAuth.URL == "") && (globalExternalAuthURL != "") && (location.EnableGlobalAuth) {
+	if (location.ExternalAuth.URL == "") && (globalExternalAuthURL != "") && location.EnableGlobalAuth {
 		return true
 	}
 

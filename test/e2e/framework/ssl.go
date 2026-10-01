@@ -329,7 +329,7 @@ func tlsConfig(serverName string, pemCA []byte) (*tls.Config, error) {
 	if !rootCAPool.AppendCertsFromPEM(pemCA) {
 		return nil, fmt.Errorf("error creating CA certificate pool (%s)", serverName)
 	}
-	return &tls.Config{ //nolint:gosec // Ignore the gosec error in testing
+	return &tls.Config{
 		ServerName: serverName,
 		RootCAs:    rootCAPool,
 	}, nil

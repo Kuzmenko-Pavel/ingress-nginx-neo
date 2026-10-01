@@ -93,7 +93,7 @@ func TestHandleAdmission(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	review, isV1 := (result).(*admissionv1.AdmissionReview)
+	review, isV1 := result.(*admissionv1.AdmissionReview)
 	if !isV1 {
 		t.Fatalf("expected AdmissionReview V1 object but %T returned", result)
 	}

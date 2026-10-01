@@ -424,7 +424,7 @@ func dialTestServer(port string, rootCertificates ...[]byte) error {
 			return fmt.Errorf("failed to add root certificate")
 		}
 	}
-	resp, err := tls.Dial("tcp", "localhost:"+port, &tls.Config{ //nolint:gosec // Ignore the gosec error in testing
+	resp, err := tls.Dial("tcp", "localhost:"+port, &tls.Config{
 		RootCAs: roots,
 	})
 	if err != nil {
