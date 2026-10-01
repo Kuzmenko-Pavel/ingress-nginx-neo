@@ -208,22 +208,43 @@ E2E_CHECK_LEAKS ?=
 SKIP_BUILD ?=
 BASE ?= origin/main
 
-##@ General
 
+# Colors of make help; empty when tput is missing.
+GREEN  := $(shell tput -Txterm setaf 2 2>/dev/null || true)
+YELLOW := $(shell tput -Txterm setaf 3 2>/dev/null || true)
+GRAY   := $(shell tput -Txterm setaf 6 2>/dev/null || true)
+RESET  := $(shell tput -Txterm sgr0 2>/dev/null || true)
+TARGET_MAX_CHAR_NUM ?= 30
+
+# A target is listed when the line above it is "## <description>"; a
+# description ending in "| <group>" starts a new group. Targets without such a
+# line are internal.
 .PHONY: help
-help: ## Show this help
-	@awk 'BEGIN { FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m [VAR=value ...]\n" } \
-		/^[a-zA-Z0-9_-]+:.*##/ { printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2 } \
-		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) }' $(MAKEFILE_LIST)
+## Show this help. | General
+help:
+	@printf '\nUsage:\n\n  %smake%s %s<target>%s [VAR=value ...]\n\nTargets:\n' '$(YELLOW)' '$(RESET)' '$(GREEN)' '$(RESET)'
+	@awk -v width='$(TARGET_MAX_CHAR_NUM)' -v yellow='$(YELLOW)' -v green='$(GREEN)' -v gray='$(GRAY)' -v reset='$(RESET)' ' \
+		/^[a-zA-Z0-9_-]+:/ && last ~ /^## / { \
+			text = substr(last, 4); group = ""; \
+			bar = index(text, "|"); \
+			if (bar > 0) { group = substr(text, bar + 1); text = substr(text, 1, bar - 1); } \
+			sub(/[ \t]+$$/, "", text); sub(/^[ \t]+/, "", group); \
+			if (group != "") printf "\n %s%s:%s\n\n", gray, group, reset; \
+			printf "  %s%-" width "s%s %s%s%s\n", yellow, substr($$1, 1, index($$1, ":") - 1), reset, green, text, reset; \
+		} \
+		{ last = $$0 }' $(MAKEFILE_LIST)
+	@echo
 
 .PHONY: version
-version: ## Print VERSION, CHANNEL and derived IMAGE_TAG/CHART_VERSION/APP_VERSION/DOCS_VERSION
+## Print VERSION, CHANNEL and derived IMAGE_TAG/CHART_VERSION/APP_VERSION/DOCS_VERSION.
+version:
 	@printf '%-14s %s\n' VERSION '$(VERSION)' CHANNEL '$(CHANNEL)' IMAGE_TAG '$(IMAGE_TAG)' \
 		CHART_VERSION '$(CHART_VERSION)' APP_VERSION '$(APP_VERSION)' DOCS_VERSION '$(DOCS_VERSION)' \
 		GO_VERSION '$(GO_VERSION)' COMMIT '$(COMMIT)'
 
 .PHONY: tools
-tools: $(addprefix $(TOOLS_DIR)/,$(GO_TOOLS) actionlint $(DOWNLOADED_TOOLS)) $(GINKGO) $(CERT_MANAGER_MANIFEST) ## Build/download all pinned tools into .cache/tools
+## Build/download all pinned tools into .cache/tools.
+tools: $(addprefix $(TOOLS_DIR)/,$(GO_TOOLS) actionlint $(DOWNLOADED_TOOLS)) $(GINKGO) $(CERT_MANAGER_MANIFEST)
 
 $(addprefix $(TOOLS_DIR)/,$(GO_TOOLS)): $(TOOLS_DIR)/%:
 	go -C tools build -o $@ $(TOOL_PKG_$*)
@@ -246,12 +267,14 @@ $(DOCS_VENV)/bin/mkdocs: docs/requirements.txt
 	touch $@
 
 .PHONY: clean
-clean: ## Remove dist/, build outputs and local images built by this Makefile
+## Remove dist/, build outputs and local images built by this Makefile.
+clean:
 	rm -rf $(DIST) rootfs/bin site test/e2e/e2e.test test/junitreports
 	-docker image rm --force $(foreach i,controller controller-chroot kube-webhook-certgen custom-error-pages,$(REGISTRY)/$(i):$(IMAGE_TAG)) $(E2E_IMAGE) 2>/dev/null
 
 .PHONY: check
-check: code-lint test-unit test-unit-lua docs-verify helm-docs-verify helm-lint helm-test ## Fast local checks: code-lint test-unit test-unit-lua docs-verify helm-docs-verify helm-lint helm-test
+## Fast local checks: code-lint test-unit test-unit-lua docs-verify helm-docs-verify helm-lint helm-test.
+check: code-lint test-unit test-unit-lua docs-verify helm-docs-verify helm-lint helm-test
 
 # CI matrices: [{"version": "<kindest/node tag@digest>", "name": "<tag>"}].
 .PHONY: print-k8s-versions
@@ -288,24 +311,27 @@ print-deps-platforms:
 print-%:
 	@echo '$($*)'
 
-##@ Code
 
 .PHONY: code-fmt
-code-fmt: $(GOLANGCI_LINT) ## Format Go code
+## Format Go code. | Code
+code-fmt: $(GOLANGCI_LINT)
 	$(GOLANGCI_LINT) fmt
 
 .PHONY: code-lint
-code-lint: $(GOLANGCI_LINT) $(ACTIONLINT) deps-runner ## golangci-lint, luacheck, actionlint
+## golangci-lint, luacheck, actionlint.
+code-lint: $(GOLANGCI_LINT) $(ACTIONLINT) deps-runner
 	$(GOLANGCI_LINT) run
 	tools/run-in-container.sh $(RUNNER_IMAGE) tools/lint-lua.sh
 	$(ACTIONLINT)
 
 .PHONY: code-lint-commits
-code-lint-commits: ## Check Conventional Commits in BASE..HEAD (BASE ?= origin/main)
+## Check Conventional Commits in BASE..HEAD (BASE ?= origin/main).
+code-lint-commits:
 	tools/lint-commits.sh '$(BASE)'
 
 .PHONY: code-build
-code-build: ## Build controller, dbg, wait-shutdown (GOOS=linux, ARCH) into rootfs/bin/$(ARCH)
+## Build controller, dbg, wait-shutdown (GOOS=linux, ARCH) into rootfs/bin/$(ARCH).
+code-build:
 	for cmd in nginx:nginx-ingress-controller dbg:dbg waitshutdown:wait-shutdown; do \
 		GOOS=linux GOARCH=$(ARCH) CGO_ENABLED=0 go build -trimpath -buildvcs=false \
 			-ldflags '-buildid= -s -w $(VERSION_LDFLAGS)' \
@@ -318,23 +344,26 @@ PLUGIN_PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/am
 PLUGIN_DIR := $(DIST)/plugin
 
 .PHONY: code-build-plugin
-code-build-plugin: ## Build kubectl-ingress_nginx_neo for PLUGIN_PLATFORMS into dist/plugin (+ checksums.sha256, krew manifest)
+## Build kubectl-ingress_nginx_neo for PLUGIN_PLATFORMS into dist/plugin (+ checksums.sha256, krew manifest).
+code-build-plugin:
 	VERSION=$(VERSION) LDFLAGS='$(VERSION_LDFLAGS)' RELEASE_URL=$(REPO_URL)/releases/download/$(VERSION) \
 		tools/build-plugin.sh $(PLUGIN_DIR) $(PLUGIN_PLATFORMS)
 
 .PHONY: code-sign-plugin
-code-sign-plugin: $(COSIGN) ## cosign sign-blob the plugin checksums (CHANNEL=release)
+## cosign sign-blob the plugin checksums (CHANNEL=release).
+code-sign-plugin: $(COSIGN)
 	$(if $(filter release,$(CHANNEL)),,$(error code-sign-plugin needs CHANNEL=release))
 	$(COSIGN) sign-blob --yes --bundle $(PLUGIN_DIR)/checksums.sha256.sigstore.json $(PLUGIN_DIR)/checksums.sha256
 
-##@ Test
 
 .PHONY: test-unit
-test-unit: deps-runner ## Go unit tests: root module (excluding test/e2e, images, docs/examples) + images/{kube-webhook-certgen,custom-error-pages,fastcgi-helloserver}/rootfs
+## Go unit tests: root module (excluding test/e2e, images, docs/examples) + images/{kube-webhook-certgen,custom-error-pages,fastcgi-helloserver}/rootfs. | Test
+test-unit: deps-runner
 	tools/run-in-container.sh $(RUNNER_IMAGE) test/test.sh
 
 .PHONY: test-unit-lua
-test-unit-lua: deps-runner ## Lua unit tests inside e2e-test-runner
+## Lua unit tests inside e2e-test-runner.
+test-unit-lua: deps-runner
 	tools/run-in-container.sh $(RUNNER_IMAGE) test/test-lua.sh
 
 E2E_CONTROLLER := $(if $(filter chroot,$(E2E_VARIANT)),controller-chroot,controller)
@@ -349,7 +378,8 @@ E2E_LOAD_IMAGES = $(REGISTRY)/$(E2E_CONTROLLER):$(IMAGE_TAG) $(CERTGEN_IMAGE):$(
 	$(FASTCGI_IMAGE) $(CFSSL_IMAGE)
 
 .PHONY: test-e2e
-test-e2e: $(KIND) $(KUBECTL) ## Controller e2e on kind (E2E_VARIANT=default|chroot, K8S_VERSION, FOCUS, E2E_NODES; SKIP_BUILD=1 uses already loaded images)
+## Controller e2e on kind (E2E_VARIANT=default or chroot, K8S_VERSION, FOCUS, E2E_NODES; SKIP_BUILD=1 uses already loaded images).
+test-e2e: $(KIND) $(KUBECTL)
 	$(if $(filter-out default chroot,$(E2E_VARIANT)),$(error E2E_VARIANT must be default or chroot))
 	$(MAKE) --no-print-directory docker-build-deps
 ifeq ($(SKIP_BUILD),)
@@ -366,7 +396,8 @@ endif
 		test/e2e/run-kind-e2e.sh
 
 .PHONY: test-e2e-chart
-test-e2e-chart: helm-package $(KIND) $(KUBECTL) $(HELM) $(CERT_MANAGER_MANIFEST) ## Install the chart on kind for every ci/*-values.yaml (SKIP_BUILD=1 supported)
+## Install the chart on kind for every ci/*-values.yaml (SKIP_BUILD=1 supported).
+test-e2e-chart: helm-package $(KIND) $(KUBECTL) $(HELM) $(CERT_MANAGER_MANIFEST)
 ifeq ($(SKIP_BUILD),)
 	$(MAKE) --no-print-directory docker-build IMAGES="controller kube-webhook-certgen custom-error-pages"
 endif
@@ -378,14 +409,15 @@ endif
 		tools/e2e-chart.sh $(CHART_PACKAGE) $(STAGED_CHART)/ci
 
 .PHONY: test-e2e-certgen
-test-e2e-certgen: $(KIND) $(KUBECTL) ## kube-webhook-certgen e2e on kind
+## kube-webhook-certgen e2e on kind.
+test-e2e-certgen: $(KIND) $(KUBECTL)
 	KIND=$(KIND) KUBECTL=$(KUBECTL) KIND_CLUSTER_NAME=$(PROJECT)-certgen K8S_VERSION=$(K8S_VERSION) \
 		tools/e2e-certgen.sh
 
-##@ Images
 
 .PHONY: docker-build-deps
-docker-build-deps: ## Ensure every dependency image src-* (DEPS ?= nginx e2e-test-runner e2e-test-echo httpbun fastcgi-helloserver cfssl): pull if published, otherwise build for the host platform, in dependency order
+## Ensure every dependency image src-* (DEPS ?= nginx e2e-test-runner e2e-test-echo httpbun fastcgi-helloserver cfssl): pull if published, otherwise build for the host platform, in dependency order. | Images
+docker-build-deps:
 	for dep in $(filter $(DEPS),$(DEPS_ALL)); do \
 		$(MAKE) --no-print-directory deps-ensure-$$dep; \
 	done
@@ -452,7 +484,8 @@ image-build-args = \
 	--label 'org.opencontainers.image.description=$(IMAGE_DESCRIPTION_$(1))'
 
 .PHONY: docker-build
-docker-build: ## Build delivered images for the host platform (IMAGES ?= controller controller-chroot kube-webhook-certgen custom-error-pages), load locally, tag IMAGE_TAG
+## Build delivered images for the host platform (IMAGES ?= controller controller-chroot kube-webhook-certgen custom-error-pages), load locally, tag IMAGE_TAG.
+docker-build:
 	$(if $(filter $(IMAGE_ON_BASE),$(IMAGES)),$(MAKE) --no-print-directory code-build deps-ensure-nginx)
 	$(foreach i,$(IMAGES),docker buildx build --builder default --load --platform $(PLATFORM) \
 		$(call image-build-args,$(i),$(BASE_IMAGE)) \
@@ -464,7 +497,8 @@ define newline
 endef
 
 .PHONY: docker-publish
-docker-publish: $(CRANE) ## Build and push delivered images for PLATFORMS with IMAGE_TAG (CHANNEL=latest|release), write dist/digests.env
+## Build and push delivered images for PLATFORMS with IMAGE_TAG (CHANNEL=latest or release), write dist/digests.env.
+docker-publish: $(CRANE)
 	$(if $(filter dev,$(CHANNEL)),$(error docker-publish needs CHANNEL=latest or CHANNEL=release))
 	$(foreach p,$(subst $(comma), ,$(PLATFORMS)),$(MAKE) --no-print-directory code-build ARCH=$(notdir $(p))$(newline))
 	mkdir -p $(DIST)
@@ -502,7 +536,8 @@ DOCKER_CACHE ?=
 cache-args = $(if $(DOCKER_CACHE),--cache-from type=$(DOCKER_CACHE),scope=$(1) --cache-to type=$(DOCKER_CACHE),mode=max,scope=$(1))
 
 .PHONY: docker-publish-deps
-docker-publish-deps: $(CRANE) ## Build and push one PLATFORM of every missing dependency src-* by digest, in dependency order; digests into dist/digests/
+## Build and push one PLATFORM of every missing dependency src-* by digest, in dependency order; digests into dist/digests/.
+docker-publish-deps: $(CRANE)
 	for dep in $(filter $(DEPS),$(DEPS_ALL)); do \
 		$(MAKE) --no-print-directory deps-publish-$$dep; \
 	done
@@ -530,7 +565,8 @@ deps-publish-%:
 	jq -r '."containerimage.digest"' $(DIST)/digests/$*/$$arch.json > $(DIST)/digests/$*/$$arch
 
 .PHONY: docker-publish-deps-manifest
-docker-publish-deps-manifest: ## Create the multi-platform src-* indexes from dist/digests/ (no-op for published ones)
+## Create the multi-platform src-* indexes from dist/digests/ (no-op for published ones).
+docker-publish-deps-manifest:
 	for dep in $(filter $(DEPS),$(DEPS_ALL)); do \
 		$(MAKE) --no-print-directory deps-manifest-$$dep; \
 	done
@@ -551,7 +587,8 @@ deps-manifest-%:
 		--tag "$$image" "$${refs[@]}"
 
 .PHONY: docker-promote
-docker-promote: $(CRANE) ## Point latest (CHANNEL=latest) / vX.Y.Z (CHANNEL=release) of every dependency image to its src-* digest
+## Point latest (CHANNEL=latest) / vX.Y.Z (CHANNEL=release) of every dependency image to its src-* digest.
+docker-promote: $(CRANE)
 	$(if $(filter dev,$(CHANNEL)),$(error docker-promote needs CHANNEL=latest or CHANNEL=release))
 	mkdir -p $(DIST)
 	for dep in $(DEPS_ALL); do \
@@ -575,14 +612,16 @@ deps-promote-%:
 	echo "$*=$(REGISTRY)/$*@$$digest" >> $(DIGESTS_FILE)
 
 .PHONY: docker-sign
-docker-sign: $(COSIGN) ## cosign keyless sign every digest in dist/digests.env (delivered images, promoted dependency images)
+## cosign keyless sign every digest in dist/digests.env (delivered images, promoted dependency images).
+docker-sign: $(COSIGN)
 	test -s $(DIGESTS_FILE) || { echo "$(DIGESTS_FILE) is missing: run docker-publish/docker-promote first" >&2; exit 1; }
 	cut -d= -f2- $(DIGESTS_FILE) | sort -u | xargs -r -n1 $(COSIGN) sign --yes --recursive
 
 E2E_CONTEXT := $(DIST)/e2e-image
 
 .PHONY: docker-build-e2e
-docker-build-e2e: $(GINKGO) helm-stage ## Build the e2e suite image (e2e.test of this commit, FROM e2e-test-runner); local only
+## Build the e2e suite image (e2e.test of this commit, FROM e2e-test-runner); local only.
+docker-build-e2e: $(GINKGO) helm-stage
 	$(MAKE) --no-print-directory docker-build-deps DEPS="e2e-test-runner cfssl"
 	rm -rf $(E2E_CONTEXT)
 	mkdir -p $(E2E_CONTEXT)/charts
@@ -610,15 +649,16 @@ SAVE_IMAGES_custom-error-pages = $(ERROR_PAGES_IMAGE):$(IMAGE_TAG)
 SAVE_IMAGES_e2e = $(E2E_IMAGE)
 
 .PHONY: docker-save
-docker-save: ## Save images listed by SAVE ?= (default: everything e2e needs) into dist/images-<name>.tar
+## Save images listed by SAVE ?= (default: everything e2e needs) into dist/images-<name>.tar.
+docker-save:
 	mkdir -p $(DIST)
 	$(foreach s,$(SAVE),docker save --output $(DIST)/images-$(s).tar $(SAVE_IMAGES_$(s));)
 
 .PHONY: docker-load
-docker-load: ## Load dist/images-*.tar
+## Load dist/images-*.tar.
+docker-load:
 	for f in $(wildcard $(DIST)/images-*.tar); do docker load --input "$$f"; done
 
-##@ Helm
 
 STAGED_CHART := $(DIST)/chart/$(CHART_NAME)
 CHART_PACKAGE := $(DIST)/$(CHART_NAME)-$(CHART_VERSION).tgz
@@ -634,7 +674,8 @@ helm-stage: $(YQ)
 	$(YQ) -i '.version = "$(CHART_VERSION)" | .appVersion = "$(APP_VERSION)"' $(STAGED_CHART)/Chart.yaml
 
 .PHONY: helm-lint
-helm-lint: helm-stage $(HELM) $(KUBECONFORM) ## helm lint --strict + kubeconform on the staged chart for every ci values file
+## helm lint --strict + kubeconform on the staged chart for every ci values file. | Helm
+helm-lint: helm-stage $(HELM) $(KUBECONFORM)
 	for values in $(STAGED_CHART)/ci/*-values.yaml; do \
 		echo "--- $$values"; \
 		$(HELM_ENV) $(HELM) lint --strict --values "$$values" $(STAGED_CHART); \
@@ -644,29 +685,34 @@ helm-lint: helm-stage $(HELM) $(KUBECONFORM) ## helm lint --strict + kubeconform
 	done
 
 .PHONY: helm-test
-helm-test: $(HELM_UNITTEST) ## helm-unittest
+## helm-unittest.
+helm-test: $(HELM_UNITTEST)
 	$(HELM_UNITTEST) --file 'tests/**/*_test.yaml' $(CHART_DIR)
 
 .PHONY: helm-template
-helm-template: helm-stage $(HELM) ## Render the staged chart into dist/rendered/
+## Render the staged chart into dist/rendered/.
+helm-template: helm-stage $(HELM)
 	mkdir -p $(DIST)/rendered
 	$(HELM_ENV) $(HELM) template $(RELEASE_NAME) $(STAGED_CHART) --namespace $(NAMESPACE) \
 		--kube-version $(K8S_MINOR) > $(DIST)/rendered/$(CHART_NAME).yaml
 	@echo "rendered $(DIST)/rendered/$(CHART_NAME).yaml"
 
 .PHONY: helm-docs-generate
-helm-docs-generate: $(HELM_DOCS) ## Regenerate charts/ingress-nginx-neo/README.md
+## Regenerate charts/ingress-nginx-neo/README.md.
+helm-docs-generate: $(HELM_DOCS)
 	$(HELM_DOCS) --chart-search-root charts
 
 .PHONY: helm-docs-verify
-helm-docs-verify: helm-docs-generate ## Fail if the chart README is stale
+## Fail if the chart README is stale.
+helm-docs-verify: helm-docs-generate
 	git diff --exit-code -- $(CHART_DIR)/README.md || \
 		{ echo "$(CHART_DIR)/README.md is stale: run make helm-docs-generate" >&2; exit 1; }
 
 HELM_REGISTRY_CONFIG ?= $(or $(DOCKER_CONFIG),$(HOME)/.docker)/config.json
 
 .PHONY: helm-package
-helm-package: helm-stage $(HELM) $(YQ) ## Stage, (release: pin digests), package into dist/
+## Stage, (release: pin digests), package into dist/.
+helm-package: helm-stage $(HELM) $(YQ)
 ifeq ($(CHANNEL),release)
 	test -s $(DIGESTS_FILE) || { echo "$(DIGESTS_FILE) is missing: run make docker-publish first" >&2; exit 1; }
 	digest() { sed -n "s/^$$1=.*@//p" $(DIGESTS_FILE); }; \
@@ -680,7 +726,8 @@ endif
 	$(HELM_ENV) $(HELM) package $(STAGED_CHART) --version $(CHART_VERSION) --app-version $(APP_VERSION) --destination $(DIST)
 
 .PHONY: helm-publish
-helm-publish: $(HELM) $(COSIGN) ## Push dist/*.tgz to CHART_REGISTRY and sign it
+## Push dist/*.tgz to CHART_REGISTRY and sign it.
+helm-publish: $(HELM) $(COSIGN)
 	test -s $(CHART_PACKAGE) || { echo "$(CHART_PACKAGE) is missing: run make helm-package first" >&2; exit 1; }
 	$(HELM_ENV) HELM_REGISTRY_CONFIG=$(HELM_REGISTRY_CONFIG) $(HELM) push $(CHART_PACKAGE) $(CHART_REGISTRY) 2>&1 | tee $(DIST)/helm-push.log
 	digest="$$(sed -n 's/^Digest: //p' $(DIST)/helm-push.log)"; \
@@ -688,60 +735,66 @@ helm-publish: $(HELM) $(COSIGN) ## Push dist/*.tgz to CHART_REGISTRY and sign it
 	echo "chart=$(REGISTRY)/charts/$(CHART_NAME)@$$digest" > $(DIST)/chart-digest.env; \
 	$(COSIGN) sign --yes "$(REGISTRY)/charts/$(CHART_NAME)@$$digest"
 
-##@ Manifests
 
 MANIFESTS_K8S_MINOR = $(shell sed -E 's/^v([0-9]+\.[0-9]+).*/\1/' <<< '$(firstword $(K8S_VERSIONS))')
 
 .PHONY: manifests-generate
-manifests-generate: helm-package $(HELM) $(KUSTOMIZE) ## Render deploy-<provider>.yaml from the packaged chart into dist/manifests (+ sha256)
+## Render deploy-<provider>.yaml from the packaged chart into dist/manifests (+ sha256). | Manifests
+manifests-generate: helm-package $(HELM) $(KUSTOMIZE)
 	$(HELM_ENV) HELM=$(HELM) KUSTOMIZE=$(KUSTOMIZE) RELEASE_NAME=$(RELEASE_NAME) NAMESPACE=$(NAMESPACE) \
 		CHART_NAME=$(CHART_NAME) K8S_MINOR=$(MANIFESTS_K8S_MINOR) \
 		tools/generate-manifests.sh $(CHART_PACKAGE) $(DIST)/manifests
 
-##@ Docs
 
 .PHONY: docs-generate
-docs-generate: ## Regenerate annotations-risk.md and cli-arguments.md
+## Regenerate annotations-risk.md and cli-arguments.md. | Docs
+docs-generate:
 	go run ./cmd/annotations -output docs/user-guide/nginx-configuration/annotations-risk.md
 	go run ./cmd/flagsdoc -output docs/user-guide/cli-arguments.md
 
 .PHONY: docs-verify
-docs-verify: docs-generate ## Fail if generated docs are stale
+## Fail if generated docs are stale.
+docs-verify: docs-generate
 	git diff --exit-code -- docs/ || \
 		{ echo "generated docs are stale: run make docs-generate" >&2; exit 1; }
 
 .PHONY: docs-build
-docs-build: $(DOCS_VENV)/bin/mkdocs ## mkdocs build --strict
+## mkdocs build --strict.
+docs-build: $(DOCS_VENV)/bin/mkdocs
 	$(DOCS_VENV)/bin/mkdocs build --strict --site-dir $(DIST)/site
 
 .PHONY: docs-serve
-docs-serve: $(DOCS_VENV)/bin/mkdocs ## Serve the site locally with live reload
+## Serve the site locally with live reload.
+docs-serve: $(DOCS_VENV)/bin/mkdocs
 	$(DOCS_VENV)/bin/mkdocs serve
 
 .PHONY: docs-publish
-docs-publish: $(DOCS_VENV)/bin/mkdocs ## Publish the docs version for CHANNEL via mike
+## Publish the docs version for CHANNEL via mike.
+docs-publish: $(DOCS_VENV)/bin/mkdocs
 	MIKE=$(DOCS_VENV)/bin/mike CHANNEL=$(CHANNEL) VERSION=$(VERSION) DOCS_VERSION=$(DOCS_VERSION) \
 		tools/docs-publish.sh
 
-##@ Release
 
 GITHUB_REPO ?= Kuzmenko-Pavel/ingress-nginx-neo
 DELIVERED_IMAGES := controller controller-chroot kube-webhook-certgen custom-error-pages
 RELEASE_NOTES := $(DIST)/release-notes.md
 
 .PHONY: release-tag
-release-tag: ## Create the signed annotated release tag with a generated changelog (interactive)
+## Create the signed annotated release tag with a generated changelog (interactive). | Release
+release-tag:
 	RELEASE_TAG_PATTERN='$(RELEASE_TAG_PATTERN)' RELEASE_VERSION='$(RELEASE_VERSION)' NOTES_FROM='$(NOTES_FROM)' \
 	REPO_SLUG=$(GITHUB_REPO) PROJECT=$(PROJECT) \
 		tools/release/changelog.sh
 
 .PHONY: release-verify
-release-verify: $(YQ) ## Verify RELEASE_TAG: format, annotated, trusted signature, branch, CI result, not released
+## Verify RELEASE_TAG: format, annotated, trusted signature, branch, CI result, not released.
+release-verify: $(YQ)
 	test -n '$(RELEASE_TAG)' || { echo "set RELEASE_TAG=vX.Y.Z" >&2; exit 1; }
 	YQ=$(YQ) GITHUB_REPO=$(GITHUB_REPO) tools/release/verify-tag.sh '$(RELEASE_TAG)'
 
 .PHONY: release-notes
-release-notes: ## Render dist/release-notes.md
+## Render dist/release-notes.md.
+release-notes:
 	$(if $(filter release,$(CHANNEL)),,$(error release-notes needs CHANNEL=release))
 	DIGESTS_FILE=$(DIGESTS_FILE) CHART_DIGEST_FILE=$(DIST)/chart-digest.env PLUGIN_DIR=$(PLUGIN_DIR) \
 	MANIFESTS_DIR=$(DIST)/manifests CHART_REGISTRY=$(CHART_REGISTRY) CHART_NAME=$(CHART_NAME) \
@@ -754,12 +807,14 @@ RELEASE_ASSETS = $(wildcard $(DIST)/manifests/deploy-*.yaml $(DIST)/manifests/de
 	$(PLUGIN_DIR)/checksums.sha256.sigstore.json $(PLUGIN_DIR)/ingress-nginx-neo.yaml)
 
 .PHONY: release-publish
-release-publish: ## Create or update the draft GitHub Release with all assets
+## Create or update the draft GitHub Release with all assets.
+release-publish:
 	$(if $(filter release,$(CHANNEL)),,$(error release-publish needs CHANNEL=release))
 	GITHUB_REPO=$(GITHUB_REPO) tools/release/publish.sh publish $(VERSION) $(RELEASE_NOTES) $(RELEASE_ASSETS)
 
 .PHONY: release-finalize
-release-finalize: ## Publish the draft GitHub Release
+## Publish the draft GitHub Release.
+release-finalize:
 	$(if $(filter release,$(CHANNEL)),,$(error release-finalize needs CHANNEL=release))
 	GITHUB_REPO=$(GITHUB_REPO) tools/release/publish.sh finalize $(VERSION)
 
@@ -786,12 +841,12 @@ print-latest-release:
 	@git ls-remote --tags --refs origin 'v*' | sed 's#.*refs/tags/##' | \
 		grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | sort -V | tail -n1
 
-##@ Development
 
 DEV_KIND_CLUSTER ?= $(PROJECT)-dev
 
 .PHONY: dev-env-up
-dev-env-up: helm-stage $(KIND) $(KUBECTL) $(HELM) ## kind cluster with locally built images and the staged chart installed
+## kind cluster with locally built images and the staged chart installed. | Development
+dev-env-up: helm-stage $(KIND) $(KUBECTL) $(HELM)
 	$(MAKE) --no-print-directory docker-build IMAGES="controller kube-webhook-certgen"
 	$(HELM_ENV) KIND=$(KIND) KUBECTL=$(KUBECTL) HELM=$(HELM) KIND_CLUSTER_NAME=$(DEV_KIND_CLUSTER) \
 	K8S_VERSION=$(K8S_VERSION) RELEASE_NAME=$(RELEASE_NAME) NAMESPACE=$(NAMESPACE) \
@@ -800,13 +855,14 @@ dev-env-up: helm-stage $(KIND) $(KUBECTL) $(HELM) ## kind cluster with locally b
 		tools/dev-env.sh $(STAGED_CHART)
 
 .PHONY: dev-env-down
-dev-env-down: $(KIND) ## Delete the dev kind cluster
+## Delete the dev kind cluster.
+dev-env-down: $(KIND)
 	$(KIND) delete cluster --name $(DEV_KIND_CLUSTER)
 
-##@ Security
 
 .PHONY: security-dependency-scan
-security-dependency-scan: $(GOVULNCHECK) ## govulncheck for all Go modules
+## govulncheck for all Go modules. | Security
+security-dependency-scan: $(GOVULNCHECK)
 	$(GOVULNCHECK) ./...
 	for mod in $(GO_IMAGE_MODULES); do (cd "$$mod" && $(GOVULNCHECK) ./...); done
 
@@ -815,7 +871,8 @@ GO_IMAGE_MODULES := images/kube-webhook-certgen/rootfs images/custom-error-pages
 SCAN_IMAGES := $(DELIVERED_IMAGES) nginx
 
 .PHONY: security-container-scan
-security-container-scan: ## Trivy scan of the latest published release images (or VERSION=) into dist/sarif/
+## Trivy scan of the latest published release images (or VERSION=) into dist/sarif/.
+security-container-scan:
 	version='$(if $(filter command line,$(origin VERSION)),$(VERSION))'; \
 	version="$${version:-$$($(MAKE) -s print-latest-release)}"; \
 	test -n "$$version" || { echo "no release to scan" >&2; exit 1; }; \
