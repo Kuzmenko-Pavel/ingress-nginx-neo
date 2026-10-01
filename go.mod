@@ -2,6 +2,8 @@ module k8s.io/ingress-nginx
 
 go 1.26.1
 
+toolchain go1.26.8
+
 require (
 	dario.cat/mergo v1.0.2
 	github.com/Anddd7/pb v0.0.0-20250506021228-7e355c18f206
@@ -130,3 +132,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
+
+tool github.com/onsi/ginkgo/v2/ginkgo

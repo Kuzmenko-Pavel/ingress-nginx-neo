@@ -113,7 +113,7 @@ jobs:
               echo false; return
             fi
             # shellcheck disable=SC2086 # platforms is a space separated list
-            hack/image-exists.sh "${ref}" ${platforms} || rc=$?
+            tools/image-exists.sh "${ref}" ${platforms} || rc=$?
             case ${rc} in
               0) echo "::notice::${ref} is already published, skipping" >&2; echo false ;;
               1) echo true ;;
@@ -241,7 +241,7 @@ jobs:
           REF: ${{ needs.plan.outputs.nginx-image }}
         run: |
           # Re-check right before tagging: never overwrite a published tag.
-          rc=0; hack/image-exists.sh "${REF}" || rc=$?
+          rc=0; tools/image-exists.sh "${REF}" || rc=$?
           if [ ${rc} -ne 1 ]; then echo "::error::${REF} already exists or registry query failed (rc=${rc})"; exit 1; fi
 
           make -C images/nginx manifest \
@@ -301,7 +301,7 @@ jobs:
         run: |
           # The runner is built FROM the NGINX base, which must provide every platform.
           # shellcheck disable=SC2086 # one argument per platform
-          hack/image-exists.sh "$(hack/nginx-base-image.sh)" ${PLATFORMS//,/ }
+          tools/image-exists.sh "$(hack/nginx-base-image.sh)" ${PLATFORMS//,/ }
 
           make -C images/test-runner push REGISTRY="${REGISTRY}" PLATFORMS="${PLATFORMS}"
 

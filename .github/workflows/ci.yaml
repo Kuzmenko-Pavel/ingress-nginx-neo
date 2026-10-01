@@ -99,7 +99,7 @@ jobs:
               - 'Makefile'
               - 'build/**'
               - 'hack/nginx-base-image.sh'
-              - 'hack/image-exists.sh'
+              - 'tools/image-exists.sh'
 
   base-image-tag:
     name: NGINX base / tag bump
@@ -224,7 +224,7 @@ jobs:
           if [ "${{ needs.changes.outputs.baseimage }}" = "true" ]; then
             echo "build=true" >> "$GITHUB_OUTPUT"
           else
-            rc=0; hack/image-exists.sh "${BASE_IMAGE}" || rc=$?
+            rc=0; tools/image-exists.sh "${BASE_IMAGE}" || rc=$?
             case ${rc} in
               0) echo "build=false" >> "$GITHUB_OUTPUT" ;;
               1) echo "build=true" >> "$GITHUB_OUTPUT" ;;

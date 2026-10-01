@@ -182,7 +182,7 @@ jobs:
 
           # Controller tags and chart versions are immutable unless explicitly forced.
           for image in controller controller-chroot; do
-            rc=0; hack/image-exists.sh "${REGISTRY}/${image}:${RELEASE_TAG}" || rc=$?
+            rc=0; tools/image-exists.sh "${REGISTRY}/${image}:${RELEASE_TAG}" || rc=$?
             case ${rc} in
               0) if [ "${FORCE}" = "true" ]; then echo "::warning::overwriting ${image}:${RELEASE_TAG} (force)"; else echo "::error::${REGISTRY}/${image}:${RELEASE_TAG} is already published"; fail=1; fi ;;
               1) ;;
@@ -207,7 +207,7 @@ jobs:
           aux() {
             local name=$1 tag=$2 output=$3 rc=0
             # shellcheck disable=SC2086 # one argument per platform
-            hack/image-exists.sh "${REGISTRY}/${name}:${tag}" ${PLATFORMS} || rc=$?
+            tools/image-exists.sh "${REGISTRY}/${name}:${tag}" ${PLATFORMS} || rc=$?
             case ${rc} in
               0) echo "${output}=false" >> "$GITHUB_OUTPUT"; echo "::notice::${name}:${tag} already published, reusing it" ;;
               1) echo "${output}=true" >> "$GITHUB_OUTPUT" ;;
@@ -308,7 +308,7 @@ jobs:
           BASE="$(hack/nginx-base-image.sh)"
           PLATFORMS="${{ steps.platforms.outputs.buildx }}"
           # shellcheck disable=SC2086 # one argument per platform
-          hack/image-exists.sh "${BASE}" ${PLATFORMS//,/ }
+          tools/image-exists.sh "${BASE}" ${PLATFORMS//,/ }
           DIGEST=$(docker buildx imagetools inspect "${BASE}" --format '{{json .Manifest}}' | jq -r .digest)
           echo "image=${BASE}@${DIGEST}" >> "$GITHUB_OUTPUT"
 
