@@ -27,6 +27,9 @@ MEM_GROWTH_MAX_PCT="${MEM_GROWTH_MAX_PCT:-}"
 root="$(git rev-parse --show-toplevel)"
 export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/kind-config-${KIND_CLUSTER_NAME}}"
 kubectl() { "$KUBECTL" --context "kind-${KIND_CLUSTER_NAME}" "$@"; }
+# The kubeconfig of the cluster may live in another file (KUBECONFIG of the
+# run that created it).
+"$KIND" export kubeconfig --name "${KIND_CLUSTER_NAME}"
 load_ns=ingress-nginx-neo-load
 
 controller="$(kubectl -n "$NAMESPACE" get pods 2>/dev/null \

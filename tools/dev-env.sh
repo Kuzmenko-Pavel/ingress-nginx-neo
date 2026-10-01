@@ -19,6 +19,8 @@ dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if "$KIND" get clusters | grep -qx "${KIND_CLUSTER_NAME}"; then
   echo "using the existing kind cluster ${KIND_CLUSTER_NAME}"
+  # Its kubeconfig may live in another file (KUBECONFIG of an earlier run).
+  "$KIND" export kubeconfig --name "${KIND_CLUSTER_NAME}"
 else
   "$KIND" create cluster --name "${KIND_CLUSTER_NAME}" --image "kindest/node:${K8S_VERSION}" \
     --config "${dir}/kind-dev.yaml" --wait 2m
