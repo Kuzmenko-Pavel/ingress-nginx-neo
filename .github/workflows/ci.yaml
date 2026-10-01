@@ -100,7 +100,7 @@ jobs:
       contents: read
       packages: write
     with:
-      publish: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      publish: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' }}
 
   lint:
     name: Lint
@@ -469,7 +469,9 @@ jobs:
   publish-latest:
     name: Publish latest
     needs: result
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.result.result == 'success'
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      github.ref == 'refs/heads/main' && needs.result.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     concurrency:
