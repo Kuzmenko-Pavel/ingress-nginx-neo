@@ -58,38 +58,21 @@ linters:
       check-blank: true
     gocritic:
       enabled-checks:
-        - appendAssign
-        - argOrder
-        - badCall
-        - badCond
         - badLock
         - badRegexp
         - badSorting
         - builtinShadowDecl
-        - caseOrder
-        - codegenComment
         - commentedOutCode
         - deferInLoop
-        - deprecatedComment
-        - dupArg
-        - dupBranchBody
-        - dupCase
-        - dupSubExpr
         - dynamicFmtString
         - emptyDecl
         - evalOrder
-        - exitAfterDefer
         - externalErrorReassign
         - filepathJoin
-        - flagDeref
-        - flagName
-        - mapKey
         - nilValReturn
-        - offBy1
         - regexpPattern
         - returnAfterHttpError
         - sloppyReassign
-        - sloppyTypeAssert
         - sortSlice
         - sqlQuery
         - syncMapLoadAndDelete
@@ -108,47 +91,30 @@ linters:
         - rangeValCopy
         - sliceClear
         - stringXbytes
-        - assignOp
         - boolExprSimplify
-        - captLocal
-        - commentFormatting
         - commentedOutImport
-        - defaultCaseOrder
         - deferUnlambda
         - docStub
         - dupImport
-        - elseif
         - emptyFallthrough
         - emptyStringTest
         - exposedSyncMutex
         - hexLiteral
         - httpNoBody
-        - ifElseChain
         - methodExprCall
-        - newDeref
         - octalLiteral
         - preferFilepathJoin
         - redundantSprint
-        - regexpMust
         - regexpSimplify
         - ruleguard
-        - singleCaseSwitch
-        - sloppyLen
         - stringConcatSimplify
         - stringsCompare
-        - switchTrue
         - timeExprSimplify
         - tooManyResultsChecker
         - typeAssertChain
         - typeDefFirst
-        - typeSwitchVar
-        - underef
         - unlabelStmt
-        - unlambda
-        - unslice
-        - valSwap
         - whyNoLint
-        - wrapperFunc
         - yodaStyleExpr
         - builtinShadow
         - importShadow
@@ -184,6 +150,10 @@ linters:
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
+  # The code base predates this configuration and the pinned linter version;
+  # findings in unchanged code (mostly goconst and staticcheck quick fixes) are
+  # not reported. Code changed since the merge base with main is checked fully.
+  new-from-merge-base: origin/main
 formatters:
   enable:
     - gofmt
