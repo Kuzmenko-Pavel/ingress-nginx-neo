@@ -18,8 +18,6 @@ package util
 
 import (
 	"fmt"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -27,73 +25,26 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-// The default deployment and service names for ingress-nginx
-const (
-	DefaultIngressDeploymentName = "ingress-nginx-controller" //#nosec G101
-	DefaultIngressServiceName    = "ingress-nginx-controller" //#nosec G101
-	DefaultIngressContainerName  = "controller"
-)
+// DefaultIngressContainerName is the name of the controller container.
+const DefaultIngressContainerName = "controller"
 
-// IssuePrefix is the github url that we can append an issue number to link to it
-const IssuePrefix = "https://github.com/kubernetes/ingress-nginx/issues/"
+// ControllerSelector matches the controller pods and services of the
+// ingress-nginx-neo chart, including releases installed with
+// nameOverride=ingress-nginx.
+const ControllerSelector = "app.kubernetes.io/component=controller,app.kubernetes.io/name in (ingress-nginx-neo,ingress-nginx)"
 
-var versionRegex = regexp.MustCompile(`(\d)+\.(\d)+\.(\d)+.*`)
+// IssuePrefix is the URL that an issue number of this project is appended to.
+const IssuePrefix = "https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/issues/"
+
+// UpstreamIssuePrefix is the URL that an issue number of the
+// kubernetes/ingress-nginx project is appended to.
+const UpstreamIssuePrefix = "https://github.com/kubernetes/ingress-nginx/issues/"
 
 // PrintError receives an error value and prints it if it exists
 func PrintError(e error) {
 	if e != nil {
 		fmt.Println(e)
 	}
-}
-
-// ParseVersionString returns the major, minor, and patch numbers of a version string
-func ParseVersionString(v string) (major, minor, patch int, err error) {
-	parts := versionRegex.FindStringSubmatch(v)
-
-	if len(parts) != 4 {
-		return 0, 0, 0, fmt.Errorf("could not parse %v as a version string (like 0.20.3)", v)
-	}
-
-	major, err = strconv.Atoi(parts[1])
-	if err != nil {
-		return 0, 0, 0, err
-	}
-	minor, err = strconv.Atoi(parts[2])
-	if err != nil {
-		return 0, 0, 0, err
-	}
-	patch, err = strconv.Atoi(parts[3])
-	if err != nil {
-		return 0, 0, 0, err
-	}
-	return major, minor, patch, nil
-}
-
-// InVersionRangeInclusive checks that the middle version is between the other two versions
-func InVersionRangeInclusive(start, v, stop string) bool {
-	return !isVersionLessThan(v, start) && !isVersionLessThan(stop, v)
-}
-
-func isVersionLessThan(a, b string) bool {
-	aMajor, aMinor, aPatch, err := ParseVersionString(a)
-	if err != nil {
-		panic(err)
-	}
-
-	bMajor, bMinor, bPatch, err := ParseVersionString(b)
-	if err != nil {
-		panic(err)
-	}
-
-	if aMajor != bMajor {
-		return aMajor < bMajor
-	}
-
-	if aMinor != bMinor {
-		return aMinor < bMinor
-	}
-
-	return aPatch < bPatch
 }
 
 // PodInDeployment returns whether a pod is part of a deployment with the given name
@@ -118,28 +69,28 @@ func PodInDeployment(pod *apiv1.Pod, deployment string) bool {
 // AddPodFlag adds a --pod flag to a cobra command
 func AddPodFlag(cmd *cobra.Command) *string {
 	v := ""
-	cmd.Flags().StringVar(&v, "pod", "", "Query a particular ingress-nginx pod")
+	cmd.Flags().StringVar(&v, "pod", "", "Query a particular controller pod")
 	return &v
 }
 
 // AddDeploymentFlag adds a --deployment flag to a cobra command
 func AddDeploymentFlag(cmd *cobra.Command) *string {
 	v := ""
-	cmd.Flags().StringVar(&v, "deployment", DefaultIngressDeploymentName, "The name of the ingress-nginx deployment")
+	cmd.Flags().StringVar(&v, "deployment", "", "Query a pod of this controller Deployment instead of any controller pod found by label")
 	return &v
 }
 
 // AddSelectorFlag adds a --selector flag to a cobra command
 func AddSelectorFlag(cmd *cobra.Command) *string {
 	v := ""
-	cmd.Flags().StringVarP(&v, "selector", "l", "", "Selector (label query) of the ingress-nginx pod")
+	cmd.Flags().StringVarP(&v, "selector", "l", "", "Selector (label query) of the controller pod; defaults to "+ControllerSelector)
 	return &v
 }
 
 // AddContainerFlag adds a --container flag to a cobra command
 func AddContainerFlag(cmd *cobra.Command) *string {
 	v := ""
-	cmd.Flags().StringVar(&v, "container", DefaultIngressContainerName, "The name of the ingress-nginx controller container")
+	cmd.Flags().StringVar(&v, "container", DefaultIngressContainerName, "The name of the controller container")
 	return &v
 }
 

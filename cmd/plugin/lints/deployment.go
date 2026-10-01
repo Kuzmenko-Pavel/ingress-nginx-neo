@@ -28,7 +28,6 @@ import (
 // DeploymentLint is a validation for a deployment
 type DeploymentLint struct {
 	message string
-	version string
 	issue   int
 	f       func(cmp v1.Deployment) bool
 }
@@ -47,15 +46,10 @@ func (lint DeploymentLint) Message() string {
 	return lint.message
 }
 
-// Version is the ingress-nginx version the lint was added for, or the empty string
-func (lint DeploymentLint) Version() string {
-	return lint.version
-}
-
-// Link is a URL to the issue or PR explaining the lint
+// Link is a URL to the kubernetes/ingress-nginx issue explaining the lint
 func (lint DeploymentLint) Link() string {
 	if lint.issue > 0 {
-		return fmt.Sprintf("%v%v", util.IssuePrefix, lint.issue)
+		return fmt.Sprintf("%v%v", util.UpstreamIssuePrefix, lint.issue)
 	}
 
 	return ""
@@ -64,16 +58,15 @@ func (lint DeploymentLint) Link() string {
 // GetDeploymentLints returns all of the lints for ingresses
 func GetDeploymentLints() []DeploymentLint {
 	return []DeploymentLint{
-		removedFlag("sort-backends", 3655, "0.22.0"),
-		removedFlag("force-namespace-isolation", 3887, "0.24.0"),
+		unsupportedFlag("sort-backends", 3655),
+		unsupportedFlag("force-namespace-isolation", 3887),
 	}
 }
 
-func removedFlag(flag string, issueNumber int, version string) DeploymentLint {
+func unsupportedFlag(flag string, issueNumber int) DeploymentLint {
 	return DeploymentLint{
-		message: fmt.Sprintf("Uses removed config flag --%v", flag),
+		message: fmt.Sprintf("Uses the --%v flag, which the controller does not accept", flag),
 		issue:   issueNumber,
-		version: version,
 		f: func(dep v1.Deployment) bool {
 			if !isIngressNginxDeployment(&dep) {
 				return false

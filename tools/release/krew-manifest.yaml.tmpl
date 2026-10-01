@@ -1,0 +1,13 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: ingress-nginx-neo
+spec:
+  version: @VERSION@
+  homepage: https://kuzmenko-pavel.github.io/ingress-nginx-neo/kubectl-plugin/
+  shortDescription: Interact with ingress-nginx-neo controllers
+  description: |
+    Inspect ingress-nginx-neo controllers: backends, certificates, the rendered
+    nginx.conf, logs, Ingress definitions and lint checks.
+  platforms:
+@PLATFORMS@

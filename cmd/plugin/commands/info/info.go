@@ -21,6 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"k8s.io/ingress-nginx/cmd/plugin/request"
@@ -31,7 +32,7 @@ import (
 func CreateCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "info",
-		Short: "Show information about the ingress-nginx service",
+		Short: "Show information about the controller service",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			service, err := cmd.Flags().GetString("service")
 			if err != nil {
@@ -43,16 +44,23 @@ func CreateCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().String("service", util.DefaultIngressServiceName, "The name of the ingress-nginx service")
+	cmd.Flags().String("service", "", "The name of the controller service; defaults to the controller service found by label")
 	return cmd
 }
 
 func info(flags *genericclioptions.ConfigFlags, serviceName string) error {
-	service, err := request.GetServiceByName(flags, serviceName, nil)
+	var service apiv1.Service
+	var err error
+	if serviceName == "" {
+		service, err = request.GetControllerService(flags)
+	} else {
+		service, err = request.GetServiceByName(flags, serviceName, nil)
+	}
 	if err != nil {
 		return err
 	}
 
+	fmt.Printf("Service: %v\n", service.Name)
 	fmt.Printf("Service cluster IP address: %v\n", service.Spec.ClusterIP)
 	fmt.Printf("LoadBalancer IP|CNAME: %v\n", service.Spec.LoadBalancerIP)
 	return nil

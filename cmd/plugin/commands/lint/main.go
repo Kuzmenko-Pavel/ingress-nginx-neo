@@ -29,7 +29,6 @@ import (
 	"k8s.io/ingress-nginx/cmd/plugin/lints"
 	"k8s.io/ingress-nginx/cmd/plugin/request"
 	"k8s.io/ingress-nginx/cmd/plugin/util"
-	"k8s.io/ingress-nginx/version"
 )
 
 // CreateCommand creates and returns this cobra subcommand
@@ -39,13 +38,8 @@ func CreateCommand(flags *genericclioptions.ConfigFlags) *cobra.Command {
 		Use:   "lint",
 		Short: "Inspect kubernetes resources for possible issues",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			err := opts.Validate()
-			if err != nil {
-				return err
-			}
-
 			fmt.Println("Checking ingresses...")
-			err = ingresses(*opts)
+			err := ingresses(*opts)
 			if err != nil {
 				util.PrintError(err)
 			}
@@ -74,10 +68,6 @@ func createSubcommand(flags *genericclioptions.ConfigFlags, names []string, shor
 		Aliases: names[1:],
 		Short:   short,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			err := opts.Validate()
-			if err != nil {
-				return err
-			}
 			util.PrintError(f(*opts))
 			return nil
 		},
@@ -95,8 +85,6 @@ func addCommonOptions(flags *genericclioptions.ConfigFlags, cmd *cobra.Command) 
 	cmd.Flags().BoolVar(&out.allNamespaces, "all-namespaces", false, "Check resources in all namespaces")
 	cmd.Flags().BoolVar(&out.showAll, "show-all", false, "Show all resources, not just the ones with problems")
 	cmd.Flags().BoolVarP(&out.verbose, "verbose", "v", false, "Show extra information about the lints")
-	cmd.Flags().StringVarP(&out.versionFrom, "from-version", "f", "0.0.0", "Use lints added for versions starting with this one")
-	cmd.Flags().StringVarP(&out.versionTo, "to-version", "t", version.RELEASE, "Use lints added for versions up to and including this one")
 
 	return &out
 }
@@ -106,45 +94,15 @@ type lintOptions struct {
 	allNamespaces bool
 	showAll       bool
 	verbose       bool
-	versionFrom   string
-	versionTo     string
-}
-
-func (opts *lintOptions) Validate() error {
-	//nolint:dogsled // Ignore 3 blank identifiers
-	_, _, _, err := util.ParseVersionString(opts.versionFrom)
-	if err != nil {
-		return err
-	}
-
-	//nolint:dogsled // Ignore 3 blank identifiers
-	_, _, _, err = util.ParseVersionString(opts.versionTo)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 type lint interface {
 	Check(obj kmeta.Object) bool
 	Message() string
 	Link() string
-	Version() string
 }
 
 func checkObjectArray(allLints []lint, objects []kmeta.Object, opts lintOptions) {
-	usedLints := make([]lint, 0)
-	for _, lint := range allLints {
-		lintVersion := lint.Version()
-		if lint.Version() == "" {
-			lintVersion = "0.0.0"
-		}
-		if util.InVersionRangeInclusive(opts.versionFrom, lintVersion, opts.versionTo) {
-			usedLints = append(usedLints, lint)
-		}
-	}
-
 	for _, obj := range objects {
 		objName := obj.GetName()
 		if opts.allNamespaces {
@@ -152,7 +110,7 @@ func checkObjectArray(allLints []lint, objects []kmeta.Object, opts lintOptions)
 		}
 
 		failedLints := make([]lint, 0)
-		for _, lint := range usedLints {
+		for _, lint := range allLints {
 			if lint.Check(obj) {
 				failedLints = append(failedLints, lint)
 			}
@@ -162,9 +120,6 @@ func checkObjectArray(allLints []lint, objects []kmeta.Object, opts lintOptions)
 			fmt.Printf("✗ %v\n", objName)
 			for _, lint := range failedLints {
 				fmt.Printf("  - %v\n", lint.Message())
-				if opts.verbose && lint.Version() != "" {
-					fmt.Printf("      Lint added for version %v\n", lint.Version())
-				}
 				if opts.verbose && lint.Link() != "" {
 					fmt.Printf("      %v\n", lint.Link())
 				}

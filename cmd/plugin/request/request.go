@@ -19,6 +19,7 @@ package request
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -34,7 +35,10 @@ import (
 	"k8s.io/ingress-nginx/cmd/plugin/util"
 )
 
-// ChoosePod finds a pod either by deployment or by name
+// ChoosePod finds the controller pod to query. An explicit pod name, label
+// selector or Deployment name selects the pod; without them it is any pod
+// matching util.ControllerSelector, which covers Deployment and DaemonSet
+// installations. A Ready pod is preferred.
 func ChoosePod(flags *genericclioptions.ConfigFlags, podName, deployment, selector string) (apiv1.Pod, error) {
 	if podName != "" {
 		return GetNamedPod(flags, podName)
@@ -44,7 +48,19 @@ func ChoosePod(flags *genericclioptions.ConfigFlags, podName, deployment, select
 		return GetLabeledPod(flags, selector)
 	}
 
-	return GetDeploymentPod(flags, deployment)
+	if deployment != "" {
+		return GetDeploymentPod(flags, deployment)
+	}
+
+	pods, err := getLabeledPods(flags, util.ControllerSelector)
+	if err != nil {
+		return apiv1.Pod{}, err
+	}
+	if len(pods) == 0 {
+		return apiv1.Pod{}, fmt.Errorf("no controller pods found in namespace %v (selector %q); select one with --pod, --deployment or --selector",
+			util.GetNamespace(flags), util.ControllerSelector)
+	}
+	return preferReady(pods), nil
 }
 
 // GetNamedPod finds a pod with the given name
@@ -63,7 +79,7 @@ func GetNamedPod(flags *genericclioptions.ConfigFlags, name string) (apiv1.Pod, 
 	return apiv1.Pod{}, fmt.Errorf("pod %v not found in namespace %v", name, util.GetNamespace(flags))
 }
 
-// GetDeploymentPod finds a pod from a given deployment
+// GetDeploymentPod finds a pod from a given deployment, preferring a Ready one
 func GetDeploymentPod(flags *genericclioptions.ConfigFlags, deployment string) (apiv1.Pod, error) {
 	ings, err := getDeploymentPods(flags, deployment)
 	if err != nil {
@@ -74,10 +90,10 @@ func GetDeploymentPod(flags *genericclioptions.ConfigFlags, deployment string) (
 		return apiv1.Pod{}, fmt.Errorf("no pods for deployment %v found in namespace %v", deployment, util.GetNamespace(flags))
 	}
 
-	return ings[0], nil
+	return preferReady(ings), nil
 }
 
-// GetLabeledPod finds a pod from a given label
+// GetLabeledPod finds a pod from a given label, preferring a Ready one
 func GetLabeledPod(flags *genericclioptions.ConfigFlags, label string) (apiv1.Pod, error) {
 	ings, err := getLabeledPods(flags, label)
 	if err != nil {
@@ -88,7 +104,50 @@ func GetLabeledPod(flags *genericclioptions.ConfigFlags, label string) (apiv1.Po
 		return apiv1.Pod{}, fmt.Errorf("no pods for label selector %v found in namespace %v", label, util.GetNamespace(flags))
 	}
 
-	return ings[0], nil
+	return preferReady(ings), nil
+}
+
+// preferReady returns the first Ready pod, or the first pod if none is Ready.
+func preferReady(pods []apiv1.Pod) apiv1.Pod {
+	for i := range pods {
+		for _, condition := range pods[i].Status.Conditions {
+			if condition.Type == apiv1.PodReady && condition.Status == apiv1.ConditionTrue {
+				return pods[i]
+			}
+		}
+	}
+	return pods[0]
+}
+
+// GetControllerService finds the main controller Service by
+// util.ControllerSelector: the one whose name ends in "-controller".
+func GetControllerService(flags *genericclioptions.ConfigFlags) (apiv1.Service, error) {
+	services, err := getLabeledServices(flags, util.ControllerSelector)
+	if err != nil {
+		return apiv1.Service{}, err
+	}
+
+	var candidates []apiv1.Service
+	for i := range services {
+		if strings.HasSuffix(services[i].Name, "-controller") {
+			candidates = append(candidates, services[i])
+		}
+	}
+
+	switch len(candidates) {
+	case 1:
+		return candidates[0], nil
+	case 0:
+		return apiv1.Service{}, fmt.Errorf("no controller service found in namespace %v (selector %q); select one with --service",
+			util.GetNamespace(flags), util.ControllerSelector)
+	default:
+		names := make([]string, 0, len(candidates))
+		for i := range candidates {
+			names = append(names, candidates[i].Name)
+		}
+		return apiv1.Service{}, fmt.Errorf("several controller services found in namespace %v (%v); select one with --service",
+			util.GetNamespace(flags), strings.Join(names, ", "))
+	}
 }
 
 // GetDeployments returns an array of Deployments
@@ -252,41 +311,27 @@ func GetServiceByName(flags *genericclioptions.ConfigFlags, name string, service
 	return apiv1.Service{}, fmt.Errorf("could not find service %v in namespace %v", name, util.GetNamespace(flags))
 }
 
-func getPods(flags *genericclioptions.ConfigFlags) ([]apiv1.Pod, error) {
-	namespace := util.GetNamespace(flags)
-
+// newCoreClient returns the core/v1 client for the kubectl flags; tests
+// replace it with a fake.
+var newCoreClient = func(flags *genericclioptions.ConfigFlags) (corev1.CoreV1Interface, error) {
 	rawConfig, err := flags.ToRESTConfig()
 	if err != nil {
-		return make([]apiv1.Pod, 0), err
+		return nil, err
 	}
+	return corev1.NewForConfig(rawConfig)
+}
 
-	api, err := corev1.NewForConfig(rawConfig)
-	if err != nil {
-		return make([]apiv1.Pod, 0), err
-	}
-
-	pods, err := api.Pods(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return make([]apiv1.Pod, 0), err
-	}
-
-	return pods.Items, nil
+func getPods(flags *genericclioptions.ConfigFlags) ([]apiv1.Pod, error) {
+	return getLabeledPods(flags, "")
 }
 
 func getLabeledPods(flags *genericclioptions.ConfigFlags, label string) ([]apiv1.Pod, error) {
-	namespace := util.GetNamespace(flags)
-
-	rawConfig, err := flags.ToRESTConfig()
+	api, err := newCoreClient(flags)
 	if err != nil {
 		return make([]apiv1.Pod, 0), err
 	}
 
-	api, err := corev1.NewForConfig(rawConfig)
-	if err != nil {
-		return make([]apiv1.Pod, 0), err
-	}
-
-	pods, err := api.Pods(namespace).List(context.TODO(), metav1.ListOptions{
+	pods, err := api.Pods(util.GetNamespace(flags)).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: label,
 	})
 	if err != nil {
@@ -294,6 +339,22 @@ func getLabeledPods(flags *genericclioptions.ConfigFlags, label string) ([]apiv1
 	}
 
 	return pods.Items, nil
+}
+
+func getLabeledServices(flags *genericclioptions.ConfigFlags, label string) ([]apiv1.Service, error) {
+	api, err := newCoreClient(flags)
+	if err != nil {
+		return nil, err
+	}
+
+	services, err := api.Services(util.GetNamespace(flags)).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: label,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return services.Items, nil
 }
 
 func getDeploymentPods(flags *genericclioptions.ConfigFlags, deployment string) ([]apiv1.Pod, error) {

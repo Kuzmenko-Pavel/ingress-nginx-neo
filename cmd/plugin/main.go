@@ -38,12 +38,14 @@ import (
 	"k8s.io/ingress-nginx/cmd/plugin/commands/lint"
 	"k8s.io/ingress-nginx/cmd/plugin/commands/logs"
 	"k8s.io/ingress-nginx/cmd/plugin/commands/ssh"
+	"k8s.io/ingress-nginx/version"
 )
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "ingress-nginx",
-		Short: "A kubectl plugin for inspecting your ingress-nginx deployments",
+		Use:     "ingress-nginx-neo",
+		Short:   "A kubectl plugin for inspecting ingress-nginx-neo controllers",
+		Version: fmt.Sprintf("%v (commit %v, %v)", version.RELEASE, version.COMMIT, version.REPO),
 	}
 
 	// Respect some basic kubectl flags like --namespace

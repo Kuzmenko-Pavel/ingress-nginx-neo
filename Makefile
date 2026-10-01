@@ -288,6 +288,19 @@ code-build: ## Build controller, dbg, wait-shutdown (GOOS=linux, ARCH) into root
 
 VERSION_LDFLAGS = -X $(GO_PACKAGE)/version.RELEASE=$(VERSION) -X $(GO_PACKAGE)/version.COMMIT=$(COMMIT) -X $(GO_PACKAGE)/version.REPO=$(REPO_URL)
 
+PLUGIN_PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
+PLUGIN_DIR := $(DIST)/plugin
+
+.PHONY: code-build-plugin
+code-build-plugin: ## Build kubectl-ingress_nginx_neo for PLUGIN_PLATFORMS into dist/plugin (+ checksums.sha256, krew manifest)
+	VERSION=$(VERSION) LDFLAGS='$(VERSION_LDFLAGS)' RELEASE_URL=$(REPO_URL)/releases/download/$(VERSION) \
+		tools/build-plugin.sh $(PLUGIN_DIR) $(PLUGIN_PLATFORMS)
+
+.PHONY: code-sign-plugin
+code-sign-plugin: $(COSIGN) ## cosign sign-blob the plugin checksums (CHANNEL=release)
+	$(if $(filter release,$(CHANNEL)),,$(error code-sign-plugin needs CHANNEL=release))
+	$(COSIGN) sign-blob --yes --bundle $(PLUGIN_DIR)/checksums.sha256.sigstore.json $(PLUGIN_DIR)/checksums.sha256
+
 ##@ Test
 
 .PHONY: test-unit
