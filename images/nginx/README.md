@@ -32,6 +32,11 @@ make print-NGINX_IMAGE                     # reference used by this tree
 make docker-build-deps DEPS=nginx          # pull it, or build it for the host platform
 ```
 
+`build.sh` downloads the sources from GitHub with the token of the BuildKit secret `github_token`
+(`git` through `http.extraHeader` in its environment, `curl` through an `Authorization` header),
+and retries failed downloads. The Makefile passes `GITHUB_TOKEN` as this secret and stops with an
+error when it is not set; any GitHub token works, for example `export GITHUB_TOKEN="$(gh auth token)"`.
+
 ## Adding a patch
 
 1. Add `NN_nginx-<nginx version>-<topic>.patch` to `rootfs/patches/`, where `NN` orders it after the

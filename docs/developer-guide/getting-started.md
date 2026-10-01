@@ -13,7 +13,7 @@ project API: contributors, agents and CI run the same targets with the same pinn
 | Go | any; the toolchain of `go.mod` is downloaded automatically | building code and tools |
 | Docker with buildx | any recent | images, Go/Lua unit tests, e2e |
 | jq, python3 (3.10+), gpg | any recent | CI helpers, docs, release tags |
-| gh | any recent | release targets only |
+| gh | any recent | release targets; `GITHUB_TOKEN` for building the NGINX base |
 
 Everything else (helm, kind, kubectl, golangci-lint, helm-unittest, helm-docs, yq, kustomize,
 kubeconform, cosign, crane, govulncheck, actionlint, ginkgo) is pinned in `tools/` and installed into

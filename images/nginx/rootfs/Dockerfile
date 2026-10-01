@@ -15,7 +15,10 @@ FROM alpine:3.23.3 AS builder
 
 COPY . /
 
-RUN apk update \
+# build.sh downloads the sources from GitHub with the token of the secret
+# github_token; secrets are not stored in layers.
+RUN --mount=type=secret,id=github_token,required=true \
+  apk update \
   && apk upgrade \
   && apk add -U bash --no-cache \
   && /build.sh

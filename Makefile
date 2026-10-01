@@ -185,7 +185,7 @@ DEP_IMAGE_e2e-test-echo := $(ECHO_IMAGE)
 DEP_IMAGE_httpbun := $(HTTPBUN_IMAGE)
 DEP_IMAGE_fastcgi-helloserver := $(FASTCGI_IMAGE)
 DEP_IMAGE_cfssl := $(CFSSL_IMAGE)
-DEP_ARGS_nginx :=
+DEP_ARGS_nginx := --secret id=github_token,env=GITHUB_TOKEN
 DEP_ARGS_e2e-test-runner := --build-arg GOLANG_VERSION=$(GO_VERSION) --build-arg GINKGO_VERSION=$(GINKGO_VERSION) --build-arg HELM_VERSION=$(HELM_VERSION)
 DEP_ARGS_e2e-test-echo :=
 DEP_ARGS_httpbun := --build-arg GOLANG_VERSION=$(GO_VERSION)
@@ -193,6 +193,19 @@ DEP_ARGS_fastcgi-helloserver := --build-arg GOLANG_VERSION=$(GO_VERSION)
 DEP_ARGS_cfssl := --build-arg GOLANG_VERSION=$(GO_VERSION)
 # Images built FROM the nginx base.
 DEPS_ON_BASE := e2e-test-runner e2e-test-echo
+# Images whose build downloads sources from GitHub with GITHUB_TOKEN (BuildKit
+# secret github_token): anonymous clones are refused or rate limited on some
+# networks. The token is not an image input.
+DEPS_GITHUB_TOKEN := nginx
+export GITHUB_TOKEN
+
+define github-token-check
+if [ -z "$${GITHUB_TOKEN:-}" ]; then \
+	echo "Error: GITHUB_TOKEN is not set" >&2; \
+	echo 'Please add: export GITHUB_TOKEN="$$(gh auth token)"' >&2; \
+	exit 1; \
+fi
+endef
 
 # Digests published by docker-publish and docker-promote: <name>=<repository>@<digest>.
 DIGESTS_FILE := $(DIST)/digests.env
@@ -438,6 +451,7 @@ deps-ensure-%:
 
 # Build one dependency image for the host platform into the local image store.
 deps-build-%:
+	$(if $(filter $*,$(DEPS_GITHUB_TOKEN)),@$(github-token-check))
 	$(if $(filter $*,$(DEPS_ON_BASE)),$(MAKE) --no-print-directory deps-ensure-nginx)
 	docker buildx build --builder $(LOCAL_BUILDER) --load \
 		--platform $(PLATFORM) \
@@ -550,6 +564,7 @@ deps-publish-%:
 	image='$(DEP_IMAGE_$*)'; arch='$(notdir $(PLATFORM))'; \
 	rc=0; tools/image-exists.sh "$$image" $(DEPS_PLATFORMS) || rc=$$?; \
 	case $$rc in 0) echo "$$image: published"; exit 0 ;; 1) ;; *) exit $$rc ;; esac; \
+	$(if $(filter $*,$(DEPS_GITHUB_TOKEN)),$(github-token-check);) \
 	base=''; \
 	if [[ " $(DEPS_ON_BASE) " == *" $* "* ]]; then \
 		if tools/image-exists.sh '$(NGINX_IMAGE)' $(PLATFORM); then \

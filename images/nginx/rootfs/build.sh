@@ -111,6 +111,33 @@ export BUILD_PATH=/tmp/build
 
 ARCH=$(uname -m)
 
+# Downloads from GitHub are authenticated with the token of the build secret
+# github_token: anonymous clones are refused or rate limited on some networks.
+# git reads the header from its environment only, so no configuration file
+# holds the token.
+GITHUB_TOKEN_FILE=/run/secrets/github_token
+if [ ! -s "$GITHUB_TOKEN_FILE" ]; then
+  echo "secret github_token is missing: build with --secret id=github_token,env=GITHUB_TOKEN" >&2
+  exit 1
+fi
+GITHUB_TOKEN=$(cat "$GITHUB_TOKEN_FILE")
+export GIT_TERMINAL_PROMPT=0
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=http.https://github.com/.extraHeader
+GIT_CONFIG_VALUE_0="Authorization: Basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
+export GIT_CONFIG_VALUE_0
+
+# Run a network command up to three times.
+retry()
+{
+  for attempt in 1 2 3; do
+    "$@" && return 0
+    echo "Attempt $attempt of 3 failed: $*" >&2
+    sleep $((attempt * 10))
+  done
+  return 1
+}
+
 get_src()
 {
   hash="$1"
@@ -118,10 +145,14 @@ get_src()
   dest="${3-}"
   ARGS=""
   f=$(basename "$url")
+  auth=()
+  case "$url" in
+    https://github.com/*) auth=(--header "Authorization: Bearer $GITHUB_TOKEN") ;;
+  esac
 
   echo "Downloading $url"
 
-  curl -sSL "$url" -o "$f"
+  curl -sSL --fail --retry 5 --retry-all-errors --connect-timeout 30 "${auth[@]}" "$url" -o "$f"
   # TODO: Reenable checksum verification but make it smarter
   # echo "$hash  $f" | sha256sum -c - || exit 10
   if [ ! -z "$dest" ]; then
@@ -318,14 +349,14 @@ git config --global --add core.compression -1
 
 # Get Brotli source and deps
 cd "$BUILD_PATH"
-git clone --depth=100 https://github.com/google/ngx_brotli.git
+retry git clone --depth=100 https://github.com/google/ngx_brotli.git
 cd ngx_brotli
 git reset --hard a71f9312c2deb28875acc7bacfdd5695a111aa53
 git submodule init
-git submodule update
+retry git submodule update
 
 cd "$BUILD_PATH"
-git clone --depth=1 https://github.com/ssdeep-project/ssdeep
+retry git clone --depth=1 https://github.com/ssdeep-project/ssdeep
 cd ssdeep/
 
 ./bootstrap
@@ -336,11 +367,11 @@ make install
 
 # build modsecurity library
 cd "$BUILD_PATH"
-git clone -n https://github.com/owasp-modsecurity/ModSecurity
+retry git clone -n https://github.com/owasp-modsecurity/ModSecurity
 cd ModSecurity/
 git checkout $MODSECURITY_LIB_VERSION
 git submodule init
-git submodule update
+retry git submodule update
 
 sh build.sh
 
@@ -379,7 +410,7 @@ echo "SecAuditLogStorageDir /var/log/audit/" >> /etc/nginx/modsecurity/modsecuri
 # Download owasp modsecurity crs
 cd /etc/nginx/
 
-git clone -b $OWASP_MODSECURITY_CRS_VERSION https://github.com/coreruleset/coreruleset
+retry git clone -b $OWASP_MODSECURITY_CRS_VERSION https://github.com/coreruleset/coreruleset
 mv coreruleset owasp-modsecurity-crs
 cd owasp-modsecurity-crs
 
@@ -522,7 +553,7 @@ make install
 export OPENTELEMETRY_CONTRIB_COMMIT=8933841f0a7f8737f61404cf0a64acf6b079c8a5
 cd "$BUILD_PATH"
 
-git clone https://github.com/open-telemetry/opentelemetry-cpp-contrib.git opentelemetry-cpp-contrib-${OPENTELEMETRY_CONTRIB_COMMIT}
+retry git clone https://github.com/open-telemetry/opentelemetry-cpp-contrib.git opentelemetry-cpp-contrib-${OPENTELEMETRY_CONTRIB_COMMIT}
 
 cd ${BUILD_PATH}/opentelemetry-cpp-contrib-${OPENTELEMETRY_CONTRIB_COMMIT}
 git reset --hard ${OPENTELEMETRY_CONTRIB_COMMIT}

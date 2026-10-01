@@ -70,6 +70,19 @@ Lua libraries; `images/nginx/rootfs/patches` holds the patches applied to the NG
 for its contents and for adding a patch or backporting an NGINX security fix. A change of the base
 produces a new `src-*` tag; the controller images of the same commit are built from it.
 
+Building the base downloads its sources from GitHub with a token, because anonymous clones are
+refused or rate limited on some networks. The Makefile passes `GITHUB_TOKEN` to the build as the
+BuildKit secret `github_token`, which is not stored in the image and is not an input of the
+content tag. Any GitHub token works, a token without scopes is enough:
+
+```console
+export GITHUB_TOKEN="$(gh auth token)"
+make docker-build-deps DEPS=nginx
+```
+
+CI passes the token of the workflow run. The token is needed only when the base is built; a
+published `src-*` base is pulled without it.
+
 ## Architectures
 
 Every image is published for `linux/amd64` and `linux/arm64`. Dependency images are built

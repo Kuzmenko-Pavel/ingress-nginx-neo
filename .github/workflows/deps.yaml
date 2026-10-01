@@ -95,6 +95,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push by digest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: make docker-publish-deps PLATFORM=${{ matrix.platform }} DOCKER_CACHE=gha
 
       - name: Upload digests
@@ -168,6 +170,7 @@ jobs:
       - name: Pull or build
         env:
           BUILDX_BUILDER: default
+          GITHUB_TOKEN: ${{ github.token }}
         run: make docker-build-deps docker-save SAVE=deps
 
       - name: Upload images
