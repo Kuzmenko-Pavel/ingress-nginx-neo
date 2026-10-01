@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"mime"
 	"net/http"
@@ -102,11 +103,11 @@ func errorHandler(path, defaultFormat string) func(http.ResponseWriter, *http.Re
 	if err != nil || len(defaultExts) == 0 {
 		panic("couldn't get file extension for default format")
 	}
-	defaultExt := defaultExts[0]
+	pages := os.DirFS(path)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		ext := defaultExt
+		exts := defaultExts
 
 		if os.Getenv("DEBUG") != "" {
 			w.Header().Set(FormatHeader, r.Header.Get(FormatHeader))
@@ -134,12 +135,12 @@ func errorHandler(path, defaultFormat string) func(http.ResponseWriter, *http.Re
 
 		cext, err := mime.ExtensionsByType(format)
 		if err != nil {
-			log.Printf("unexpected error reading media type extension: %v. Using %v", err, ext)
+			log.Printf("unexpected error reading media type extension: %v. Using the default format", err)
 			format = defaultFormat
 		} else if len(cext) == 0 {
-			log.Printf("couldn't get media type extension. Using %v", ext)
+			log.Print("couldn't get media type extension. Using the default format")
 		} else {
-			ext = cext[0]
+			exts = cext
 		}
 		w.Header().Set(ContentType, format)
 
@@ -150,33 +151,14 @@ func errorHandler(path, defaultFormat string) func(http.ResponseWriter, *http.Re
 			log.Printf("unexpected error reading return code: %v. Using %v", err, code)
 		}
 
-		if !strings.HasPrefix(ext, ".") {
-			ext = "." + ext
-		}
-		// special case for compatibility
-		if ext == ".htm" {
-			ext = ".html"
-		}
-		file := fmt.Sprintf("%v/%v%v", path, code, ext)
-		f, err := os.Open(file)
-		if err != nil {
-			log.Printf("unexpected error opening file: %v", err)
-			scode := strconv.Itoa(code)
-			file := fmt.Sprintf("%v/%cxx%v", path, scode[0], ext)
-			f, err := os.Open(file)
-			if err != nil {
-				log.Printf("unexpected error opening file: %v", err)
-				http.NotFound(w, r)
-				return
-			}
-			defer f.Close()
-			log.Printf("serving custom error response for code %v and format %v from file %v", code, format, file)
-			w.WriteHeader(code)
-			io.Copy(w, f)
+		f, name := openPage(pages, code, exts)
+		if f == nil {
+			log.Printf("no file for code %v and the requested format", code)
+			http.NotFound(w, r)
 			return
 		}
 		defer f.Close()
-		log.Printf("serving custom error response for code %v and format %v from file %v", code, format, file)
+		log.Printf("serving custom error response for code %v from file %v", code, name)
 		w.WriteHeader(code)
 		io.Copy(w, f)
 
@@ -188,4 +170,29 @@ func errorHandler(path, defaultFormat string) func(http.ResponseWriter, *http.Re
 		requestCount.WithLabelValues(proto).Inc()
 		requestDuration.WithLabelValues(proto).Observe(duration)
 	}
+}
+
+// openPage opens the page of the code (<code><ext>, then <class>xx<ext>) with
+// the first extension of the media type that has one, or returns nil. The
+// extensions and their order come from the MIME tables of Go and of the
+// system, which differ between versions (Go 1.26 lists .ehtml before .html for
+// text/html).
+func openPage(pages fs.FS, code int, exts []string) (page fs.File, name string) {
+	scode := strconv.Itoa(code)
+	for _, base := range []string{scode, scode[:1] + "xx"} {
+		for _, ext := range exts {
+			if !strings.HasPrefix(ext, ".") {
+				ext = "." + ext
+			}
+			// special case for compatibility
+			if ext == ".htm" {
+				ext = ".html"
+			}
+			name = base + ext
+			if f, err := pages.Open(name); err == nil {
+				return f, name
+			}
+		}
+	}
+	return nil, ""
 }
