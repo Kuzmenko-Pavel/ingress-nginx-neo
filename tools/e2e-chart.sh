@@ -42,22 +42,28 @@ image_args=(
   --set "controller.admissionWebhooks.patch.image.tag=${IMAGE_TAG}"
   --set "defaultBackend.image.image=${IMAGE_PREFIX}/custom-error-pages"
   --set "defaultBackend.image.tag=${IMAGE_TAG}"
+  # The test checks installations, not the draining of connections.
+  --set "controller.terminationGracePeriodSeconds=0"
 )
 
-# Every values file gets its own namespace, deleted after the uninstall:
-# objects the release does not own outlive it (for example the admission
-# Secret written by cert-manager) and would change the next installation.
+# Every values file gets its own namespace: objects the release does not own
+# outlive it (for example the admission Secret written by cert-manager) and
+# would change the next installation. Teardown does not wait: the uninstall
+# removes the cluster-scoped objects of the release at once, the namespace is
+# deleted in the background and the cluster at the end.
 i=0
 for values in "${values_dir}"/*-values.yaml; do
   i=$((i + 1))
   namespace="${NAMESPACE}-${i}"
   echo "--- $(basename "${values}") (namespace ${namespace})"
+  start=$SECONDS
   "$HELM" install "${RELEASE_NAME}" "${chart}" \
     --namespace "${namespace}" --create-namespace \
     --values "${values}" \
     "${image_args[@]}" \
-    --wait --timeout 5m
+    --hide-notes --wait --timeout 5m
   "$KUBECTL" get pods --namespace "${namespace}"
-  "$HELM" uninstall "${RELEASE_NAME}" --namespace "${namespace}" --wait --timeout 5m
-  "$KUBECTL" delete namespace "${namespace}" --wait --timeout 5m
+  echo "installed in $((SECONDS - start))s"
+  "$HELM" uninstall "${RELEASE_NAME}" --namespace "${namespace}"
+  "$KUBECTL" delete namespace "${namespace}" --wait=false
 done
