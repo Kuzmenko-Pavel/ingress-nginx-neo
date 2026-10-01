@@ -1,300 +1,310 @@
 # Installation Guide
 
-There are multiple ways to install the Ingress-Nginx Controller:
+ingress-nginx-neo can be installed in two ways:
 
-- with [Helm](https://helm.sh), using the project repository chart;
-- with `kubectl apply`, using YAML manifests;
-- with specific addons (e.g. for [minikube](#minikube) or [MicroK8s](#microk8s)).
+- with [Helm](https://helm.sh), using the chart published as an OCI artifact (recommended);
+- with `kubectl apply`, using the static manifests attached to every release.
 
-On most Kubernetes clusters, the ingress controller will work without requiring any extra configuration. If you want to
-get started as fast as possible, you can check the [quick start](#quick-start) instructions. However, in many
-environments, you can improve the performance or get better logs by enabling extra features. We recommend that you
-check the [environment-specific instructions](#environment-specific-instructions) for details about optimizing the
-ingress controller for your particular environment or cloud provider.
+Both methods install the same resources into the namespace `ingress-nginx-neo` with the release name
+`ingress-nginx-neo`, so the controller Deployment and Service are named `ingress-nginx-neo-controller`.
+
+Every command below uses `<version>` as a placeholder. Pick a version from the
+[releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases): Helm takes the chart version
+without the `v` prefix (`X.Y.Z`), release asset URLs take the release tag (`vX.Y.Z`).
 
 ## Contents
 
 <!-- Quick tip: run `grep '^##' index.md` to check that the table of contents is up-to-date. -->
 
-- [Quick start](#quick-start)
-
+- [Prerequisites](#prerequisites)
+- [Supported Kubernetes versions](#supported-kubernetes-versions)
+- [Install with Helm](#install-with-helm)
+- [Install with static manifests](#install-with-static-manifests)
+- [Verify the installation](#verify-the-installation)
 - [Environment-specific instructions](#environment-specific-instructions)
-  - ... [Docker Desktop](#docker-desktop)
-  - ... [Rancher Desktop](#rancher-desktop)
-  - ... [minikube](#minikube)
-  - ... [MicroK8s](#microk8s)
-  - ... [AWS](#aws)
-  - ... [GCE - GKE](#gce-gke)
-  - ... [Azure](#azure)
-  - ... [Digital Ocean](#digital-ocean)
-  - ... [Scaleway](#scaleway)
-  - ... [Exoscale](#exoscale)
-  - ... [Oracle Cloud Infrastructure](#oracle-cloud-infrastructure)
-  - ... [OVHcloud](#ovhcloud)
-  - ... [Bare-metal](#bare-metal-clusters)
 - [Miscellaneous](#miscellaneous)
 
-<!-- TODO: We have subdirectories for kubernetes versions now because of a PR
-https://github.com/kubernetes/ingress-nginx/pull/8162 . You can see this here
-https://github.com/kubernetes/ingress-nginx/tree/main/deploy/static/provider/cloud .
-We need to add documentation here that is clear and unambiguous in guiding users to pick the deployment manifest
-under a subdirectory, based on the K8S version being used. But until the explicit clear docs land here, users are
-free to use those subdirectories and get the manifest(s) related to their K8S version. -->
+## Prerequisites
 
-## Quick start
-
-**If you have Helm,** you can deploy the ingress controller with the following command:
-
-```console
-helm upgrade --install ingress-nginx ingress-nginx \
-  --repo https://kubernetes.github.io/ingress-nginx \
-  --namespace ingress-nginx --create-namespace
-```
-
-It will install the controller in the `ingress-nginx` namespace, creating that namespace if it doesn't already exist.
-
-!!! info
-    This command is *idempotent*:
-
-    - if the ingress controller is not installed, it will install it,
-    - if the ingress controller is already installed, it will upgrade it.
-
-**If you want a full list of values that you can set, while installing with Helm,** then run:
-
-```console
-helm show values ingress-nginx --repo https://kubernetes.github.io/ingress-nginx
-```
-
-!!! attention "Helm install on AWS/GCP/Azure/Other providers"
-    The *ingress-nginx-controller helm-chart is a generic install out of the box*. The default set of helm values is **not** configured for installation on any infra provider. The annotations that are applicable to the cloud provider must be customized by the users.<br/>
-    See [AWS LB Controller](https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/guide/service/annotations/).<br/>
-    Examples of some annotations recommended (healthecheck ones are required for target-type IP) for the service resource of `--type LoadBalancer` on AWS are below:
-    ```yaml
-      annotations:
-        service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: deregistration_delay.timeout_seconds=270
-        service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
-        service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /healthz
-        service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "10254"
-        service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: http
-        service.beta.kubernetes.io/aws-load-balancer-healthcheck-success-codes: 200-299
-        service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
-        service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
-        service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
-        service.beta.kubernetes.io/aws-load-balancer-type: nlb
-        service.beta.kubernetes.io/aws-load-balancer-manage-backend-security-group-rules: "true"
-        service.beta.kubernetes.io/aws-load-balancer-access-log-enabled: "true"
-        service.beta.kubernetes.io/aws-load-balancer-security-groups: "sg-something1 sg-something2"
-        service.beta.kubernetes.io/aws-load-balancer-access-log-s3-bucket-name: "somebucket"
-        service.beta.kubernetes.io/aws-load-balancer-access-log-s3-bucket-prefix: "ingress-nginx"
-        service.beta.kubernetes.io/aws-load-balancer-access-log-emit-interval: "5"
-    ```
-
-**If you don't have Helm** or if you prefer to use a YAML manifest, you can run the following command instead:
-
-```console
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
-```
-
-!!! info
-    The YAML manifest in the command above was generated with `helm template`, so you will end up with almost the same
-    resources as if you had used Helm to install the controller.
-
-!!! attention
-    If you are running an old version of Kubernetes (1.18 or earlier), please read [this paragraph](#running-on-kubernetes-versions-older-than-119) for specific instructions.
-    Because of api deprecations, the default manifest may not work on your cluster.
-    Specific manifests for supported Kubernetes versions are available within a sub-folder of each provider.
+- A Kubernetes cluster in the [supported version range](#supported-kubernetes-versions) and `kubectl`
+  configured for it.
+- [Helm](https://helm.sh/docs/intro/install/) 3.8 or newer for the Helm installation (OCI registry support).
+- Network access from the cluster nodes to `ghcr.io`, or a mirror of the images
+  (see [Artifacts and verification](./artifacts.md#mirroring)).
+- Permissions to create cluster-scoped resources (ClusterRole, ClusterRoleBinding, IngressClass,
+  ValidatingWebhookConfiguration).
 
 ### Firewall configuration
 
-To check which ports are used by your installation of ingress-nginx, look at the output of `kubectl -n ingress-nginx get pod -o yaml`. In general, you need:
+In general, you need:
 
-- Port 8443 open between all hosts on which the kubernetes nodes are running. This is used for the ingress-nginx [admission controller](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/).
-- Port 80 (for HTTP) and/or 443 (for HTTPS) open to the public on the kubernetes nodes to which the DNS of your apps are pointing.
+- Port 8443 open from the Kubernetes API server to the nodes running the controller. It is used by the
+  [admission webhook](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) served
+  by the controller.
+- Port 80 (HTTP) and/or 443 (HTTPS) open to the clients, on the load balancer or on the nodes your DNS
+  records point to.
+
+To check which ports your installation uses, look at the output of
+`kubectl get pod --namespace ingress-nginx-neo -o yaml`.
+
+## Supported Kubernetes versions
+
+ingress-nginx-neo supports the Kubernetes versions of the
+[Amazon EKS standard support window](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html).
+Every change is tested in CI on [kind](https://kind.sigs.k8s.io/) clusters with these versions:
+
+| Kubernetes | Tested in CI |
+|------------|--------------|
+| 1.36       | yes          |
+| 1.35       | yes          |
+| 1.34       | yes          |
+
+The static manifests are rendered for the oldest version in this list. Only `networking.k8s.io/v1` Ingress and
+IngressClass resources are supported.
+
+## Install with Helm
+
+The chart is published at `oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo`. A released
+chart pins every image by digest, so no image overrides are needed.
+
+### Install
+
+```console
+helm install ingress-nginx-neo oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \
+  --version <version> \
+  --namespace ingress-nginx-neo --create-namespace
+```
+
+To make the command idempotent (install if missing, upgrade otherwise), use `helm upgrade --install` with the same
+arguments.
+
+### Values
+
+Show the chart metadata and the full list of values:
+
+```console
+helm show chart oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo --version <version>
+helm show values oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo --version <version>
+```
+
+All values are documented in the
+[chart README](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/blob/main/charts/ingress-nginx-neo/README.md).
+Pass your own values with `--values my-values.yaml` or `--set key=value`.
+
+!!! attention "Cloud provider settings"
+    The default chart values are generic and not tuned for any infrastructure provider. Load balancer annotations
+    for your cloud provider have to be set in `controller.service.annotations`. The
+    [static manifests](#install-with-static-manifests) show the settings used for each provider; see also the
+    [environment-specific instructions](#environment-specific-instructions).
+
+    For example, these annotations configure an AWS NLB with IP targets through the
+    [AWS Load Balancer Controller](https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/service/annotations/)
+    (the health check annotations are required for target type `ip`):
+
+    ```yaml
+    controller:
+      service:
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: nlb
+          service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+          service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+          service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
+          service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+          service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: deregistration_delay.timeout_seconds=270
+          service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /healthz
+          service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "10254"
+          service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: http
+          service.beta.kubernetes.io/aws-load-balancer-healthcheck-success-codes: 200-299
+          service.beta.kubernetes.io/aws-load-balancer-manage-backend-security-group-rules: "true"
+    ```
+
+### Upgrade
+
+```console
+helm upgrade ingress-nginx-neo oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \
+  --version <version> \
+  --namespace ingress-nginx-neo
+```
+
+Read the release notes before upgrading. See [Upgrade](./upgrade.md) for the versioning policy and rollback.
+
+### Uninstall
+
+```console
+helm uninstall ingress-nginx-neo --namespace ingress-nginx-neo
+kubectl delete namespace ingress-nginx-neo
+```
+
+## Install with static manifests
+
+Every release attaches one manifest per provider, rendered from the released chart with the release name and
+namespace `ingress-nginx-neo`. The manifests create the namespace and pin every image by digest:
+
+```console
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-<provider>.yaml
+```
+
+| `<provider>` | Service | Settings |
+|--------------|---------|----------|
+| `cloud` | `LoadBalancer` | generic cloud provider (GKE, AKS, ...), `externalTrafficPolicy: Local` |
+| `aws` | `LoadBalancer` | AWS NLB (in-tree service load balancer annotations) |
+| `aws-nlb-with-tls-termination` | `LoadBalancer` | AWS NLB terminating TLS with an ACM certificate (needs editing, see [below](#tls-termination-in-aws-load-balancer-nlb)) |
+| `do` | `LoadBalancer` | DigitalOcean load balancer with PROXY protocol |
+| `scw` | `LoadBalancer` | Scaleway load balancer with PROXY protocol v2 |
+| `exoscale` | `LoadBalancer` | Exoscale load balancer, controller as a DaemonSet |
+| `oracle` | `LoadBalancer` | Oracle Cloud Infrastructure flexible load balancer |
+| `baremetal` | `NodePort` | bare-metal clusters, see [bare-metal considerations](./baremetal.md) |
+| `kind` | `LoadBalancer` + `hostPort` | local [kind](https://kind.sigs.k8s.io/) clusters |
+
+The SHA-256 checksums of all manifests of a release are in `deploy-manifests.sha256`, attached to the same release:
+
+```console
+curl -fsSLO https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-cloud.yaml
+curl -fsSLO https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-manifests.sha256
+sha256sum --check --ignore-missing deploy-manifests.sha256
+kubectl apply -f deploy-cloud.yaml
+```
+
+!!! info
+    The static manifests are generated with `helm template`, so they create the same resources as a Helm
+    installation with the provider settings listed above. To change other settings, install with Helm instead.
+
+To upgrade, apply the manifest of the new release (see [Upgrade](./upgrade.md)). To uninstall, delete the
+resources of the manifest you applied:
+
+```console
+kubectl delete -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-<provider>.yaml
+```
+
+## Verify the installation
 
 ### Pre-flight check
 
-A few pods should start in the `ingress-nginx` namespace:
+A few pods start in the `ingress-nginx-neo` namespace:
 
 ```console
-kubectl get pods --namespace=ingress-nginx
+kubectl get pods --namespace ingress-nginx-neo
 ```
 
-After a while, they should all be running. The following command will wait for the ingress controller pod to be up,
-running, and ready:
+The following command waits until the controller pod is up, running and ready:
 
 ```console
-kubectl wait --namespace ingress-nginx \
+kubectl wait --namespace ingress-nginx-neo \
   --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
+  --selector=app.kubernetes.io/name=ingress-nginx-neo,app.kubernetes.io/component=controller \
   --timeout=120s
 ```
 
+!!! attention "Admission webhook certificate"
+    On the first installation, two [Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/job/)
+    create the TLS certificate used by the admission webhook. Until the controller pod is ready, which can take up
+    to two minutes, creating Ingress resources may fail with a webhook error.
+
 ### Local testing
 
-Let's create a simple web server and the associated service:
+Create a simple web server and the associated service:
 
 ```console
 kubectl create deployment demo --image=httpd --port=80
 kubectl expose deployment demo
 ```
 
-Then create an ingress resource. The following example uses a host that maps to `localhost`:
+Then create an Ingress resource. The following example uses a host that maps to `localhost`:
 
 ```console
 kubectl create ingress demo-localhost --class=nginx \
   --rule="demo.localdev.me/*=demo:80"
 ```
 
-Now, forward a local port to the ingress controller:
+Forward a local port to the ingress controller:
 
 ```console
-kubectl port-forward --namespace=ingress-nginx service/ingress-nginx-controller 8080:80
+kubectl port-forward --namespace=ingress-nginx-neo service/ingress-nginx-neo-controller 8080:80
 ```
 
 !!! info
-    A note on DNS & network-connection.
-    This documentation assumes that a user has awareness of the DNS and the network routing aspects involved in using ingress.
-    The port-forwarding mentioned above, is the easiest way to demo the working of ingress. The "kubectl port-forward..." command above has forwarded the port number 8080, on the localhost's tcp/ip stack, where the command was typed, to the port  number 80, of the service created by the installation of ingress-nginx controller. So now, the traffic sent to port number 8080 on localhost will reach the port number 80, of the ingress-controller's service.
-    Port-forwarding is not for a production environment use-case. But here we use port-forwarding, to simulate a HTTP request, originating from outside the cluster, to reach the service of the ingress-nginx controller, that is exposed to receive traffic from outside the cluster.
-  [This issue](https://github.com/kubernetes/ingress-nginx/issues/10014#issuecomment-1567791549described) shows a typical DNS problem and its solution.
+    `kubectl port-forward` forwards port 8080 on the machine where the command runs to port 80 of the controller
+    Service. Traffic sent to `localhost:8080` reaches the controller as if it came from outside the cluster.
+    Port forwarding is a quick way to test the controller; it is not meant for production traffic, where DNS
+    records point to the external address of the controller (see [Online testing](#online-testing)).
 
-At this point, you can access your deployment using curl ;
+Then send a request:
 
 ```console
 curl --resolve demo.localdev.me:8080:127.0.0.1 http://demo.localdev.me:8080
 ```
 
-You should see a HTML response containing text like **"It works!"**.
+You should see an HTML response containing text like **"It works!"**.
 
 ### Online testing
 
-If your Kubernetes cluster is a "real" cluster that supports services of type `LoadBalancer`, it will have allocated an
-external IP address or FQDN to the ingress controller.
-
-You can see that IP address or FQDN with the following command:
+If your Kubernetes cluster supports Services of type `LoadBalancer`, it allocates an external IP address or FQDN
+to the ingress controller. Show it with:
 
 ```console
-kubectl get service ingress-nginx-controller --namespace=ingress-nginx
+kubectl get service ingress-nginx-neo-controller --namespace=ingress-nginx-neo
 ```
 
-It will be the `EXTERNAL-IP` field. If that field shows `<pending>`, this means that your Kubernetes cluster wasn't
-able to provision the load balancer (generally, this is because it doesn't support services of type `LoadBalancer`).
+The address is in the `EXTERNAL-IP` column. If it shows `<pending>`, the cluster was not able to provision the
+load balancer (generally because it does not support Services of type `LoadBalancer`; see
+[bare-metal considerations](./baremetal.md)).
 
-Once you have the external IP address (or FQDN), set up a DNS record pointing to it. Then you can create an ingress
-resource. The following example assumes that you have set up a DNS record for `www.demo.io`:
+Once you have the external IP address (or FQDN), set up a DNS record pointing to it. Then create an Ingress
+resource. The following example assumes a DNS record for `www.demo.io`:
 
 ```console
 kubectl create ingress demo --class=nginx \
   --rule="www.demo.io/*=demo:80"
 ```
 
-Alternatively, the above command can be rewritten as follows for the ```--rule``` command and below.
-
-```console
-kubectl create ingress demo --class=nginx \
-  --rule www.demo.io/=demo:80
-```
-
-You should then be able to see the "It works!" page when you connect to <http://www.demo.io/>. Congratulations,
-you are serving a public website hosted on a Kubernetes cluster! 🎉
+You should then see the "It works!" page at <http://www.demo.io/>.
 
 ## Environment-specific instructions
 
-### Local development clusters
-
-#### minikube
-
-The ingress controller can be installed through minikube's addons system:
-
-```console
-minikube addons enable ingress
-```
-
-#### MicroK8s
-
-The ingress controller can be installed through MicroK8s's addons system:
-
-```console
-microk8s enable ingress
-```
-
-Please check the MicroK8s [documentation page](https://microk8s.io/docs/addon-ingress) for details.
-
-#### Docker Desktop
-
-Kubernetes is available in Docker Desktop:
-
-- Mac, from [version 18.06.0-ce](https://docs.docker.com/docker-for-mac/release-notes/#stable-releases-of-2018)
-- Windows, from [version 18.06.0-ce](https://docs.docker.com/docker-for-windows/release-notes/#docker-community-edition-18060-ce-win70-2018-07-25)
-
-First, make sure that Kubernetes is enabled in the Docker settings. The command `kubectl get nodes` should show a
-single node called `docker-desktop`.
-
-The ingress controller can be installed on Docker Desktop using the default [quick start](#quick-start) instructions.
-
-On most systems, if you don't have any other service of type `LoadBalancer` bound to port 80, the ingress controller
-will be assigned the `EXTERNAL-IP` of `localhost`, which means that it will be reachable on localhost:80. If that
-doesn't work, you might have to fall back to the `kubectl port-forward` method described in the
-[local testing section](#local-testing).
-
-#### Rancher Desktop
-
-Rancher Desktop provides Kubernetes and Container Management on the desktop. Kubernetes is enabled by default in Rancher Desktop.
-
-Rancher Desktop uses K3s under the hood, which in turn uses Traefik as the default ingress controller for the Kubernetes cluster. To use Ingress-Nginx Controller in place of the default Traefik, disable Traefik from Preference > Kubernetes menu.
-
-Once traefik is disabled, the Ingress-Nginx Controller can be installed on Rancher Desktop using the default [quick start](#quick-start) instructions. Follow the instructions described in the [local testing section](#local-testing) to try a sample.
-
 ### Cloud deployments
 
-If the load balancers of your cloud provider do active healthchecks on their backends (most do), you can change the
-`externalTrafficPolicy` of the ingress controller Service to `Local` (instead of the default `Cluster`) to save an
-extra hop in some cases. If you're installing with Helm, this can be done by adding
-`--set controller.service.externalTrafficPolicy=Local` to the `helm install` or `helm upgrade` command.
+If the load balancers of your cloud provider do active health checks on their backends (most do), set the
+`externalTrafficPolicy` of the controller Service to `Local` (instead of the default `Cluster`) to save an extra
+hop and keep the client source IP. With Helm, add `--set controller.service.externalTrafficPolicy=Local`. The
+cloud provider manifests already set it.
 
-Furthermore, if the load balancers of your cloud provider support the PROXY protocol, you can enable it, and it will
-let the ingress controller see the real IP address of the clients. Otherwise, it will generally see the IP address of
-the upstream load balancer. This must be done both in the ingress controller
-(with e.g. `--set controller.config.use-proxy-protocol=true`) and in the cloud provider's load balancer configuration
-to function correctly.
-
-In the following sections, we provide YAML manifests that enable these options when possible, using the specific
-options of various cloud providers.
+If the load balancers of your cloud provider support the PROXY protocol, you can enable it to let the controller
+see the real IP address of the clients. Otherwise it generally sees the IP address of the load balancer. The PROXY
+protocol must be enabled both in the controller (for example with `--set controller.config.use-proxy-protocol=true`)
+and in the load balancer configuration of your cloud provider.
 
 #### AWS
 
-In AWS, we use a Network load balancer (NLB) to expose the Ingress-Nginx Controller behind a Service of `Type=LoadBalancer`.
-
-!!! info
-    The provided templates illustrate the setup for legacy in-tree service load balancer for AWS NLB.
-    AWS provides the documentation on how to use
-    [Network load balancing on Amazon EKS](https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html)
-    with [AWS Load Balancer Controller](https://github.com/kubernetes-sigs/aws-load-balancer-controller).
-
-##### Network Load Balancer (NLB)
+In AWS, a Network Load Balancer (NLB) exposes the controller behind a Service of type `LoadBalancer`:
 
 ```console
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/aws/deploy.yaml
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-aws.yaml
 ```
+
+!!! info
+    The `aws` manifests use the annotations of the in-tree service load balancer for AWS NLB. AWS documents
+    [Network load balancing on Amazon EKS](https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html)
+    with the [AWS Load Balancer Controller](https://github.com/kubernetes-sigs/aws-load-balancer-controller); for that
+    setup, install with Helm and set the annotations shown in [Values](#values).
 
 ##### TLS termination in AWS Load Balancer (NLB)
 
-By default, TLS is terminated in the ingress controller. But it is also possible to terminate TLS in the Load Balancer.
-This section explains how to do that on AWS using an NLB.
+By default, TLS is terminated in the ingress controller. It is also possible to terminate TLS in the NLB with a
+certificate from AWS Certificate Manager (ACM):
 
-1. Download the [deploy.yaml](https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/aws/nlb-with-tls-termination/deploy.yaml) template
+1. Download the manifest:
 
     ```console
-    wget https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/aws/nlb-with-tls-termination/deploy.yaml
+    curl -fsSLO https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-aws-nlb-with-tls-termination.yaml
     ```
 
-2. Edit the file and change the VPC CIDR in use for the Kubernetes cluster:
+2. Edit the file and set the VPC CIDR of the Kubernetes cluster in the controller ConfigMap:
 
     ```
     proxy-real-ip-cidr: XXX.XXX.XXX/XX
     ```
 
-3. Change the AWS Certificate Manager (ACM) ID as well:
+3. Set the ACM certificate ARN in the Service annotation `service.beta.kubernetes.io/aws-load-balancer-ssl-cert`:
 
     ```
     arn:aws:acm:us-west-2:XXXXXXXX:certificate/XXXXXX-XXXXXXX-XXXXXXX-XXXXXXXX
@@ -303,30 +313,26 @@ This section explains how to do that on AWS using an NLB.
 4. Deploy the manifest:
 
     ```console
-    kubectl apply -f deploy.yaml
+    kubectl apply -f deploy-aws-nlb-with-tls-termination.yaml
     ```
 
+In this manifest the NLB forwards HTTPS (decrypted) to the controller's HTTP port, and plain HTTP to an extra port
+`2443` on which the controller redirects to HTTPS.
 
+##### NLB idle timeouts
 
-##### NLB Idle Timeouts
+The default idle timeout for TCP flows is 350 seconds and
+[can be modified to any value between 60 and 6000 seconds](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancers.html#connection-idle-timeout).
+Make sure the NGINX [keepalive_timeout](https://nginx.org/en/docs/http/ngx_http_core_module.html#keepalive_timeout)
+is lower than the configured idle timeout. The default NGINX `keepalive_timeout` is `75s`
+(ConfigMap key [`keep-alive`](../user-guide/nginx-configuration/configmap.md#keep-alive)).
 
-The default idle timeout value for TCP flows is 350 seconds and [can be modified to any value between 60-6000 seconds.](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancers.html#connection-idle-timeout)
+#### GCE - GKE
 
-For this reason, you need to ensure the
-[keepalive_timeout](https://nginx.org/en/docs/http/ngx_http_core_module.html#keepalive_timeout)
-value is configured less than your configured idle timeout to work as expected.
+> **Note:** The default GKE load balancer (Service type `LoadBalancer`) does not support the PROXY protocol.
+> Enabling `use-proxy-protocol` does not work with the default GKE load balancer.
 
-By default, NGINX `keepalive_timeout` is set to `75s`.
-
-More information with regard to timeouts can be found in the
-[official AWS documentation](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/network-load-balancers.html#connection-idle-timeout)
-
-#### GCE-GKE
-
-> **Note:** The default GKE LoadBalancer (Service type `LoadBalancer`) does not support the PROXY protocol.
-> Enabling `use-proxy-protocol` will not work when using the default GKE load balancer.
-
-First, your user needs to have `cluster-admin` permissions on the cluster. This can be done with the following command:
+Your user needs `cluster-admin` permissions on the cluster to create the cluster-scoped resources:
 
 ```console
 kubectl create clusterrolebinding cluster-admin-binding \
@@ -334,156 +340,146 @@ kubectl create clusterrolebinding cluster-admin-binding \
   --user $(gcloud config get-value account)
 ```
 
-Then, the ingress controller can be installed like this:
+Then install with Helm or with the `cloud` manifest:
 
 ```console
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-cloud.yaml
 ```
 
 !!! warning
-    For private clusters, you will need to either add a firewall rule that allows master nodes access to
-    port `8443/tcp` on worker nodes, or change the existing rule that allows access to port `80/tcp`, `443/tcp` and
-    `10254/tcp` to also allow access to port `8443/tcp`. More information can be found in the
-    [Official GCP Documentation](https://cloud.google.com/load-balancing/docs/tcp/setting-up-tcp#config-hc-firewall).
-
-    See the [GKE documentation](https://cloud.google.com/kubernetes-engine/docs/how-to/private-clusters#add_firewall_rules)
-    on adding rules and the [Kubernetes issue](https://github.com/kubernetes/kubernetes/issues/79739) for more detail.
-
-Proxy-protocol is supported in GCE check the [Official Documentations on how to enable.](https://cloud.google.com/load-balancing/docs/tcp/setting-up-tcp#proxy-protocol)
+    For private clusters, either add a firewall rule that allows the control plane to reach port `8443/tcp` on the
+    worker nodes, or change the existing rule that allows access to ports `80/tcp`, `443/tcp` and `10254/tcp` to
+    also allow port `8443/tcp`. See the
+    [GKE documentation](https://cloud.google.com/kubernetes-engine/docs/how-to/private-clusters#add_firewall_rules)
+    on adding firewall rules and the [Kubernetes issue](https://github.com/kubernetes/kubernetes/issues/79739) for
+    more detail.
 
 #### Azure
 
-```console
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
-```
-
-More information with regard to Azure annotations for ingress controller can be found in the [official AKS documentation](https://docs.microsoft.com/en-us/azure/aks/ingress-internal-ip#create-an-ingress-controller).
-
-#### Digital Ocean
+Install with Helm or with the `cloud` manifest:
 
 ```console
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/do/deploy.yaml
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-cloud.yaml
 ```
 
-- By default the service object of the ingress-nginx-controller for Digital-Ocean, only configures one annotation. Its this one `service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: "true"`. While this makes the service functional, it was reported that the Digital-Ocean LoadBalancer graphs shows `no data`, unless a few other annotations are also configured. Some of these other annotations require values that can not be generic and hence not forced in a out-of-the-box installation. These annotations and a discussion on them is well documented in [this issue](https://github.com/kubernetes/ingress-nginx/issues/8965). Please refer to the issue to add annotations, with values specific to user, to get graphs of the DO-LB populated with data.
+More information about Azure load balancer annotations is in the
+[AKS documentation](https://learn.microsoft.com/en-us/azure/aks/ingress-internal-ip).
+
+#### DigitalOcean
+
+```console
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-do.yaml
+```
+
+The `do` manifest sets one Service annotation, `service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: "true"`,
+and enables `use-proxy-protocol` in the controller. With only this annotation the DigitalOcean load balancer graphs
+show `no data`; populating them needs further annotations with values specific to your setup, which are discussed in
+[this issue](https://github.com/kubernetes/ingress-nginx/issues/8965). Add them with Helm in
+`controller.service.annotations`.
 
 #### Scaleway
 
 ```console
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/scw/deploy.yaml
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-scw.yaml
 ```
 
-Refer to the [dedicated tutorial](https://www.scaleway.com/en/docs/tutorials/proxy-protocol-v2-load-balancer/#configuring-proxy-protocol-for-ingress-nginx) in the Scaleway documentation for configuring the proxy protocol for ingress-nginx with the Scaleway load balancer.
+The `scw` manifest enables PROXY protocol v2 on the Scaleway load balancer and in the controller. See the
+[Scaleway tutorial](https://www.scaleway.com/en/docs/tutorials/proxy-protocol-v2-load-balancer/#configuring-proxy-protocol-for-ingress-nginx)
+for details.
 
 #### Exoscale
 
 ```console
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/exoscale/deploy.yaml
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-exoscale.yaml
 ```
 
-The full list of annotations supported by Exoscale is available in the Exoscale Cloud Controller Manager
+The `exoscale` manifest runs the controller as a DaemonSet and configures the load balancer health check. The full
+list of annotations supported by Exoscale is in the Exoscale Cloud Controller Manager
 [documentation](https://github.com/exoscale/exoscale-cloud-controller-manager/blob/master/docs/service-loadbalancer.md).
 
 #### Oracle Cloud Infrastructure
 
 ```console
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/cloud/deploy.yaml
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-oracle.yaml
 ```
 
-A
+The `oracle` manifest uses a flexible load balancer shape (10 to 100 Mbps). A
 [complete list of available annotations for Oracle Cloud Infrastructure](https://github.com/oracle/oci-cloud-controller-manager/blob/master/docs/load-balancer-annotations.md)
-can be found in the [OCI Cloud Controller Manager](https://github.com/oracle/oci-cloud-controller-manager) documentation.
+is in the [OCI Cloud Controller Manager](https://github.com/oracle/oci-cloud-controller-manager) documentation.
 
-#### OVHcloud
+### Local development clusters
 
-```console
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm repo update
-helm -n ingress-nginx install ingress-nginx ingress-nginx/ingress-nginx --create-namespace
-```
+#### kind
 
-You can find the [complete tutorial](https://docs.ovh.com/gb/en/kubernetes/installing-nginx-ingress/).
-
-### Bare metal clusters
-
-This section is applicable to Kubernetes clusters deployed on bare metal servers, as well as "raw" VMs where Kubernetes
-was installed manually, using generic Linux distros (like CentOS, Ubuntu...)
-
-For quick testing, you can use a
-[NodePort](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport).
-This should work on almost every cluster, but it will typically use a port in the range 30000-32767.
+The `kind` manifest binds ports 80 and 443 of the node with `hostPort`, tolerates the control-plane taints and
+reports `localhost` as the Ingress address. Create the cluster with port mappings for these ports, as described in
+the [kind ingress guide](https://kind.sigs.k8s.io/docs/user/ingress/), then apply the manifest:
 
 ```console
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.15.1/deploy/static/provider/baremetal/deploy.yaml
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-kind.yaml
 ```
 
-For more information about bare metal deployments (and how to use port 80 instead of a random port in the 30000-32767 range),
-see [bare-metal considerations](./baremetal.md).
+The `kind` manifest also handles Ingress resources without an `ingressClassName`.
+
+#### Docker Desktop
+
+First, make sure that Kubernetes is enabled in the Docker Desktop settings. The command `kubectl get nodes` should
+show a single node called `docker-desktop`.
+
+Install the controller with [Helm](#install-with-helm) or the `cloud` manifest. If no other Service of type
+`LoadBalancer` is bound to port 80, the controller gets the `EXTERNAL-IP` `localhost` and is reachable on
+`localhost:80`. Otherwise use the `kubectl port-forward` method described in [Local testing](#local-testing).
+
+#### Rancher Desktop
+
+Rancher Desktop uses K3s, which installs Traefik as its default ingress controller. Disable Traefik in
+*Preferences > Kubernetes*, then install the controller with [Helm](#install-with-helm) or the `cloud` manifest
+and follow [Local testing](#local-testing) to try a sample.
+
+### Bare-metal clusters
+
+This section applies to Kubernetes clusters deployed on bare-metal servers, as well as "raw" VMs where Kubernetes was
+installed manually on generic Linux distributions.
+
+For quick testing, use the `baremetal` manifest. It exposes the controller with a
+[NodePort](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport) Service, which works on
+almost every cluster but uses a port in the range 30000-32767:
+
+```console
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-baremetal.yaml
+```
+
+For other options (MetalLB, host network, using ports 80 and 443), see
+[bare-metal considerations](./baremetal.md).
 
 ## Miscellaneous
 
-### Checking ingress controller version
+### Checking the controller version
 
-Run `/nginx-ingress-controller --version` within the pod, for instance with `kubectl exec`:
+Run `/nginx-ingress-controller --version` in the controller pod:
 
 ```console
-POD_NAMESPACE=ingress-nginx
-POD_NAME=$(kubectl get pods -n $POD_NAMESPACE -l app.kubernetes.io/name=ingress-nginx --field-selector=status.phase=Running -o name)
-kubectl exec $POD_NAME -n $POD_NAMESPACE -- /nginx-ingress-controller --version
+kubectl exec --namespace ingress-nginx-neo deploy/ingress-nginx-neo-controller -- /nginx-ingress-controller --version
 ```
+
+For a DaemonSet installation, use `ds/ingress-nginx-neo-controller` instead. The
+[kubectl plugin](../kubectl-plugin.md) finds the controller pod for you, for example
+`kubectl ingress-nginx-neo exec --namespace ingress-nginx-neo -- /nginx-ingress-controller --version`.
 
 ### Scope
 
-By default, the controller watches Ingress objects from all namespaces. If you want to change this behavior,
-use the flag `--watch-namespace` or check the Helm chart value `controller.scope` to limit the controller to a single
-namespace. Although the use of this flag is not popular, one important fact to note is that the secret containing the default-ssl-certificate needs to also be present in the watched namespace(s).
+By default, the controller watches Ingress objects in all namespaces. To limit it to a single namespace, use the
+flag `--watch-namespace` or the Helm value `controller.scope`. The secret referenced by `--default-ssl-certificate`
+must then be present in the watched namespace(s).
 
-See also [“How to install multiple Ingress controllers in the same cluster”](https://kubernetes.github.io/ingress-nginx/user-guide/multiple-ingress/) for more details.
+See [Multiple Ingress controllers](../user-guide/multiple-ingress.md) to run several controllers in one cluster.
 
 ### Webhook network access
 
 !!! warning
-    The controller uses an [admission webhook](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/)
-    to validate Ingress definitions. Make sure that you don't have
-    [Network policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
-    or additional firewalls preventing connections from the API server to the `ingress-nginx-controller-admission` service.
-
-### Certificate generation
-
-!!! attention
-    The first time the ingress controller starts, two [Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/) create the SSL Certificate used by the admission webhook.
-
-This can cause an initial delay of up to two minutes until it is possible to create and validate Ingress definitions.
-
-You can wait until it is ready to run the next command:
-
-```yaml
- kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=120s
-```
-
-### Running on Kubernetes versions older than 1.19
-
-Ingress resources evolved over time. They started with `apiVersion: extensions/v1beta1`,
-then moved to `apiVersion: networking.k8s.io/v1beta1` and more recently to `apiVersion: networking.k8s.io/v1`.
-
-Here is how these Ingress versions are supported in Kubernetes:
-
-- before Kubernetes 1.19, only `v1beta1` Ingress resources are supported
-- from Kubernetes 1.19 to 1.21, both `v1beta1` and `v1` Ingress resources are supported
-- in Kubernetes 1.22 and above, only `v1` Ingress resources are supported
-
-And here is how these Ingress versions are supported in Ingress-Nginx Controller:
-
-- before version 1.0, only `v1beta1` Ingress resources are supported
-- in version 1.0 and above, only `v1` Ingress resources are
-
-As a result, if you're running Kubernetes 1.19 or later, you should be able to use the latest version of the NGINX
-Ingress Controller; but if you're using an old version of Kubernetes (1.18 or earlier) you will have to use version 0.X
-of the Ingress-Nginx Controller (e.g. version 0.49).
-
-The Helm chart of the Ingress-Nginx Controller switched to version 1 in version 4 of the chart. In other words, if
-you're running Kubernetes 1.19 or earlier, you should use version 3.X of the chart (this can be done by adding
-`--version='<4'` to the `helm install` command ).
+    The controller uses an
+    [admission webhook](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/)
+    to validate Ingress definitions. Make sure that no
+    [network policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+    or additional firewalls block connections from the API server to the `ingress-nginx-neo-controller-admission`
+    Service.

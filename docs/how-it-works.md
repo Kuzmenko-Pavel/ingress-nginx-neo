@@ -1,6 +1,6 @@
 # How it works
 
-The objective of this document is to explain how the Ingress-NGINX controller works, in particular how the NGINX model is built and why we need one.
+The objective of this document is to explain how the ingress-nginx-neo controller works, in particular how the NGINX model is built and why we need one.
 
 ## NGINX configuration
 
@@ -60,15 +60,15 @@ In a relatively big cluster with frequently deploying apps this feature saves si
 
 Because the ingress controller works using the [synchronization loop pattern](https://coreos.com/kubernetes/docs/latest/replication-controller.html#the-reconciliation-loop-in-detail), it is applying the configuration for all matching objects. In case some Ingress objects have a broken configuration, for example a syntax error in the `nginx.ingress.kubernetes.io/configuration-snippet` annotation, the generated configuration becomes invalid, does not reload and hence no more ingresses will be taken into account.
 
-To prevent this situation to happen, the Ingress-Nginx Controller optionally exposes a [validating admission webhook server][8] to ensure the validity of incoming ingress objects.
+To prevent this situation to happen, the controller optionally exposes a [validating admission webhook server][8] to ensure the validity of incoming ingress objects.
 This webhook appends the incoming ingress objects to the list of ingresses, generates the configuration and calls nginx to ensure the configuration has no syntax errors.
 
 [0]: https://github.com/openresty/lua-nginx-module/pull/1259
 [1]: https://kubernetes.io/docs/concepts/architecture/controller/#controller-pattern
 [2]: https://godoc.org/k8s.io/client-go/informers#NewFilteredSharedInformerFactory
 [3]: https://godoc.org/k8s.io/client-go/tools/cache#ResourceEventHandlerFuncs
-[4]: https://github.com/kubernetes/ingress-nginx/blob/main/internal/task/queue.go#L38
+[4]: https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/blob/main/internal/task/queue.go
 [5]: https://golang.org/pkg/sync/#Mutex
-[6]: https://github.com/kubernetes/ingress-nginx/blob/main/rootfs/etc/nginx/template/nginx.tmpl
+[6]: https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/blob/main/rootfs/etc/nginx/template/nginx.tmpl
 [7]: https://nginx.org/en/docs/beginners_guide.html#control
 [8]: https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#validatingadmissionwebhook

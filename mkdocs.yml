@@ -1,8 +1,12 @@
-site_name: Ingress-Nginx Controller
-repo_name: "kubernetes/ingress-nginx"
-repo_url: https://github.com/kubernetes/ingress-nginx
-site_url: https://kubernetes.github.io/ingress-nginx
+site_name: ingress-nginx-neo
+site_description: NGINX Ingress controller for Kubernetes
+site_url: https://kuzmenko-pavel.github.io/ingress-nginx-neo/
+repo_name: Kuzmenko-Pavel/ingress-nginx-neo
+repo_url: https://github.com/Kuzmenko-Pavel/ingress-nginx-neo
 edit_uri: edit/main/docs/
+
+exclude_docs: |
+  requirements.txt
 
 # Extensions
 markdown_extensions:
@@ -25,7 +29,7 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - pymdownx.highlight
   - pymdownx.inlinehilite
   - pymdownx.keys
@@ -56,30 +60,28 @@ theme:
     primary: "teal"
     accent: "green"
 
-  include_sidebar: true
-
 plugins:
   - search
-  - awesome-pages
-  - minify:
-      minify_html: true
+
+extra:
+  version:
+    provider: mike
+    default: stable
 
 extra_css: [extra.css]
 
-
 nav:
-  - Welcome:
-      - Welcome: "index.md"
-      - How it works: "how-it-works.md"
-      - Troubleshooting: "troubleshooting.md"
-      - kubectl plugin: "kubectl-plugin.md"
-  - Deployment:
-      - Installation Guide: "deploy/index.md"
+  - Home: "index.md"
+  - Deploy:
+      - Installation: "deploy/index.md"
       - Bare-metal considerations: "deploy/baremetal.md"
       - Role Based Access Control (RBAC): "deploy/rbac.md"
-      - Upgrade: "deploy/upgrade.md"
       - Hardening guide: "deploy/hardening-guide.md"
-  - User Guide:
+      - Upgrade: "deploy/upgrade.md"
+      - Migrate from kubernetes/ingress-nginx: "deploy/migrate.md"
+      - Artifacts and verification: "deploy/artifacts.md"
+  - User guide:
+      - How it works: "how-it-works.md"
       - NGINX Configuration:
           - Introduction: "user-guide/nginx-configuration/index.md"
           - Basic usage: "user-guide/basic-usage.md"
@@ -93,15 +95,16 @@ nav:
       - Default backend: "user-guide/default-backend.md"
       - Exposing TCP and UDP services: "user-guide/exposing-tcp-udp-services.md"
       - Exposing FCGI services: "user-guide/fcgi-services.md"
-      - Regular expressions in paths: user-guide/ingress-path-matching.md
+      - Regular expressions in paths: "user-guide/ingress-path-matching.md"
       - External Articles: "user-guide/external-articles.md"
       - Miscellaneous: "user-guide/miscellaneous.md"
-      - Prometheus and Grafana installation: "user-guide/monitoring.md"
+      - Monitoring: "user-guide/monitoring.md"
       - Multiple Ingress controllers: "user-guide/multiple-ingress.md"
       - TLS/HTTPS: "user-guide/tls.md"
       - Third party addons:
           - ModSecurity Web Application Firewall: "user-guide/third-party-addons/modsecurity.md"
           - OpenTelemetry: "user-guide/third-party-addons/opentelemetry.md"
+  - kubectl plugin: "kubectl-plugin.md"
   - Examples:
       - Introduction: "examples/index.md"
       - Prerequisites: "examples/PREREQUISITES.md"
@@ -127,7 +130,13 @@ nav:
       - TLS termination: "examples/tls-termination/README.md"
       - Open Policy Agent rules: "examples/openpolicyagent/README.md"
       - Canary Deployments: "examples/canary/README.md"
-  - Developer Guide:
-      - Getting Started: "developer-guide/getting-started.md"
-      - Code Overview: "developer-guide/code-overview.md"
+  - Developer guide:
+      - Getting started: "developer-guide/getting-started.md"
+      - Code overview: "developer-guide/code-overview.md"
+      - Images: "developer-guide/images.md"
+      - Testing: "developer-guide/testing.md"
+      - CI: "developer-guide/ci.md"
+      - Release: "developer-guide/release.md"
+      - Backporting: "developer-guide/backporting.md"
+  - Troubleshooting: "troubleshooting.md"
   - FAQ: "faq.md"

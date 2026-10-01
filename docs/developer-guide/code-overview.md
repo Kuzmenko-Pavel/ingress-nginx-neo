@@ -1,6 +1,6 @@
-# Ingress NGINX - Code Overview
+# Code overview
 
-This document provides an overview of Ingress NGINX code.
+This page gives an overview of the ingress-nginx-neo code.
 
 
 ## Core Golang code
@@ -28,41 +28,41 @@ The following parts of the code can be found:
 
 ### Entrypoint
 
-The `main` package is responsible for starting ingress-nginx program, which can be found in [cmd/nginx](https://github.com/kubernetes/ingress-nginx/tree/main/cmd/nginx) directory.
+The `main` package starts the controller, which can be found in [cmd/nginx](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/cmd/nginx) directory.
 
 ### Version
 
-Is the package of the code responsible for adding `version` subcommand, and can be found in [version](https://github.com/kubernetes/ingress-nginx/tree/main/version) directory.
+Holds the release, commit and repository of a build (set with `-ldflags` by `make code-build`), printed by `--version` and exported as metric labels. It is in the [version](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/version) directory.
 
 ### Internal code
 
-This part of the code contains the internal logics that compose Ingress NGINX Controller, and it's split into:
+This part of the code contains the internal logics that compose the controller, and it's split into:
 
 #### Admission Controller
 
 Contains the code of [Kubernetes Admission Controller](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) which validates the syntax of ingress objects before accepting it.
 
-This code can be found in [internal/admission/controller](https://github.com/kubernetes/ingress-nginx/tree/main/internal/admission/controller) directory.
+This code can be found in [internal/admission/controller](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/internal/admission/controller) directory.
 
 
 #### File functions
 
 Contains auxiliary codes that deal with files, such as generating the SHA1 checksum of a file, or creating required directories.
 
-This code can be found in [internal/file](https://github.com/kubernetes/ingress-nginx/blob/main/internal/file) directory.
+This code can be found in [pkg/util/file](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/pkg/util/file) directory.
 
 #### Ingress functions
 
-Contains all the logics from Ingress-Nginx Controller, with some examples being:
+Contains the logic of the controller, with some examples being:
 
-* Expected Golang structures that will be used in templates and other parts of the code - [internal/ingress/types.go](https://github.com/kubernetes/ingress-nginx/blob/main/internal/ingress/types.go).
-* supported annotations and its parsing logics - [internal/ingress/annotations](https://github.com/kubernetes/ingress-nginx/tree/main/internal/ingress/annotations).
-* reconciliation loops and logics - [internal/ingress/controller](https://github.com/kubernetes/ingress-nginx/tree/main/internal/ingress/controller)
-* defaults - define the default struct - [internal/ingress/defaults](https://github.com/kubernetes/ingress-nginx/tree/main/internal/ingress/defaults).
-* Error interface and types implementation - [internal/ingress/errors](https://github.com/kubernetes/ingress-nginx/tree/main/internal/ingress/errors)
-* Metrics collectors for Prometheus exporting - [internal/ingress/metric](https://github.com/kubernetes/ingress-nginx/tree/main/internal/ingress/metric).
-* Resolver - Extracts information from a controller - [internal/ingress/resolver](https://github.com/kubernetes/ingress-nginx/tree/main/internal/ingress/resolver).
-* Ingress Object status publisher - [internal/ingress/status](https://github.com/kubernetes/ingress-nginx/tree/main/internal/ingress/status).
+* Expected Golang structures that will be used in templates and other parts of the code - [internal/ingress/types.go](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/blob/main/internal/ingress/types.go).
+* supported annotations and its parsing logics - [internal/ingress/annotations](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/internal/ingress/annotations).
+* reconciliation loops and logics - [internal/ingress/controller](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/internal/ingress/controller)
+* defaults - define the default struct - [internal/ingress/defaults](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/internal/ingress/defaults).
+* Error interface and types implementation - [internal/ingress/errors](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/internal/ingress/errors)
+* Metrics collectors for Prometheus exporting - [internal/ingress/metric](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/internal/ingress/metric).
+* Resolver - Extracts information from a controller - [internal/ingress/resolver](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/internal/ingress/resolver).
+* Ingress Object status publisher - [internal/ingress/status](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/internal/ingress/status).
 
 And other parts of the code that will be written in this document in a future.
 
@@ -70,25 +70,25 @@ And other parts of the code that will be written in this document in a future.
 
 Contains helper functions for parsing Kubernetes objects.
 
-This part of the code can be found in [internal/k8s](https://github.com/kubernetes/ingress-nginx/tree/main/internal/k8s) directory.
+This part of the code can be found in [internal/k8s](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/internal/k8s) directory.
 
 #### Networking functions
 
 Contains helper functions for networking, such as IPv4 and IPv6 parsing, SSL certificate parsing, etc.
 
-This part of the code can be found in [internal/net](https://github.com/kubernetes/ingress-nginx/tree/main/internal/net) directory.
+This part of the code can be found in [internal/net](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/internal/net) directory.
 
 #### NGINX functions
 
 Contains helper function to deal with NGINX, such as verify if it's running and reading it's configuration file parts.
 
-This part of the code can be found in [internal/nginx](https://github.com/kubernetes/ingress-nginx/tree/main/internal/nginx) directory.
+This part of the code can be found in [internal/nginx](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/internal/nginx) directory.
 
 #### Tasks / Queue
 
 Contains the functions responsible for the sync queue part of the controller.
 
-This part of the code can be found in [internal/task](https://github.com/kubernetes/ingress-nginx/tree/main/internal/task) directory.
+This part of the code can be found in [internal/task](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/internal/task) directory.
 
 #### Other parts of internal
 
@@ -96,47 +96,51 @@ Other parts of internal code might not be covered here, like runtime and watch b
 
 ## E2E Test
 
-The e2e tests code is in [test](https://github.com/kubernetes/ingress-nginx/tree/main/test) directory.
+The e2e tests code is in [test](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/test) directory.
 
 ## Other programs
 
-Describe here `kubectl plugin`, `dbg`, `waitshutdown` and cover the hack scripts.
-
 ### kubectl plugin
 
-It contains kubectl plugin for inspecting your ingress-nginx deployments.
-This part of code can be found in [cmd/plugin](https://github.com/kubernetes/ingress-nginx/tree/main/cmd/plugin) directory
-Detail functions flow and available flow can be found in [kubectl-plugin](https://github.com/kubernetes/ingress-nginx/blob/main/docs/kubectl-plugin.md)
+The kubectl plugin `kubectl ingress-nginx-neo` inspects running controllers. Its code is in
+[cmd/plugin](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/cmd/plugin); the commands
+are described in [kubectl plugin](../kubectl-plugin.md).
 
-## Deploy files
+### dbg and wait-shutdown
 
-This directory contains the `yaml` deploy files used as examples or references in the docs to deploy Ingress NGINX and other components.
+`dbg` ([cmd/dbg](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/cmd/dbg)) prints the
+dynamic configuration of a running controller from inside its container; `wait-shutdown`
+([cmd/waitshutdown](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/cmd/waitshutdown))
+is the `preStop` hook that lets NGINX drain connections.
 
-Those files are in [deploy](https://github.com/kubernetes/ingress-nginx/tree/main/deploy) directory.
+### Documentation generators
 
-## Helm Chart
+[cmd/annotations](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/cmd/annotations) writes
+the annotation risk page and [cmd/flagsdoc](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/cmd/flagsdoc)
+the command line argument page (`make docs-generate`).
 
-Used to generate the Helm chart published.
+## Helm chart
 
-Code is in [charts/ingress-nginx](https://github.com/kubernetes/ingress-nginx/tree/main/charts/ingress-nginx).
+The chart is in [charts/ingress-nginx-neo](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/charts/ingress-nginx-neo).
+The static manifests of a release are rendered from it by `make manifests-generate` with the
+provider values in [tools/manifest-templates](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/tools/manifest-templates).
 
-## Documentation/Website
+## Documentation
 
-The documentation used to generate the website https://kubernetes.github.io/ingress-nginx/
-
-This code is available in [docs](https://github.com/kubernetes/ingress-nginx/tree/main/docs) and it's main "language" is `Markdown`, used by [mkdocs](https://github.com/kubernetes/ingress-nginx/blob/main/mkdocs.yml) file to generate static pages.
+This site is built with [MkDocs](https://www.mkdocs.org/) and Material for MkDocs from
+[docs](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/docs) and
+[mkdocs.yml](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/blob/main/mkdocs.yml):
+`make docs-serve` serves it locally, `make docs-build` builds it in strict mode. Versions are
+published with mike, see [Release](release.md).
 
 ## Container Images
 
-Container images used to run ingress-nginx, or to build the final image.
+Container images that run the controller or build it.
 
-### Base Images
+### Base and auxiliary images
 
-Contains the `Dockerfiles` and scripts used to build base images that are used in other parts of the repo. They are present in [images](https://github.com/kubernetes/ingress-nginx/tree/main/images) repo. Some examples:
-* [nginx](https://github.com/kubernetes/ingress-nginx/tree/main/images/nginx) - The base NGINX image ingress-nginx uses is not a vanilla NGINX. It bundles many libraries together and it is a job in itself to maintain that and keep things up-to-date.
-* [custom-error-pages](https://github.com/kubernetes/ingress-nginx/tree/main/images/custom-error-pages) - Used on the custom error page examples.
-
-There are other images inside this directory.
+The [images](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/images) directory holds the
+NGINX base image, kube-webhook-certgen, custom-error-pages and the test images; see [Images](images.md).
 
 ### Ingress Controller Image
 
@@ -144,20 +148,20 @@ The image used to build the final ingress controller, used in deploy scripts and
 
 This is NGINX with some Lua enhancement. We do dynamic certificate, endpoints handling, canary traffic split, custom load balancing etc at this component. One can also add new functionalities using Lua plugin system.
 
-The files are in [rootfs](https://github.com/kubernetes/ingress-nginx/tree/main/rootfs) directory and contains:
+The files are in [rootfs](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/rootfs) directory and contains:
 
 * The Dockerfile
-* [nginx config](https://github.com/kubernetes/ingress-nginx/tree/main/rootfs/etc/nginx)
+* [nginx config](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/rootfs/etc/nginx)
 
 #### Ingress NGINX Lua Scripts
 
 Ingress NGINX uses Lua Scripts to enable features like hot reloading, rate limiting and monitoring. Some are written using the [OpenResty](https://openresty.org/en/) helper.
 
-The directory containing Lua scripts is [rootfs/etc/nginx/lua](https://github.com/kubernetes/ingress-nginx/tree/main/rootfs/etc/nginx/lua).
+The directory containing Lua scripts is [rootfs/etc/nginx/lua](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/rootfs/etc/nginx/lua).
 
 #### Nginx Go template file
 
 One of the functions of Ingress NGINX is to turn [Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/) objects into nginx.conf file. 
 
-To do so, the final step is to apply those configurations in [nginx.tmpl](https://github.com/kubernetes/ingress-nginx/tree/main/rootfs/etc/nginx/template) turning it into a final nginx.conf file.
+To do so, the final step is to apply those configurations in [nginx.tmpl](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/rootfs/etc/nginx/template) turning it into a final nginx.conf file.
 

@@ -1,14 +1,14 @@
 # Bare-metal considerations
 
 In traditional *cloud* environments, where network load balancers are available on-demand, a single Kubernetes manifest
-suffices to provide a single point of contact to the Ingress-Nginx Controller to external clients and, indirectly, to
+suffices to provide a single point of contact to the ingress controller to external clients and, indirectly, to
 any application running inside the cluster. *Bare-metal* environments lack this commodity, requiring a slightly
 different setup to offer the same kind of access to external consumers.
 
 ![Cloud environment](../images/baremetal/cloud_overview.jpg)
 ![Bare-metal environment](../images/baremetal/baremetal_overview.jpg)
 
-The rest of this document describes a few recommended approaches to deploying the Ingress-Nginx Controller inside a
+The rest of this document describes a few recommended approaches to deploying the ingress controller inside a
 Kubernetes cluster running on bare-metal.
 
 ## A pure software solution: MetalLB
@@ -18,7 +18,7 @@ supported cloud provider, effectively allowing the usage of LoadBalancer Service
 
 This section demonstrates how to use the [Layer 2 configuration mode][metallb-l2] of MetalLB together with the NGINX
 Ingress controller in a Kubernetes cluster that has **publicly accessible nodes**. In this mode, one node attracts all
-the traffic for the `ingress-nginx` Service IP. See [Traffic policies][metallb-trafficpolicies] for more details.
+the traffic for the `ingress-nginx-neo-controller` Service IP. See [Traffic policies][metallb-trafficpolicies] for more details.
 
 ![MetalLB in L2 mode](../images/baremetal/metallb.jpg)
 
@@ -30,10 +30,10 @@ the traffic for the `ingress-nginx` Service IP. See [Traffic policies][metallb-t
     yourself by reading the official documentation thoroughly.
 
 MetalLB can be deployed either with a simple Kubernetes manifest or with Helm. The rest of this example assumes MetalLB
-was deployed following the [Installation][metallb-install] instructions, and that the Ingress-Nginx Controller was installed 
-using the steps described in the [quickstart section of the installation guide][install-quickstart].
+was deployed following the [Installation][metallb-install] instructions, and that the ingress controller was installed
+using the steps described in the [installation guide][install-quickstart].
 
-MetalLB requires a pool of IP addresses in order to be able to take ownership of the `ingress-nginx` Service. This pool
+MetalLB requires a pool of IP addresses in order to be able to take ownership of the `ingress-nginx-neo-controller` Service. This pool
 can be defined through `IPAddressPool` objects in the same namespace as the MetalLB controller. This pool of IPs **must** be dedicated to MetalLB's use, you can't reuse the Kubernetes node IPs or IPs handed out by a DHCP server.
 
 !!! example
@@ -49,7 +49,7 @@ can be defined through `IPAddressPool` objects in the same namespace as the Meta
     ```
 
     After creating the following objects, MetalLB takes ownership of one of the IP addresses in the pool and updates
-    the *loadBalancer* IP field of the `ingress-nginx` Service accordingly.
+    the *loadBalancer* IP field of the `ingress-nginx-neo-controller` Service accordingly.
 
     ```yaml
     ---
@@ -74,20 +74,20 @@ can be defined through `IPAddressPool` objects in the same namespace as the Meta
     ```
 
     ```console
-    $ kubectl -n ingress-nginx get svc
-    NAME                   TYPE          CLUSTER-IP     EXTERNAL-IP  PORT(S)
-    default-http-backend   ClusterIP     10.0.64.249    <none>       80/TCP
-    ingress-nginx          LoadBalancer  10.0.220.217   203.0.113.10  80:30100/TCP,443:30101/TCP
+    $ kubectl -n ingress-nginx-neo get svc
+    NAME                                     TYPE          CLUSTER-IP     EXTERNAL-IP    PORT(S)
+    ingress-nginx-neo-controller             LoadBalancer  10.0.220.217   203.0.113.10   80:30100/TCP,443:30101/TCP
+    ingress-nginx-neo-controller-admission   ClusterIP     10.0.64.249    <none>         443/TCP
     ```
 
-As soon as MetalLB sets the external IP address of the `ingress-nginx` LoadBalancer Service, the corresponding entries
+As soon as MetalLB sets the external IP address of the `ingress-nginx-neo-controller` LoadBalancer Service, the corresponding entries
 are created in the iptables NAT table and the node with the selected IP address starts responding to HTTP requests on
 the ports configured in the LoadBalancer Service:
 
 ```console
 $ curl -D- http://203.0.113.10 -H 'Host: myapp.example.com'
 HTTP/1.1 200 OK
-Server: nginx/1.15.2
+Server: nginx
 ```
 
 !!! tip
@@ -113,7 +113,7 @@ Due to its simplicity, this is the setup a user will deploy by default when foll
 In this configuration, the NGINX container remains isolated from the host network. As a result, it can safely bind to
 any port, including the standard HTTP ports 80 and 443. However, due to the container namespace isolation, a client
 located outside the cluster network (e.g. on the public internet) is not able to access Ingress hosts directly on ports
-80 and 443. Instead, the external client must append the NodePort allocated to the `ingress-nginx` Service to HTTP
+80 and 443. Instead, the external client must append the NodePort allocated to the `ingress-nginx-neo-controller` Service to HTTP
 requests.
 
 ![NodePort request flow](../images/baremetal/nodeport.jpg)
@@ -121,13 +121,13 @@ requests.
 You can **customize the exposed node port numbers** by setting the `controller.service.nodePorts.*` Helm values, but they still have to be in the 30000-32767 range.
 
 !!! example
-    Given the NodePort `30100` allocated to the `ingress-nginx` Service
+    Given the NodePort `30100` allocated to the `ingress-nginx-neo-controller` Service
 
     ```console
-    $ kubectl -n ingress-nginx get svc
-    NAME                   TYPE        CLUSTER-IP     PORT(S)
-    default-http-backend   ClusterIP   10.0.64.249    80/TCP
-    ingress-nginx          NodePort    10.0.220.217   80:30100/TCP,443:30101/TCP
+    $ kubectl -n ingress-nginx-neo get svc
+    NAME                                     TYPE        CLUSTER-IP     PORT(S)
+    ingress-nginx-neo-controller             NodePort    10.0.220.217   80:30100/TCP,443:30101/TCP
+    ingress-nginx-neo-controller-admission   ClusterIP   10.0.64.249    443/TCP
     ```
 
     and a Kubernetes node with the public IP address `203.0.113.2` (the external IP is added as an example, in most
@@ -161,12 +161,13 @@ HTTP request is always **the IP address of the Kubernetes node that received the
 NGINX.
 
 The recommended way to preserve the source IP in a NodePort setup is to set the value of the `externalTrafficPolicy`
-field of the `ingress-nginx` Service spec to `Local` ([example][preserve-ip]).
+field of the `ingress-nginx-neo-controller` Service spec to `Local`. With Helm, set
+`--set controller.service.externalTrafficPolicy=Local`.
 
 !!! warning
     This setting effectively **drops packets** sent to Kubernetes nodes which are not running any instance of the NGINX
     Ingress controller. Consider [assigning NGINX Pods to specific nodes][pod-assign] in order to control on what nodes
-    the Ingress-Nginx Controller should be scheduled or not scheduled.
+    the ingress controller should be scheduled or not scheduled.
 
 !!! example
     In a Kubernetes cluster composed of 3 nodes (the external IP is added as an example, in most bare-metal environments
@@ -180,24 +181,23 @@ field of the `ingress-nginx` Service spec to `Local` ([example][preserve-ip]).
     host-3   Ready    node     203.0.113.3
     ```
 
-    with a `ingress-nginx-controller` Deployment composed of 2 replicas
+    with a `ingress-nginx-neo-controller` Deployment composed of 2 replicas
 
     ```console
-    $ kubectl -n ingress-nginx get pod -o wide
-    NAME                                       READY   STATUS    IP           NODE
-    default-http-backend-7c5bc89cc9-p86md      1/1     Running   172.17.1.1   host-2
-    ingress-nginx-controller-cf9ff8c96-8vvf8   1/1     Running   172.17.0.3   host-3
-    ingress-nginx-controller-cf9ff8c96-pxsds   1/1     Running   172.17.1.4   host-2
+    $ kubectl -n ingress-nginx-neo get pod -o wide
+    NAME                                           READY   STATUS    IP           NODE
+    ingress-nginx-neo-controller-cf9ff8c96-8vvf8   1/1     Running   172.17.0.3   host-3
+    ingress-nginx-neo-controller-cf9ff8c96-pxsds   1/1     Running   172.17.1.4   host-2
     ```
 
     Requests sent to `host-2` and `host-3` would be forwarded to NGINX and original client's IP would be preserved,
     while requests to `host-1` would get dropped because there is no NGINX replica running on that node.
 
-Other ways to preserve the source IP in a NodePort setup are described here: [Source IP address](https://kubernetes.github.io/ingress-nginx/user-guide/miscellaneous/#source-ip-address).
+Other ways to preserve the source IP in a NodePort setup are described here: [Source IP address](../user-guide/miscellaneous.md#source-ip-address).
 
 ### Ingress status
 
-Because NodePort Services do not get a LoadBalancerIP assigned by definition, the Ingress-Nginx Controller **does not
+Because NodePort Services do not get a LoadBalancerIP assigned by definition, the ingress controller **does not
 update the status of Ingress objects it manages**.
 
 ```console
@@ -206,12 +206,12 @@ NAME           HOSTS               ADDRESS   PORTS
 test-ingress   myapp.example.com             80
 ```
 
-Despite the fact there is no load balancer providing a public IP address to the Ingress-Nginx Controller, it is possible
-to force the status update of all managed Ingress objects by setting the `externalIPs` field of the `ingress-nginx`
+Despite the fact there is no load balancer providing a public IP address to the ingress controller, it is possible
+to force the status update of all managed Ingress objects by setting the `externalIPs` field of the `ingress-nginx-neo-controller`
 Service.
 
 !!! warning
-    There is more to setting `externalIPs` than just enabling the Ingress-Nginx Controller to update the status of
+    There is more to setting `externalIPs` than just enabling the ingress controller to update the status of
     Ingress objects. Please read about this option in the [Services][external-ips] page of official Kubernetes
     documentation as well as the section about [External IPs](#external-ips) in this document for more information.
 
@@ -227,7 +227,7 @@ Service.
     host-3   Ready    node     203.0.113.3
     ```
 
-    one could edit the `ingress-nginx` Service and add the following field to the object spec
+    one could edit the `ingress-nginx-neo-controller` Service and add the following field to the object spec
 
     ```yaml
     spec:
@@ -257,26 +257,25 @@ for generating redirect URLs that take into account the URL used by external cli
     ```console
     $ curl -D- http://myapp.example.com:30100`
     HTTP/1.1 308 Permanent Redirect
-    Server: nginx/1.15.2
+    Server: nginx
     Location: https://myapp.example.com/  #-> missing NodePort in HTTPS redirect
     ```
 
 [install-baremetal]: ./index.md#bare-metal-clusters
-[install-quickstart]: ./index.md#quick-start
+[install-quickstart]: ./index.md#install-with-helm
 [nodeport-def]: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
 [nodeport-nat]: https://kubernetes.io/docs/tutorials/services/source-ip/#source-ip-for-services-with-type-nodeport
 [pod-assign]: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
-[preserve-ip]: https://github.com/kubernetes/ingress-nginx/blob/ingress-nginx-3.15.2/deploy/static/provider/aws/deploy.yaml#L290
 
 ## Via the host network
 
 In a setup where there is no external load balancer available but using NodePorts is not an option, one can configure
-`ingress-nginx` Pods to use the network of the host they run on instead of a dedicated network namespace. The benefit of
-this approach is that the Ingress-Nginx Controller can bind ports 80 and 443 directly to Kubernetes nodes' network
+controller Pods to use the network of the host they run on instead of a dedicated network namespace. The benefit of
+this approach is that the ingress controller can bind ports 80 and 443 directly to Kubernetes nodes' network
 interfaces, without the extra network translation imposed by NodePort Services.
 
 !!! note
-    This approach does not leverage any Service object to expose the Ingress-Nginx Controller. If the `ingress-nginx`
+    This approach does not leverage any Service object to expose the ingress controller. If the `ingress-nginx-neo-controller`
     Service exists in the target cluster, it is **recommended to delete it**.
 
 This can be achieved by enabling the `hostNetwork` option in the Pods' spec.
@@ -288,27 +287,26 @@ template:
 ```
 
 !!! danger "Security considerations"
-    Enabling this option **exposes every system daemon to the Ingress-Nginx Controller** on any network interface,
+    Enabling this option **exposes every system daemon to the ingress controller** on any network interface,
     including the host's loopback. Please evaluate the impact this may have on the security of your system carefully.
 
 !!! example
-    Consider this `ingress-nginx-controller` Deployment composed of 2 replicas, NGINX Pods inherit from the IP address
+    Consider this `ingress-nginx-neo-controller` Deployment composed of 2 replicas, NGINX Pods inherit from the IP address
     of their host instead of an internal Pod IP.
 
     ```console
-    $ kubectl -n ingress-nginx get pod -o wide
-    NAME                                       READY   STATUS    IP            NODE
-    default-http-backend-7c5bc89cc9-p86md      1/1     Running   172.17.1.1    host-2
-    ingress-nginx-controller-5b4cf5fc6-7lg6c   1/1     Running   203.0.113.3   host-3
-    ingress-nginx-controller-5b4cf5fc6-lzrls   1/1     Running   203.0.113.2   host-2
+    $ kubectl -n ingress-nginx-neo get pod -o wide
+    NAME                                           READY   STATUS    IP            NODE
+    ingress-nginx-neo-controller-5b4cf5fc6-7lg6c   1/1     Running   203.0.113.3   host-3
+    ingress-nginx-neo-controller-5b4cf5fc6-lzrls   1/1     Running   203.0.113.2   host-2
     ```
 
-One major limitation of this deployment approach is that only **a single Ingress-Nginx Controller Pod** may be scheduled
+One major limitation of this deployment approach is that only **a single ingress controller Pod** may be scheduled
 on each cluster node, because binding the same port multiple times on the same network interface is technically
 impossible. Pods that are unschedulable due to such situation fail with the following event:
 
 ```console
-$ kubectl -n ingress-nginx describe pod <unschedulable-ingress-nginx-controller-pod>
+$ kubectl -n ingress-nginx-neo describe pod <unschedulable-controller-pod>
 ...
 Events:
   Type     Reason            From               Message
@@ -316,7 +314,7 @@ Events:
   Warning  FailedScheduling  default-scheduler  0/3 nodes are available: 3 node(s) didn't have free ports for the requested pod ports.
 ```
 
-One way to ensure only schedulable Pods are created is to deploy the Ingress-Nginx Controller as a *DaemonSet* instead
+One way to ensure only schedulable Pods are created is to deploy the ingress controller as a *DaemonSet* instead
 of a traditional Deployment.
 
 !!! info
@@ -338,7 +336,7 @@ expected to resolve internal names for any reason.
 
 ### Ingress status
 
-Because there is no Service exposing the Ingress-Nginx Controller in a configuration using the host network, the default
+Because there is no Service exposing the ingress controller in a configuration using the host network, the default
 `--publish-service` flag used in standard cloud setups **does not apply** and the status of all Ingress objects remains
 blank.
 
@@ -350,17 +348,16 @@ test-ingress   myapp.example.com             80
 
 Instead, and because bare-metal nodes usually don't have an ExternalIP, one has to enable the
 [`--report-node-internal-ip-address`][cli-args] flag, which sets the status of all Ingress objects to the internal IP
-address of all nodes running the Ingress-Nginx Controller.
+address of all nodes running the ingress controller.
 
 !!! example
-    Given a `ingress-nginx-controller` DaemonSet composed of 2 replicas
+    Given a `ingress-nginx-neo-controller` DaemonSet composed of 2 replicas
 
     ```console
-    $ kubectl -n ingress-nginx get pod -o wide
-    NAME                                       READY   STATUS    IP            NODE
-    default-http-backend-7c5bc89cc9-p86md      1/1     Running   172.17.1.1    host-2
-    ingress-nginx-controller-5b4cf5fc6-7lg6c   1/1     Running   203.0.113.3   host-3
-    ingress-nginx-controller-5b4cf5fc6-lzrls   1/1     Running   203.0.113.2   host-2
+    $ kubectl -n ingress-nginx-neo get pod -o wide
+    NAME                                           READY   STATUS    IP            NODE
+    ingress-nginx-neo-controller-5b4cf5fc6-7lg6c   1/1     Running   203.0.113.3   host-3
+    ingress-nginx-neo-controller-5b4cf5fc6-lzrls   1/1     Running   203.0.113.2   host-2
     ```
 
     the controller sets the status of all Ingress objects it manages to the following value:
@@ -402,7 +399,7 @@ on the target nodes as shown in the diagram below:
     This method does not allow preserving the source IP of HTTP requests in any manner, it is therefore **not
     recommended** to use it despite its apparent simplicity.
 
-The `externalIPs` Service option was previously mentioned in the [NodePort](#over-a-nodeport-service) section.
+The `externalIPs` Service option is also covered in the [NodePort](#over-a-nodeport-service) section.
 
 As per the [Services][external-ips] page of the official Kubernetes documentation, the `externalIPs` option causes
 `kube-proxy` to route traffic sent to arbitrary IP addresses **and on the Service ports** to the endpoints of that
@@ -420,12 +417,12 @@ Service. These IP addresses **must belong to the target node**.
     host-3   Ready    node     203.0.113.3
     ```
 
-    and the following `ingress-nginx` NodePort Service
+    and the following `ingress-nginx-neo-controller` NodePort Service
 
     ```console
-    $ kubectl -n ingress-nginx get svc
-    NAME                   TYPE        CLUSTER-IP     PORT(S)
-    ingress-nginx          NodePort    10.0.220.217   80:30100/TCP,443:30101/TCP
+    $ kubectl -n ingress-nginx-neo get svc
+    NAME                           TYPE        CLUSTER-IP     PORT(S)
+    ingress-nginx-neo-controller   NodePort    10.0.220.217   80:30100/TCP,443:30101/TCP
     ```
 
     One could set the following external IPs in the Service spec, and NGINX would become available on both the NodePort
@@ -441,11 +438,11 @@ Service. These IP addresses **must belong to the target node**.
     ```console
     $ curl -D- http://myapp.example.com:30100
     HTTP/1.1 200 OK
-    Server: nginx/1.15.2
+    Server: nginx
 
     $ curl -D- http://myapp.example.com
     HTTP/1.1 200 OK
-    Server: nginx/1.15.2
+    Server: nginx
     ```
 
     We assume the myapp.example.com subdomain above resolves to both 203.0.113.2 and 203.0.113.3 IP addresses.

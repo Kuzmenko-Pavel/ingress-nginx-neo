@@ -1,7 +1,7 @@
 <!--
 -----------------NOTICE------------------------
-This file is referenced in code as
-https://github.com/kubernetes/ingress-nginx/blob/main/docs/troubleshooting.md
+This page is referenced in code (cmd/nginx/main.go) as
+https://kuzmenko-pavel.github.io/ingress-nginx-neo/troubleshooting/
 Do not move it without providing redirects.
 -----------------------------------------------
 -->
@@ -37,35 +37,39 @@ Annotations:
 Events:
   Type    Reason  Age   From                      Message
   ----    ------  ----  ----                      -------
-  Normal  CREATE  1m    ingress-nginx-controller  Ingress default/cafe-ingress
-  Normal  UPDATE  58s   ingress-nginx-controller  Ingress default/cafe-ingress
+  Normal  CREATE  1m    nginx-ingress-controller  Ingress default/cafe-ingress
+  Normal  UPDATE  58s   nginx-ingress-controller  Ingress default/cafe-ingress
 ```
 
 ### Check the Ingress Controller Logs
 
 ```console
 $ kubectl get pods -n <namespace-of-ingress-controller>
-NAME                                        READY     STATUS    RESTARTS   AGE
-ingress-nginx-controller-67956bf89d-fv58j   1/1       Running   0          1m
+NAME                                            READY     STATUS    RESTARTS   AGE
+ingress-nginx-neo-controller-67956bf89d-fv58j   1/1       Running   0          1m
 
-$ kubectl logs -n <namespace> ingress-nginx-controller-67956bf89d-fv58j
+$ kubectl logs -n <namespace-of-ingress-controller> ingress-nginx-neo-controller-67956bf89d-fv58j
 -------------------------------------------------------------------------------
 NGINX Ingress controller
-  Release:    0.14.0
-  Build:      git-734361d
-  Repository: https://github.com/kubernetes/ingress-nginx
+  Release:       <version>
+  Build:         <commit>
+  Repository:    https://github.com/Kuzmenko-Pavel/ingress-nginx-neo
+  nginx version: nginx/<nginx version>
+
 -------------------------------------------------------------------------------
 ....
 ```
+
+The [kubectl plugin](kubectl-plugin.md) finds the controller pod for you: `kubectl ingress-nginx-neo logs -n <namespace-of-ingress-controller>`.
 
 ### Check the Nginx Configuration
 
 ```console
 $ kubectl get pods -n <namespace-of-ingress-controller>
-NAME                                        READY     STATUS    RESTARTS   AGE
-ingress-nginx-controller-67956bf89d-fv58j   1/1       Running   0          1m
+NAME                                            READY     STATUS    RESTARTS   AGE
+ingress-nginx-neo-controller-67956bf89d-fv58j   1/1       Running   0          1m
 
-$ kubectl exec -it -n <namespace-of-ingress-controller> ingress-nginx-controller-67956bf89d-fv58j -- cat /etc/nginx/nginx.conf
+$ kubectl exec -it -n <namespace-of-ingress-controller> ingress-nginx-neo-controller-67956bf89d-fv58j -- cat /etc/nginx/nginx.conf
 daemon off;
 worker_processes 2;
 pid /run/nginx.pid;
@@ -79,6 +83,8 @@ events {
 http {
 ....
 ```
+
+With the [kubectl plugin](kubectl-plugin.md): `kubectl ingress-nginx-neo conf -n <namespace-of-ingress-controller>`.
 
 ### Check if used Services Exist
 
@@ -100,13 +106,14 @@ the deployment.
 
 ```console
 $ kubectl get deploy -n <namespace-of-ingress-controller>
-NAME                       DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-default-http-backend       1         1         1            1           35m
-ingress-nginx-controller   1         1         1            1           35m
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+ingress-nginx-neo-controller   1/1     1            1           35m
 
-$ kubectl edit deploy -n <namespace-of-ingress-controller> ingress-nginx-controller
+$ kubectl edit deploy -n <namespace-of-ingress-controller> ingress-nginx-neo-controller
 # Add --v=X to "- args", where X is an integer
 ```
+
+With Helm, set the flag through the chart value `controller.extraArgs`, for example `--set controller.extraArgs.v=2`.
 
 - `--v=2` shows details using `diff` about the changes in the configuration in nginx
 - `--v=3` shows details about the service, Ingress rule, endpoint changes and it dumps the nginx configuration in JSON format
@@ -254,9 +261,9 @@ Note: The below is based on the nginx [documentation](https://docs.nginx.com/ngi
 2. Obtain the Docker Container Running nginx
 
     ```console
-    $ docker ps | grep ingress-nginx-controller
-    CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
-    d9e1d243156a        registry.k8s.io/ingress-nginx/controller   "/usr/bin/dumb-init …"   19 minutes ago      Up 19 minutes                                                                            k8s_ingress-nginx-controller_ingress-nginx-controller-67956bf89d-mqxzt_kube-system_079f31ec-aa37-11e8-ad39-080027a227db_0
+    $ docker ps | grep ingress-nginx-neo-controller
+    CONTAINER ID        IMAGE                                                COMMAND                  CREATED             STATUS              PORTS               NAMES
+    d9e1d243156a        ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller   "/usr/bin/dumb-init …"   19 minutes ago      Up 19 minutes                           k8s_controller_ingress-nginx-neo-controller-67956bf89d-mqxzt_ingress-nginx-neo_079f31ec-aa37-11e8-ad39-080027a227db_0
     ```
 
 3. Exec into the container
@@ -277,7 +284,7 @@ Note: The below is based on the nginx [documentation](https://docs.nginx.com/ngi
     $ ps -ef
     UID        PID  PPID  C STIME TTY          TIME CMD
     root         1     0  0 20:23 ?        00:00:00 /usr/bin/dumb-init /nginx-ingres
-    root         5     1  0 20:23 ?        00:00:05 /ingress-nginx-controller --defa
+    root         5     1  0 20:23 ?        00:00:05 /nginx-ingress-controller --defa
     root        21     5  0 20:23 ?        00:00:00 nginx: master process /usr/sbin/
     nobody     106    21  0 20:23 ?        00:00:00 nginx: worker process
     nobody     107    21  0 20:23 ?        00:00:00 nginx: worker process
@@ -317,57 +324,40 @@ Note: The below is based on the nginx [documentation](https://docs.nginx.com/ngi
     cat nginx_conf.txt
     ```
     
-## Image related issues faced on Nginx 4.2.5 or other versions (Helm chart versions) 
+## Image pull errors
 
-1. Incase you face below error while installing Nginx using helm chart (either by helm commands or helm_release terraform provider ) 
+All ingress-nginx-neo images are pulled from the GitHub Container Registry, under the prefix
+`ghcr.io/kuzmenko-pavel/ingress-nginx-neo/` (see [Artifacts and verification](deploy/artifacts.md)). If pods stay in
+`ImagePullBackOff` or `ErrImagePull`, check the events of the pod:
+
+```console
+kubectl describe pod -n <namespace-of-ingress-controller> <pod-name>
 ```
-Warning  Failed     5m5s (x4 over 6m34s)   kubelet            Failed to pull image "registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.3.0@sha256:549e71a6ca248c5abd51cdb73dbc3083df62cf92ed5e6147c780e30f7e007a47": rpc error: code = Unknown desc = failed to pull and unpack image "registry.k8s.io/ingress-nginx/kube-webhook-certgen@sha256:549e71a6ca248c5abd51cdb73dbc3083df62cf92ed5e6147c780e30f7e007a47": failed to resolve reference "registry.k8s.io/ingress-nginx/kube-webhook-certgen@sha256:549e71a6ca248c5abd51cdb73dbc3083df62cf92ed5e6147c780e30f7e007a47": failed to do request: Head "https://eu.gcr.io/v2/k8s-artifacts-prod/ingress-nginx/kube-webhook-certgen/manifests/sha256:549e71a6ca248c5abd51cdb73dbc3083df62cf92ed5e6147c780e30f7e007a47": EOF
-```
-   Then please follow the below steps.
 
-2. During troubleshooting you can also execute the below commands to test the connectivities from you local machines and repositories  details
+An error such as `failed to do request: Head "https://ghcr.io/v2/...": EOF` or a timeout usually means that the
+nodes cannot reach the registry.
 
-      a. curl registry.k8s.io/ingress-nginx/kube-webhook-certgen@sha256:549e71a6ca248c5abd51cdb73dbc3083df62cf92ed5e6147c780e30f7e007a47 > /dev/null
-      ```
-      (⎈ |myprompt)➜  ~ curl registry.k8s.io/ingress-nginx/kube-webhook-certgen@sha256:549e71a6ca248c5abd51cdb73dbc3083df62cf92ed5e6147c780e30f7e007a47 > /dev/null
-                          % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                                          Dload  Upload   Total   Spent    Left  Speed
-                          0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
-       (⎈ |myprompt)➜  ~
-      ```
-      b. curl -I https://eu.gcr.io/v2/k8s-artifacts-prod/ingress-nginx/kube-webhook-certgen/manifests/sha256:549e71a6ca248c5abd51cdb73dbc3083df62cf92ed5e6147c780e30f7e007a47
-      ```
-      (⎈ |myprompt)➜  ~ curl -I https://eu.gcr.io/v2/k8s-artifacts-prod/ingress-nginx/kube-webhook-certgen/manifests/sha256:549e71a6ca248c5abd51cdb73dbc3083df62cf92ed5e6147c780e30f7e007a47
-                                          HTTP/2 200
-                                          docker-distribution-api-version: registry/2.0
-                                          content-type: application/vnd.docker.distribution.manifest.list.v2+json
-                                          docker-content-digest: sha256:549e71a6ca248c5abd51cdb73dbc3083df62cf92ed5e6147c780e30f7e007a47
-                                          content-length: 1384
-                                          date: Wed, 28 Sep 2022 16:46:28 GMT
-                                          server: Docker Registry
-                                          x-xss-protection: 0
-                                          x-frame-options: SAMEORIGIN
-                                          alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000,h3-Q050=":443"; ma=2592000,h3-Q046=":443"; ma=2592000,h3-Q043=":443"; ma=2592000,quic=":443"; ma=2592000; v="46,43"
+1. Test the connectivity to the registry from a node or from a machine in the same network. A request without
+   credentials returns `401 Unauthorized`, which shows that the registry is reachable:
 
-        (⎈ |myprompt)➜  ~
-      ```
-   Redirection in the proxy is implemented to ensure the pulling of the images.
+    ```console
+    curl -sSI https://ghcr.io/v2/
+    ```
 
-3. This is the solution recommended to whitelist the below image repositories : 
-     ```
-     *.appspot.com    
-     *.k8s.io        
-     *.pkg.dev
-     *.gcr.io
-     
-     ```
-     More details about the above repos : 
-     a. *.k8s.io -> To ensure you can pull any images from registry.k8s.io
-     b. *.gcr.io -> GCP services are used for image hosting. This is part of the domains suggested by GCP to allow and ensure users can pull images from their container registry services.
-     c. *.appspot.com -> This a Google domain. part of the domain used for GCR.
+2. If you use a proxy or firewall with an allowlist, allow the registry host and the host that serves the image
+   layers:
+
+    ```
+    ghcr.io
+    pkg-containers.githubusercontent.com
+    ```
+
+3. If the nodes cannot reach `ghcr.io` at all, mirror the images into a registry they can reach and set
+   `global.image.registry` to it, as described in [Mirroring](deploy/artifacts.md#mirroring). In this case, allow
+   your mirror instead of `ghcr.io`.
 
 ## Unable to listen on port (80/443)
-One possible reason for this error is lack of permission to bind to the port.  Ports 80, 443, and any other port < 1024 are Linux privileged ports which historically could only be bound by root.  The ingress-nginx-controller uses the CAP_NET_BIND_SERVICE [linux capability](https://man7.org/linux/man-pages/man7/capabilities.7.html) to allow binding these ports as a normal user (www-data / 101).  This involves two components:
+One possible reason for this error is lack of permission to bind to the port.  Ports 80, 443, and any other port < 1024 are Linux privileged ports which historically could only be bound by root.  The controller uses the CAP_NET_BIND_SERVICE [linux capability](https://man7.org/linux/man-pages/man7/capabilities.7.html) to allow binding these ports as a normal user (www-data / 101).  This involves two components:
 1. In the image, the /nginx-ingress-controller file has the cap_net_bind_service capability added (e.g. via [setcap](https://man7.org/linux/man-pages/man8/setcap.8.html)) 
 2. The NET_BIND_SERVICE capability is added to the container in the containerSecurityContext of the deployment.
 
@@ -379,7 +369,7 @@ The /nginx-ingress-controller process exits/crashes when encountering this error
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ingress-nginx-sleep
+  name: ingress-nginx-neo-sleep
   namespace: default
   labels:
     app: nginx
@@ -421,8 +411,8 @@ spec:
 ```
 * update the namespace if applicable/desired
 * replace `##_NODE_NAME_##` with the problematic node (or remove nodeSelector section if problem is not confined to one node)
-* replace `##_CONTROLLER_IMAGE_##` with the same image as in use by your ingress-nginx deployment
-* confirm the securityContext section matches what is in place for ingress-nginx-controller pods in your cluster
+* replace `##_CONTROLLER_IMAGE_##` with the same image as in use by your controller Deployment or DaemonSet (for example `ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:<version>`)
+* confirm the securityContext section matches what is in place for the controller pods in your cluster
 
 Apply the YAML and open a shell into the pod.
 Try to manually run the controller process:
