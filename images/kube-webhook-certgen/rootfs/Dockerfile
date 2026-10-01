@@ -22,13 +22,13 @@ ARG TARGETARCH
 
 WORKDIR /workspace
 COPY . .
-RUN go mod tidy && CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -a -o kube-webhook-certgen main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -a -o kube-webhook-certgen main.go
 
 FROM gcr.io/distroless/static:nonroot
 ARG BUILDPLATFORM
 ARG TARGETARCH
 
-LABEL org.opencontainers.image.source=https://github.com/Kuzmenko-Pavel/ingress-nginx
+LABEL org.opencontainers.image.source=https://github.com/Kuzmenko-Pavel/ingress-nginx-neo
 
 WORKDIR /
 COPY --from=builder /workspace/kube-webhook-certgen /kube-webhook-certgen

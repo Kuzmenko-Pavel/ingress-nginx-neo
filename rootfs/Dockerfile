@@ -20,18 +20,16 @@ ARG BASE_IMAGE
 ARG TARGETARCH
 ARG VERSION
 ARG COMMIT_SHA
-ARG BUILD_ID=UNSET
 
-LABEL org.opencontainers.image.title="NGINX Ingress Controller for Kubernetes"
-LABEL org.opencontainers.image.documentation="https://github.com/Kuzmenko-Pavel/ingress-nginx/tree/main/docs"
-LABEL org.opencontainers.image.source="https://github.com/Kuzmenko-Pavel/ingress-nginx"
-LABEL org.opencontainers.image.vendor="Kuzmenko-Pavel/ingress-nginx"
+LABEL org.opencontainers.image.title="ingress-nginx-neo controller"
+LABEL org.opencontainers.image.description="NGINX Ingress controller for Kubernetes"
+LABEL org.opencontainers.image.documentation="https://kuzmenko-pavel.github.io/ingress-nginx-neo/"
+LABEL org.opencontainers.image.source="https://github.com/Kuzmenko-Pavel/ingress-nginx-neo"
+LABEL org.opencontainers.image.vendor="ingress-nginx-neo"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.revision="${COMMIT_SHA}"
 LABEL org.opencontainers.image.base.name="${BASE_IMAGE}"
-
-LABEL build_id="${BUILD_ID}"
 
 WORKDIR  /etc/nginx
 
@@ -66,8 +64,12 @@ RUN bash -xeu -c ' \
   done' \
   # LD_LIBRARY_PATH does not work so below is needed for  opentelemetry/other modules
   # Put libs of newer modules under `/modules_mount/<other>/lib` and add that path below
-  # Could get complicated arch specific paths become a need
-  && echo "/lib:/usr/lib:/usr/local/lib:/modules_mount/etc/nginx/modules/otel" > /etc/ld-musl-x86_64.path
+  && case "${TARGETARCH}" in \
+       amd64) musl_arch=x86_64 ;; \
+       arm64) musl_arch=aarch64 ;; \
+       *) echo "unsupported TARGETARCH ${TARGETARCH}" >&2; exit 1 ;; \
+     esac \
+  && echo "/lib:/usr/lib:/usr/local/lib:/modules_mount/etc/nginx/modules/otel" > /etc/ld-musl-${musl_arch}.path
   
 
 RUN apk add --no-cache libcap \

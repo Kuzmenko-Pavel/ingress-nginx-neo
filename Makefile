@@ -150,12 +150,15 @@ DEPS_ALL := nginx e2e-test-runner e2e-test-echo httpbun fastcgi-helloserver cfss
 DEPS_PLATFORMS := linux/amd64 linux/arm64
 
 CONTENT_TAG := tools/content-tag.sh
-NGINX_TAG := $(shell $(CONTENT_TAG) images/nginx)
-RUNNER_TAG := $(shell $(CONTENT_TAG) images/test-runner -- $(NGINX_TAG) $(GO_VERSION) $(GINKGO_VERSION) $(HELM_VERSION))
-ECHO_TAG := $(shell $(CONTENT_TAG) images/e2e-test-echo -- $(NGINX_TAG))
-HTTPBUN_TAG := $(shell $(CONTENT_TAG) images/httpbun -- $(GO_VERSION))
-FASTCGI_TAG := $(shell $(CONTENT_TAG) images/fastcgi-helloserver -- $(GO_VERSION))
-CFSSL_TAG := $(shell $(CONTENT_TAG) images/cfssl -- $(GO_VERSION))
+# Inputs: the image build context (rootfs/), its build-args.env and every
+# value passed as a build argument. Documentation files are not inputs.
+dep-inputs = $(wildcard images/$(1)/rootfs images/$(1)/build-args.env)
+NGINX_TAG := $(shell $(CONTENT_TAG) $(call dep-inputs,nginx))
+RUNNER_TAG := $(shell $(CONTENT_TAG) $(call dep-inputs,test-runner) -- $(NGINX_TAG) $(GO_VERSION) $(GINKGO_VERSION) $(HELM_VERSION))
+ECHO_TAG := $(shell $(CONTENT_TAG) $(call dep-inputs,e2e-test-echo) -- $(NGINX_TAG))
+HTTPBUN_TAG := $(shell $(CONTENT_TAG) $(call dep-inputs,httpbun) -- $(GO_VERSION))
+FASTCGI_TAG := $(shell $(CONTENT_TAG) $(call dep-inputs,fastcgi-helloserver) -- $(GO_VERSION))
+CFSSL_TAG := $(shell $(CONTENT_TAG) $(call dep-inputs,cfssl) -- $(GO_VERSION))
 
 NGINX_IMAGE := $(REGISTRY)/nginx:$(NGINX_TAG)
 BASE_IMAGE := $(NGINX_IMAGE)
@@ -186,7 +189,8 @@ DEP_ARGS_cfssl := --build-arg GOLANG_VERSION=$(GO_VERSION)
 # Images built FROM the nginx base.
 DEPS_ON_BASE := e2e-test-runner e2e-test-echo
 
-DOCKER_CACHE_ARGS ?=
+# Digests published by docker-publish and docker-promote: <name>=<repository>@<digest>.
+DIGESTS_FILE := $(DIST)/digests.env
 
 # ---------------------------------------------------------------------------
 # Tests
@@ -307,11 +311,13 @@ deps-ensure-%:
 	image='$(DEP_IMAGE_$*)'; \
 	if docker image inspect "$$image" >/dev/null 2>&1; then \
 		echo "$$image: present"; \
-	elif tools/image-exists.sh "$$image" $(PLATFORM); then \
-		docker pull --platform $(PLATFORM) "$$image"; \
 	else \
-		rc=$$?; [[ $$rc -eq 1 || $$rc -eq 3 ]] || exit $$rc; \
-		$(MAKE) --no-print-directory deps-build-$*; \
+		rc=0; tools/image-exists.sh "$$image" $(PLATFORM) || rc=$$?; \
+		case $$rc in \
+			0) docker pull --platform $(PLATFORM) "$$image" ;; \
+			1 | 3) $(MAKE) --no-print-directory deps-build-$* ;; \
+			*) exit $$rc ;; \
+		esac; \
 	fi
 
 # Build one dependency image for the host platform into the local image store.
@@ -332,6 +338,162 @@ dep-build-args = \
 	--label org.opencontainers.image.licenses=Apache-2.0 \
 	--label org.opencontainers.image.title=$(1) \
 	--label org.opencontainers.image.version=$(notdir $(subst :,/,$(DEP_IMAGE_$(1))))
+
+# Delivered images: build context, Dockerfile and build arguments.
+IMAGE_CONTEXT_controller := rootfs
+IMAGE_CONTEXT_controller-chroot := rootfs
+IMAGE_CONTEXT_kube-webhook-certgen := images/kube-webhook-certgen/rootfs
+IMAGE_CONTEXT_custom-error-pages := images/custom-error-pages/rootfs
+IMAGE_DOCKERFILE_controller := rootfs/Dockerfile
+IMAGE_DOCKERFILE_controller-chroot := rootfs/Dockerfile-chroot
+IMAGE_DOCKERFILE_kube-webhook-certgen := images/kube-webhook-certgen/rootfs/Dockerfile
+IMAGE_DOCKERFILE_custom-error-pages := images/custom-error-pages/rootfs/Dockerfile
+IMAGE_DESCRIPTION_controller := NGINX Ingress controller for Kubernetes
+IMAGE_DESCRIPTION_controller-chroot := NGINX Ingress controller for Kubernetes, NGINX in a chroot
+IMAGE_DESCRIPTION_kube-webhook-certgen := Admission webhook certificate generator and patcher
+IMAGE_DESCRIPTION_custom-error-pages := Default backend serving custom error pages
+IMAGE_ON_BASE := controller controller-chroot
+
+image-build-args = \
+	--file $(IMAGE_DOCKERFILE_$(1)) \
+	--build-arg GOLANG_VERSION=$(GO_VERSION) \
+	--build-arg VERSION=$(IMAGE_TAG) \
+	--build-arg COMMIT_SHA=$(COMMIT) \
+	$(if $(filter $(1),$(IMAGE_ON_BASE)),--build-arg BASE_IMAGE=$(2)) \
+	--label org.opencontainers.image.source=$(REPO_URL) \
+	--label org.opencontainers.image.revision=$(COMMIT) \
+	--label org.opencontainers.image.version=$(IMAGE_TAG) \
+	--label org.opencontainers.image.licenses=Apache-2.0 \
+	--label org.opencontainers.image.title=$(PROJECT)-$(1) \
+	--label 'org.opencontainers.image.description=$(IMAGE_DESCRIPTION_$(1))'
+
+.PHONY: docker-build
+docker-build: ## Build delivered images for the host platform (IMAGES ?= controller controller-chroot kube-webhook-certgen custom-error-pages), load locally, tag IMAGE_TAG
+	$(if $(filter $(IMAGE_ON_BASE),$(IMAGES)),$(MAKE) --no-print-directory code-build deps-ensure-nginx)
+	$(foreach i,$(IMAGES),docker buildx build --builder default --load --platform $(PLATFORM) \
+		$(call image-build-args,$(i),$(BASE_IMAGE)) \
+		--tag $(REGISTRY)/$(i):$(IMAGE_TAG) $(IMAGE_CONTEXT_$(i))$(newline))
+
+define newline
+
+
+endef
+
+.PHONY: docker-publish
+docker-publish: ## Build and push delivered images for PLATFORMS with IMAGE_TAG (CHANNEL=latest|release), write dist/digests.env
+	$(if $(filter dev,$(CHANNEL)),$(error docker-publish needs CHANNEL=latest or CHANNEL=release))
+	$(foreach p,$(subst $(comma), ,$(PLATFORMS)),$(MAKE) --no-print-directory code-build ARCH=$(notdir $(p))$(newline))
+	mkdir -p $(DIST)
+	base="$(REGISTRY)/nginx@$$($(CRANE) digest $(NGINX_IMAGE))"; \
+	for image in $(IMAGES); do \
+		ref="$(REGISTRY)/$$image:$(IMAGE_TAG)"; \
+		exists=1; \
+		if [[ "$(CHANNEL)" == release ]]; then tools/image-exists.sh "$$ref" || exists=$$?; fi; \
+		[[ $$exists -le 1 ]] || exit $$exists; \
+		if [[ $$exists -eq 0 ]]; then \
+			revision="$$($(CRANE) config "$$ref" | jq -r '.config.Labels["org.opencontainers.image.revision"] // ""')"; \
+			if [[ "$$revision" != "$(COMMIT)" ]]; then \
+				echo "$$ref is published from $$revision, not $(COMMIT); release tags are immutable" >&2; exit 1; \
+			fi; \
+			echo "$$ref: already published from $(COMMIT)"; \
+		else \
+			$(MAKE) --no-print-directory docker-publish-image-$$image BASE_REF="$$base"; \
+		fi; \
+		sed -i "/^$$image=/d" $(DIGESTS_FILE) 2>/dev/null || true; \
+		echo "$$image=$(REGISTRY)/$$image@$$($(CRANE) digest "$$ref")" >> $(DIGESTS_FILE); \
+	done
+	cat $(DIGESTS_FILE)
+
+docker-publish-image-%: $(CRANE)
+	docker buildx build --push --platform $(PLATFORMS) \
+		--sbom=true --provenance=mode=max \
+		$(call image-build-args,$*,$(BASE_REF)) \
+		$(call cache-args,$*) \
+		--label org.opencontainers.image.base.name=$(BASE_REF) \
+		--tag $(REGISTRY)/$*:$(IMAGE_TAG) $(IMAGE_CONTEXT_$*)
+
+comma := ,
+# DOCKER_CACHE=gha enables the GitHub Actions build cache, one scope per image and platform.
+DOCKER_CACHE ?=
+cache-args = $(if $(DOCKER_CACHE),--cache-from type=$(DOCKER_CACHE),scope=$(1) --cache-to type=$(DOCKER_CACHE),mode=max,scope=$(1))
+
+.PHONY: docker-publish-deps
+docker-publish-deps: $(CRANE) ## Build and push one PLATFORM of every missing dependency src-* by digest, in dependency order; digests into dist/digests/
+	for dep in $(filter $(DEPS),$(DEPS_ALL)); do \
+		$(MAKE) --no-print-directory deps-publish-$$dep; \
+	done
+
+deps-publish-%:
+	image='$(DEP_IMAGE_$*)'; arch='$(notdir $(PLATFORM))'; \
+	rc=0; tools/image-exists.sh "$$image" $(DEPS_PLATFORMS) || rc=$$?; \
+	case $$rc in 0) echo "$$image: published"; exit 0 ;; 1) ;; *) exit $$rc ;; esac; \
+	base=''; \
+	if [[ " $(DEPS_ON_BASE) " == *" $* "* ]]; then \
+		if tools/image-exists.sh '$(NGINX_IMAGE)' $(PLATFORM); then \
+			base="$(REGISTRY)/nginx@$$($(CRANE) digest '$(NGINX_IMAGE)')"; \
+		else \
+			base="$(REGISTRY)/nginx@$$(cat $(DIST)/digests/nginx/$$arch)"; \
+		fi; \
+	fi; \
+	mkdir -p $(DIST)/digests/$*; \
+	docker buildx build --platform $(PLATFORM) \
+		$(call dep-build-args,$*) \
+		$${base:+--build-arg BASE_IMAGE=$$base --label org.opencontainers.image.base.name=$$base} \
+		$(call cache-args,$*-$(notdir $(PLATFORM))) \
+		--metadata-file $(DIST)/digests/$*/$$arch.json \
+		--output type=image,name=$(REGISTRY)/$*,push-by-digest=true,name-canonical=true,push=true \
+		$(DEP_DIR_$*)/rootfs; \
+	jq -r '."containerimage.digest"' $(DIST)/digests/$*/$$arch.json > $(DIST)/digests/$*/$$arch
+
+.PHONY: docker-publish-deps-manifest
+docker-publish-deps-manifest: ## Create the multi-platform src-* indexes from dist/digests/ (no-op for published ones)
+	for dep in $(filter $(DEPS),$(DEPS_ALL)); do \
+		$(MAKE) --no-print-directory deps-manifest-$$dep; \
+	done
+
+deps-manifest-%:
+	image='$(DEP_IMAGE_$*)'; \
+	rc=0; tools/image-exists.sh "$$image" $(DEPS_PLATFORMS) || rc=$$?; \
+	case $$rc in 0) echo "$$image: published"; exit 0 ;; 1) ;; *) exit $$rc ;; esac; \
+	refs=(); \
+	for platform in $(DEPS_PLATFORMS); do \
+		file="$(DIST)/digests/$*/$${platform#*/}"; \
+		test -s "$$file" || { echo "missing $$file: run docker-publish-deps PLATFORM=$$platform" >&2; exit 1; }; \
+		refs+=("$(REGISTRY)/$*@$$(cat "$$file")"); \
+	done; \
+	docker buildx imagetools create \
+		--annotation "index:org.opencontainers.image.source=$(REPO_URL)" \
+		--annotation "index:org.opencontainers.image.licenses=Apache-2.0" \
+		--tag "$$image" "$${refs[@]}"
+
+.PHONY: docker-promote
+docker-promote: $(CRANE) ## Point latest (CHANNEL=latest) / vX.Y.Z (CHANNEL=release) of every dependency image to its src-* digest
+	$(if $(filter dev,$(CHANNEL)),$(error docker-promote needs CHANNEL=latest or CHANNEL=release))
+	mkdir -p $(DIST)
+	for dep in $(DEPS_ALL); do \
+		$(MAKE) --no-print-directory deps-promote-$$dep; \
+	done
+
+deps-promote-%:
+	source='$(DEP_IMAGE_$*)'; target='$(REGISTRY)/$*:$(IMAGE_TAG)'; \
+	digest="$$($(CRANE) digest "$$source")"; \
+	exists=1; \
+	if [[ "$(CHANNEL)" == release ]]; then tools/image-exists.sh "$$target" || exists=$$?; fi; \
+	[[ $$exists -le 1 ]] || exit $$exists; \
+	if [[ $$exists -eq 0 ]]; then \
+		current="$$($(CRANE) digest "$$target")"; \
+		[[ "$$current" == "$$digest" ]] || { echo "$$target points to $$current, not $$source ($$digest)" >&2; exit 1; }; \
+		echo "$$target: already $$digest"; \
+	else \
+		docker buildx imagetools create --tag "$$target" "$$source"; \
+	fi; \
+	sed -i "/^$*=/d" $(DIGESTS_FILE) 2>/dev/null || true; \
+	echo "$*=$(REGISTRY)/$*@$$digest" >> $(DIGESTS_FILE)
+
+.PHONY: docker-sign
+docker-sign: $(COSIGN) ## cosign keyless sign every digest in dist/digests.env (delivered images, promoted dependency images)
+	test -s $(DIGESTS_FILE) || { echo "$(DIGESTS_FILE) is missing: run docker-publish/docker-promote first" >&2; exit 1; }
+	cut -d= -f2- $(DIGESTS_FILE) | sort -u | xargs -r -n1 $(COSIGN) sign --yes --recursive
 
 # The runner image backs code-lint, test-unit and test-unit-lua.
 .PHONY: deps-runner
@@ -400,8 +562,6 @@ helm-docs-verify: helm-docs-generate ## Fail if the chart README is stale
 	git diff --exit-code -- $(CHART_DIR)/README.md || \
 		{ echo "$(CHART_DIR)/README.md is stale: run make helm-docs-generate" >&2; exit 1; }
 
-# Image digests published by docker-publish: <name>=<repository>@<digest>.
-DIGESTS_FILE := $(DIST)/digests.env
 HELM_REGISTRY_CONFIG ?= $(or $(DOCKER_CONFIG),$(HOME)/.docker)/config.json
 
 .PHONY: helm-package

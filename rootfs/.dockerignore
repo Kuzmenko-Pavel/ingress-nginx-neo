@@ -1,2 +1,3 @@
 Dockerfile
 .dockerignore
+etc/nginx/lua/test

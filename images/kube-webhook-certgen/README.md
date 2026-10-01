@@ -1,51 +1,46 @@
-# Kubernetes webhook certificate generator and patcher
+# kube-webhook-certgen
 
-**This is a copy/fork of the project existing in [jet/kube-webhook-certgen](https://github.com/jet/kube-webhook-certgen/)**
+Generates a CA and a leaf certificate with a long (100y) expiration and stores them in a Secret,
+then patches the `caBundle` of ValidatingWebhookConfiguration, MutatingWebhookConfiguration and
+APIService objects with that CA. It can also patch the webhooks' `failurePolicy`.
 
-We moved it here so we can change / update the Kubernetes APIs, and we are really thankful to the original
-creators.
+The ingress-nginx-neo Helm chart runs it as pre-install and post-install hook Jobs to provision the
+admission webhook certificate. It is based on [jet/kube-webhook-certgen](https://github.com/jet/kube-webhook-certgen)
+(MIT, see `rootfs/LICENSE`).
 
-## Overview
-Generates a CA and leaf certificate with a long (100y) expiration, then patches [Kubernetes Admission Webhooks](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/)
-by setting the `caBundle` field with the generated CA. 
-Can optionally patch the hooks `failurePolicy` setting - useful in cases where a single Helm chart needs to provision resources
-and hooks at the same time as patching.
+The tool is meant for self-signed webhook certificates. For a complete certificate management
+solution use [cert-manager](https://github.com/cert-manager/cert-manager); the chart supports it with
+`controller.admissionWebhooks.certManager.enabled`.
 
-The utility works in two parts, optimized to work better with the Helm provisioning process that leverages pre-install and post-install hooks to execute this as a Kubernetes job.
+## Image
 
-## Security Considerations
-This tool may not be adequate in all security environments. If a more complete solution is required, you may want to 
-seek alternatives such as [jetstack/cert-manager](https://github.com/jetstack/cert-manager)
+`ghcr.io/kuzmenko-pavel/ingress-nginx-neo/kube-webhook-certgen:<version>`, published with every
+ingress-nginx-neo release for `linux/amd64` and `linux/arm64`.
 
-## Command line options
+## Commands
+
 ```
-Use this to create a ca and signed certificates and patch admission webhooks to allow for quick
-                   installation and configuration of validating and admission webhooks.
-
 Usage:
   kube-webhook-certgen [flags]
   kube-webhook-certgen [command]
 
 Available Commands:
+  completion  Generate the autocompletion script for the specified shell
   create      Generate a ca and server cert+key and store the results in a secret 'secret-name' in 'namespace'
   help        Help about any command
-  patch       Patch a validatingwebhookconfiguration and mutatingwebhookconfiguration 'webhook-name' by using the ca from 'secret-name' in 'namespace'
+  patch       Patch a ValidatingWebhookConfiguration, MutatingWebhookConfiguration or APIService 'object-name' by using the ca from 'secret-name' in 'namespace'
   version     Prints the CLI version information
 
 Flags:
   -h, --help                help for kube-webhook-certgen
       --kubeconfig string   Path to kubeconfig file: e.g. ~/.kube/kind-config-kind
-      --log-format string   Log format: text|json (default "text")
+      --log-format string   Log format: text|json (default "json")
       --log-level string    Log level: panic|fatal|error|warn|info|debug|trace (default "info")
 ```
 
-### Create
+### create
+
 ```
-Generate a ca and server cert+key and store the results in a secret 'secret-name' in 'namespace'
-
-Usage:
-  kube-webhook-certgen create [flags]
-
 Flags:
       --cert-name string     Name of cert file in the secret (default "cert")
   -h, --help                 help for create
@@ -53,34 +48,27 @@ Flags:
       --key-name string      Name of key file in the secret (default "key")
       --namespace string     Namespace of the secret where certificate information will be written
       --secret-name string   Name of the secret where certificate information will be written
-
-Global Flags:
-      --kubeconfig string   Path to kubeconfig file: e.g. ~/.kube/kind-config-kind
-      --log-format string   Log format: text|json (default "json")
-      --log-level string    Log level: panic|fatal|error|warn|info|debug|trace (default "info")
 ```
 
-### Patch
+### patch
+
 ```
-Patch a validatingwebhookconfiguration and mutatingwebhookconfiguration 'webhook-name' by using the ca from 'secret-name' in 'namespace'
-
-Usage:
-  kube-webhook-certgen patch [flags]
-
 Flags:
+      --apiservice-name string        Name of APIService that will be patched
   -h, --help                          help for patch
       --namespace string              Namespace of the secret where certificate information will be read from
       --patch-failure-policy string   If set, patch the webhooks with this failure policy. Valid options are Ignore or Fail
-      --patch-mutating                If true, patch mutatingwebhookconfiguration (default true)
-      --patch-validating              If true, patch validatingwebhookconfiguration (default true)
+      --patch-mutating                If true, patch MutatingWebhookConfiguration (default true)
+      --patch-validating              If true, patch ValidatingWebhookConfiguration (default true)
       --secret-name string            Name of the secret where certificate information will be read from
-      --webhook-name string           Name of validatingwebhookconfiguration and mutatingwebhookconfiguration that will be updated
-
-Global Flags:
-      --kubeconfig string   Path to kubeconfig file: e.g. ~/.kube/kind-config-kind
-      --log-format string   Log format: text|json (default "text")
-      --log-level string    Log level: panic|fatal|error|warn|info|debug|trace (default "info")
+      --webhook-name string           Name of ValidatingWebhookConfiguration and MutatingWebhookConfiguration that will be updated
 ```
 
-## Known Users
-- [stable/prometheus-operator](https://github.com/helm/charts/tree/master/stable/prometheus-operator) helm chart
+`patch` fails when `--patch-validating=false`, `--patch-mutating=false` and no `--apiservice-name` are given.
+
+## Development
+
+```console
+make test-unit          # includes the unit tests of this module
+make test-e2e-certgen   # creates a kind cluster and runs hack/e2e.sh against it
+```

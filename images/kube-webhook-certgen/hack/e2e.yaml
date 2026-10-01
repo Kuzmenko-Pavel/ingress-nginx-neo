@@ -49,8 +49,8 @@ metadata:
   name: v1alpha1.pod-policy.example.com
 spec:
   service:
-    name: "example-namespace"
-    namespace: "example-service"
+    name: "example-service"
+    namespace: "example-namespace"
   group: pod-policy.example.com
   version: v1alpha1
   groupPriorityMinimum: 100
