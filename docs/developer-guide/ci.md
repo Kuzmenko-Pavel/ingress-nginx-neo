@@ -25,7 +25,7 @@ pinned tools. Workflows authenticate with `GITHUB_TOKEN` only and sign with cosi
 | Unit tests | `make docker-load test-unit test-unit-lua` | always |
 | Generated files | `make docs-verify helm-docs-verify` | always |
 | Helm chart | `make helm-lint helm-test` | always |
-| Docs | `make docs-build` | docs or CI changes; always outside pull requests |
+| Docs | `make docs-build docs-publish-check` | docs or CI changes; always outside pull requests |
 | Dependency scan | `make security-dependency-scan` | always |
 | Build images | `make docker-load docker-build docker-build-e2e docker-save` | code, chart, image or CI changes; always outside pull requests |
 | E2E | `make docker-load test-e2e SKIP_BUILD=1 K8S_VERSION=… E2E_VARIANT=…` | every Kubernetes version × `default`, `chroot` |

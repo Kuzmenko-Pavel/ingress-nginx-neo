@@ -248,6 +248,9 @@ jobs:
       - name: Build the site
         run: make docs-build
 
+      - name: Check the docs publication
+        run: make docs-publish-check
+
   security:
     name: Dependency scan
     needs: changes
