@@ -1,36 +1,22 @@
-<!--- Provide a general summary of your changes in the Title above --->
-<!--- Please don't @-mention people in PR or commit messages (do so in an additional comment). --->
-<!--- Please make sure you title is descriptive, it is used in the Release notes to let others know what it does ---> 
+<!-- The title follows Conventional Commits: <type>[(scope)][!]: <description> -->
 
-## What this PR does / why we need it:
-<!--- Why is this change required? What problem does it solve? -->
-<!--- If it fixes an open issue, please link to the issue here. -->
+## What this pull request changes and why
 
-## Types of changes
-<!--- What types of changes does your code introduce? Put an `x` in all the boxes that apply: -->
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] CVE Report (Scanner found CVE and adding report)
-- [ ] Breaking change (fix or feature that would cause existing functionality to change)
-- [ ] Documentation only
+## Type of change
 
-## Which issue/s this PR fixes
-<!--
-(optional, in `fixes #<issue number>` format, will close that issue when PR gets merged):
+- [ ] `feat` — new functionality
+- [ ] `fix` — bug fix
+- [ ] `perf`, `refactor`, `test`, `build`, `ci`, `chore`, `style`
+- [ ] `docs` — documentation only
+- [ ] Breaking change (`!` or a `BREAKING CHANGE:` footer in the commit)
 
-fixes #
--->
+## Checks
 
-## How Has This Been Tested?
-<!--- Please describe in detail how you tested your changes. -->
-<!--- Include details of your testing environment, and the tests you ran to -->
-<!--- see how your change affects other areas of the code, etc. -->
+- [ ] `make check` passes
+- [ ] `make test-e2e` passes (changes of the controller, the NGINX template or Lua code)
+- [ ] Generated files regenerated (`make docs-generate`, `make helm-docs-generate`)
+- [ ] Documentation updated for user-visible changes
 
-## Checklist:
-<!--- Go over all the following points, and put an `x` in all the boxes that apply. -->
-<!--- If you're unsure about any of these, don't hesitate to ask. We're here to help! -->
-- [ ] My change requires a change to the documentation.
-- [ ] I have updated the documentation accordingly.
-- [ ] I've read the [CONTRIBUTING](../CONTRIBUTING.md) guide
-- [ ] I have added unit and/or e2e tests to cover my changes.
-- [ ] All new and existing tests passed.
+## Related issues
+
+<!-- fixes #<number> -->

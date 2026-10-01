@@ -1,21 +1,20 @@
 ---
-name: CVE / scanner finding report
-about: Report a published CVE surfaced by a scanner against this distribution
+name: CVE / scanner finding
+about: A published CVE reported by a scanner against an image of a release
 title: ''
-labels: kind/bug
+labels: bug
 assignees: ''
 ---
 
 <!--
-If the issue is NOT a public CVE yet (i.e. an undisclosed vulnerability), do NOT file it here.
-Report it privately via GitHub Security Advisories instead:
-https://github.com/Kuzmenko-Pavel/ingress-nginx/security/advisories/new
+An undisclosed vulnerability is reported privately with GitHub Security Advisories:
+https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/security/advisories/new
 -->
 
-<!-- What scanner and version reported the CVE? -->
+## Scanner and version
 
-<!-- What CVE was reported in the scanner findings? -->
+## CVE identifiers
 
-<!-- Which image tag / chart version did you test with? -->
+## Image (with tag or digest) and release version
 
-<!-- Any other details that help determine severity. -->
+## Details that help to assess the severity

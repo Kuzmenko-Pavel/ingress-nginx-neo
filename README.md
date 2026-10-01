@@ -1,121 +1,78 @@
-# ingress-nginx (maintained distribution)
+# ingress-nginx-neo
 
-A **self-maintained, standalone distribution** of the ingress-nginx Ingress controller for
-Kubernetes, based on the historical [`kubernetes/ingress-nginx`](https://github.com/kubernetes/ingress-nginx)
-codebase. It is developed and released independently under the `Kuzmenko-Pavel` namespace,
-with its own container images and Helm chart published to GitHub Container Registry (GHCR).
+An Ingress controller for Kubernetes using [NGINX](https://nginx.org/) as a reverse proxy and load
+balancer.
 
-> **Relationship to upstream.** The upstream `kubernetes/ingress-nginx` project is
-> [being retired](https://www.kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/)
-> (best-effort maintenance until ~March 2026, then no further releases or security fixes).
-> This repository is **not** the upstream project and is **not** affiliated with or endorsed
-> by the Kubernetes project, the CNCF, or F5/NGINX. It continues the codebase as an
-> independent distribution. Pull requests are not sent upstream; upstream is kept only as a
-> read-only historical reference.
+ingress-nginx-neo is based on the [kubernetes/ingress-nginx](https://github.com/kubernetes/ingress-nginx)
+codebase and distributed under the [Apache License 2.0](./LICENSE). It is not affiliated with or
+endorsed by the Kubernetes project, the CNCF or F5. NGINX is a trademark of F5, Inc.; Kubernetes is
+a trademark of the Linux Foundation.
 
-This is a derivative work distributed under the Apache License 2.0 (see [`LICENSE`](./LICENSE)).
-"NGINX" is a trademark of F5, Inc.; "Kubernetes" is a trademark of the Linux Foundation —
-used here descriptively only.
+Documentation: <https://kuzmenko-pavel.github.io/ingress-nginx-neo/>
 
-## Overview
+## Compatibility
 
-ingress-nginx is an Ingress controller for Kubernetes using [NGINX](https://www.nginx.org/)
-as a reverse proxy and load balancer. See [`docs/how-it-works.md`](docs/how-it-works.md) for
-the architecture and [`docs/developer-guide/code-overview.md`](docs/developer-guide/code-overview.md)
-for a code map. For agent/automation guidance, see [`AGENTS.md`](./AGENTS.md).
+The user-facing API is the one of kubernetes/ingress-nginx:
 
-## Usage warning
-
-Do not use in multi-tenant Kubernetes production installations. This project assumes that
-users who can create Ingress objects are administrators of the cluster. See the
-[FAQ](docs/faq.md) for more.
+- annotations with the prefix `nginx.ingress.kubernetes.io/`;
+- the IngressClass `nginx` with the controller value `k8s.io/ingress-nginx`;
+- the keys of the controller ConfigMap and the command line arguments;
+- the Prometheus metrics `nginx_ingress_controller_*`;
+- the controller binary `/nginx-ingress-controller`.
 
 ## Install
 
-Everything needed is published here: images for `linux/amd64` and `linux/arm64` (including AWS
-Graviton), signed with cosign, and a chart that references them by digest. No image overrides
-or builds are required.
+Releases are listed on <https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases>. Every
+release publishes signed images for `linux/amd64` and `linux/arm64` and a Helm chart that pins them
+by digest.
 
-**Helm (OCI):**
+Helm (OCI):
 
-```bash
-helm install ingress-nginx \
-  oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx \
-  --version 4.15.2 \
-  --namespace ingress-nginx --create-namespace
+```console
+helm install ingress-nginx-neo oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \
+  --version <version> \
+  --namespace ingress-nginx-neo --create-namespace
 ```
 
-**Static manifests** (attached to every [release](https://github.com/Kuzmenko-Pavel/ingress-nginx/releases)):
+Static manifests, one per provider (`aws`, `aws-nlb-with-tls-termination`, `baremetal`, `cloud`,
+`do`, `exoscale`, `kind`, `oracle`, `scw`), are release assets:
 
-```bash
-kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx/releases/download/v1.15.2/deploy-cloud.yaml
+```console
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-cloud.yaml
 ```
 
-Providers: `aws`, `aws-nlb-with-tls-termination`, `baremetal`, `cloud`, `do`, `exoscale`,
-`kind`, `oracle`, `scw`.
+kubectl plugin:
 
-**Migrating from `kubernetes/ingress-nginx`:** the chart name, values and resources are the same;
-only the chart source and the default images change.
-
-```bash
-helm upgrade ingress-nginx oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx \
-  --version 4.15.2 --namespace ingress-nginx --reuse-values
+```console
+kubectl krew install --manifest-url=https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/ingress-nginx-neo.yaml
+kubectl ingress-nginx-neo --help
 ```
 
-Remove any image overrides you set yourself (`global.image.registry`, `controller.image.*`,
-`controller.admissionWebhooks.patch.image.*`, `defaultBackend.image.*`) unless they point to a
-mirror of these images; otherwise the chart defaults to this distribution's images.
+See [Installation](https://kuzmenko-pavel.github.io/ingress-nginx-neo/stable/deploy/) for the
+supported Kubernetes versions and provider notes, and
+[Artifacts and verification](https://kuzmenko-pavel.github.io/ingress-nginx-neo/stable/deploy/artifacts/)
+for image references, signatures and mirroring.
 
-**Supported Kubernetes versions:** 1.34, 1.35, 1.36 (the Amazon EKS standard support window).
+### Resource names
 
-**Verify an image:**
+Resource names and the `app.kubernetes.io/name` label derive from the chart name
+`ingress-nginx-neo`. To keep the names of an existing kubernetes/ingress-nginx installation, set
+`nameOverride=ingress-nginx` on a release installed directly, or use `alias: ingress-nginx` when the
+chart is a dependency of another chart. See
+[Migrate from kubernetes/ingress-nginx](https://kuzmenko-pavel.github.io/ingress-nginx-neo/stable/deploy/migrate/).
 
-```bash
-cosign verify ghcr.io/kuzmenko-pavel/ingress-nginx/controller:v1.15.2 \
-  --certificate-identity-regexp '^https://github.com/Kuzmenko-Pavel/ingress-nginx/\.github/workflows/' \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com
-```
+## Usage warning
 
-## Published artifacts
+Do not use the controller in multi-tenant Kubernetes clusters where users who can create Ingress
+objects are not cluster administrators: annotations and snippets configure NGINX for the whole
+controller. See the [FAQ](https://kuzmenko-pavel.github.io/ingress-nginx-neo/stable/faq/).
 
-| Artifact | Location |
-|----------|----------|
-| Controller image | `ghcr.io/kuzmenko-pavel/ingress-nginx/controller` |
-| Controller-chroot image | `ghcr.io/kuzmenko-pavel/ingress-nginx/controller-chroot` |
-| kube-webhook-certgen | `ghcr.io/kuzmenko-pavel/ingress-nginx/kube-webhook-certgen` |
-| Default backend (custom-error-pages) | `ghcr.io/kuzmenko-pavel/ingress-nginx/custom-error-pages` |
-| Helm chart (OCI) | `oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx` |
-| Static manifests | GitHub Release assets `deploy-<provider>.yaml` |
+## Contributing and security
 
-Release and versioning details: [`docs/maintained-distribution-release.md`](docs/maintained-distribution-release.md).
-Releases use plain SemVer tags (`vX.Y.Z`); image tags match the release tag.
-
-## Build & test
-
-This repository uses the project's native `Makefile`. Common targets:
-
-```bash
-make build         # build controller binaries
-make test          # Go unit tests
-make lua-test      # Lua unit tests
-make helm-test     # helm-unittest for the chart
-make kind-e2e-test # e2e on a local kind cluster
-make help          # list all targets
-```
-
-## Troubleshooting & support
-
-Review the [troubleshooting docs](docs/troubleshooting.md) and the [FAQ](docs/faq.md). For
-problems with this distribution, open an issue in **this** repository:
-<https://github.com/Kuzmenko-Pavel/ingress-nginx/issues>.
-
-## Contributing & security
-
-- Contributing: see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
-- Security: report vulnerabilities privately via GitHub Security Advisories — see
-  [`SECURITY.md`](./SECURITY.md).
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — workflow, commit rules and checks.
+- [SECURITY.md](./SECURITY.md) — reporting vulnerabilities and supported versions.
+- [Developer guide](https://kuzmenko-pavel.github.io/ingress-nginx-neo/latest/developer-guide/getting-started/).
 
 ## License
 
-[Apache License 2.0](./LICENSE). Modifications from the upstream codebase are tracked in this
-repository's git history.
+[Apache License 2.0](./LICENSE).

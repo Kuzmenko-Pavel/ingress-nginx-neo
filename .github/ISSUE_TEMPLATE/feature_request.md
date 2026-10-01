@@ -1,21 +1,15 @@
 ---
 name: Feature request
-about: Suggest an idea for this project or its docs
+about: Suggest an enhancement of the controller, the chart, the plugin or the docs
 title: ''
-labels: kind/feature
+labels: enhancement
 assignees: ''
-
 ---
 
-<!-- What do you want to happen? -->
+## What you want to happen
 
-<!-- Is there currently another issue associated with this? -->
+## Why
 
-<!-- Does it require a particular kubernetes version? -->
+<!-- The problem it solves and who benefits. -->
 
-<!-- If this is actually about documentation, uncomment the following block -->
-
-<!-- 
-/kind documentation
-/remove-kind feature
--->
+## Alternatives you considered

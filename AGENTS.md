@@ -1,173 +1,71 @@
 # AGENTS.md
 
-Guidance for AI agents and automation working in this repository.
+## Project
 
-## What this repository is
+ingress-nginx-neo is an NGINX Ingress controller for Kubernetes, based on the kubernetes/ingress-nginx
+codebase (Apache-2.0) and released from this repository (`Kuzmenko-Pavel/ingress-nginx-neo`). It
+ships the controller images, kube-webhook-certgen, custom-error-pages, a Helm chart, static
+manifests and the kubectl plugin `kubectl ingress-nginx-neo`. The Go module path is
+`k8s.io/ingress-nginx`.
 
-This is a **self-maintained, standalone distribution** of ingress-nginx (a "sovereign fork"),
-based on the historical `kubernetes/ingress-nginx` codebase. It is **not** a contribution
-fork: pull requests are never sent upstream, and upstream (which is
-[being retired](https://www.kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/)) is kept
-only as a read-only historical reference.
+## Repository map
 
-Consequences for how you work here:
+| Path | Purpose |
+|------|---------|
+| `cmd/nginx`, `cmd/dbg`, `cmd/waitshutdown` | controller binaries |
+| `cmd/plugin` | kubectl plugin |
+| `cmd/annotations`, `cmd/flagsdoc` | generators of docs pages |
+| `internal/`, `pkg/` | controller code (sync loop, store, annotations, admission, metrics) |
+| `rootfs/` | controller Dockerfiles, `etc/nginx/template/nginx.tmpl`, Lua in `etc/nginx/lua` |
+| `charts/ingress-nginx-neo` | Helm chart (`tests/` helm-unittest, `ci/` values for lint and e2e) |
+| `images/` | NGINX base (`images/nginx`), test runner, test helpers, certgen, custom-error-pages |
+| `test/` | e2e suite (`test/e2e`, Ginkgo), e2e image, unit test entry points |
+| `tools/` | pinned tools (`go.mod`, `versions.env`) and the scripts behind the Makefile |
+| `docs/` | MkDocs site |
+| `.github/workflows` | CI, release, security; every step is a make target |
 
-- `main` in this repository is the single source of truth. Feature branches merge into `main`
-  via pull requests **within this repo** (`Kuzmenko-Pavel/ingress-nginx`).
-- Runtime changes are allowed and expected: Go code, Lua, nginx templates, Helm chart,
-  Dockerfiles, GitHub Actions, docs.
-- Do **not** open PRs against `kubernetes/ingress-nginx`, do not rebase onto upstream as a
-  standard process, and do not reintroduce upstream-only bindings (see "Hard rules").
-- The original upstream remote is kept locally as `upstream-archive` for occasional manual
-  cherry-picks only: `git fetch upstream-archive --tags && git cherry-pick <sha>`.
+## Project API
 
-The Go module path is still `k8s.io/ingress-nginx` (don't rename it — it's an internal import
-path, not a provenance claim). Provenance is recorded via OCI image labels and release notes.
+The root `Makefile` is the interface for humans, agents and CI.
 
-See `docs/maintained-distribution-release.md` for the full distribution/release model.
-
-## Codebase map
-
-| Area | Path | Notes |
-|------|------|-------|
-| Controller entrypoint | `cmd/nginx/` | `main` package; starts the controller |
-| Other binaries | `cmd/{dbg,waitshutdown,annotations,plugin}/` | `cmd/plugin` = `kubectl ingress-nginx` |
-| Core logic | `internal/ingress/controller/` | sync loop, store, template rendering, config |
-| Annotations | `internal/ingress/annotations/<name>/` | one package per supported annotation |
-| Admission webhook | `internal/admission/` | validates Ingress objects before accept |
-| Helpers | `internal/{k8s,net,nginx,task}/`, `pkg/` | k8s parsing, networking, queue, public apis/flags/metrics |
-| Go types for templates | `internal/ingress/types.go` | structures fed into the nginx template |
-| nginx template | `rootfs/etc/nginx/template/nginx.tmpl` | Go template → final `nginx.conf` (~60K) |
-| Lua | `rootfs/etc/nginx/lua/` | `balancer.lua`, `certificate.lua`, `configuration.lua`, `monitor.lua`, `lua_ingress.lua` — dynamic endpoints/certs, LB, monitoring |
-| Controller image | `rootfs/Dockerfile`, `rootfs/Dockerfile-chroot` | built by `make image` / `make release` |
-| Helm chart | `charts/ingress-nginx/` | `Chart.yaml`, `values.yaml`, `templates/`, helm-unittest `tests/` |
-| Aux/base images | `images/` (`images/Makefile`, `images/nginx/Makefile`) | nginx base (patches in `images/nginx/rootfs/patches`), kube-webhook-certgen, test runner, e2e helper images |
-| E2E + unit test harness | `test/` | `test/e2e/` (ginkgo, kind), `test/test.sh` |
-| Docs (mkdocs) | `docs/` | `how-it-works.md`, `developer-guide/`, `user-guide/`, `maintained-distribution-release.md` |
-| CI/CD | `.github/workflows/` | see "CI/CD & release" below |
-
-Architecture in one paragraph: the controller builds an in-memory model from Ingresses,
-Services, Endpoints, Secrets and ConfigMaps; on change it diffs against the running model.
-Endpoint/certificate changes are pushed dynamically to Lua inside nginx (no reload); other
-changes regenerate `nginx.conf` from `nginx.tmpl` and trigger a reload. Read `docs/how-it-works.md`
-and `docs/developer-guide/code-overview.md` before touching core logic.
-
-## Build, test, lint
-
-Common targets (`make help` lists all; most run inside a build container via
-`build/run-in-docker.sh`). Key versions: Go from `GOLANG_VERSION` (1.26.1), nginx base from
-`images/nginx/TAG` (reference printed by `hack/nginx-base-image.sh`).
-
-```bash
-make build                # build controller binaries
-make test                 # Go unit tests
-make lua-test             # Lua unit tests
-make helm-test            # helm-unittest for the chart
-make verify-docs          # regenerate/verify annotation docs
-make image image-chroot   # build controller images locally (single-arch)
-make dev-env              # local kind cluster with the controller deployed
-make kind-e2e-test        # full e2e on kind
-make kind-e2e-chart-tests # helm chart e2e on kind
+```console
+make help        # all targets by domain: code, test, images, helm, manifests, docs, security, release, development
+make check       # fast checks: lint, unit tests, generated files, chart lint and tests
+make test-e2e    # controller e2e on kind (E2E_VARIANT=default|chroot, FOCUS=...)
+make docs-serve  # documentation with live reload
 ```
-
-Linting: `golangci-lint` (config `.golangci.yml`), `luacheck` (`.luacheckrc`), chart lint via
-`helm lint` + Artifact Hub `ah`, and `helm-docs` (chart `README.md` is generated from
-`README.md.gotmpl` — regenerate, don't hand-edit). CI (`ci.yaml`) runs all of these on PRs;
-run the relevant target locally before pushing.
-
-## CI/CD & release
-
-All image builds go through the repository `Makefile` / `images/Makefile` /
-`images/nginx/Makefile` (native logic); their default `REGISTRY` is our GHCR namespace
-`ghcr.io/kuzmenko-pavel`. There is **no** custom build-push wrapper. Upstream shipped via
-Google Cloud Build (`cloudbuild.yaml`, removed here); the release workflow drives
-`make release` instead.
-
-The NGINX base image (`images/nginx`) is ours: `images/nginx/TAG` is the single source of
-its version and `hack/nginx-base-image.sh` derives the reference used by the Makefiles, e2e
-scripts, CI and release. Published images are multi-platform `linux/amd64` + `linux/arm64`
-(the repository variable `DISABLE_ARM64=true` temporarily limits them to amd64; the e2e test
-runner is amd64 only); armv7 is not supported. Details:
-`docs/maintained-distribution-release.md`.
-
-Workflows in `.github/workflows/`:
-
-- `release.yaml` — on tag push `vX.Y.Z` (or manual `workflow_dispatch`): preflight in the
-  `release` environment (tag format, `appVersion` == tag, tagged commit on `main`, no
-  overwrite of published controller tag / chart version), NGINX base via `base-images.yaml`
-  (no-op if published), `make release` on the base pinned by digest with SBOM + provenance,
-  certgen only when its `TAG` is new, cosign keyless signing, image digests pinned into
-  `values.yaml` in the workspace only, chart OCI to `oci://ghcr.io/kuzmenko-pavel/charts`,
-  GitHub Release via `gh`.
-- `base-images.yaml` — NGINX base (per-arch native runners, merged by digest) and e2e test
-  runner; publishes only tags that are not published yet. Also called by `release.yaml`.
-- `images.yaml` + `zz-tmpl-images.yaml` — aux images, pushed to GHCR via `GITHUB_TOKEN`.
-- `ci.yaml` + `zz-tmpl-k8s-e2e.yaml` — lint, unit, build, chart lint/test, kind e2e matrix.
-  The Kubernetes matrix follows the EKS standard support window (1.34–1.36); kind is
-  pinned in `.github/actions/setup-kind`.
-- `golangci-lint.yml`, `junit-reports.yaml`, `depreview.yaml`, `scorecards.yml`,
-  `perftest.yaml` — lint/reporting/security/perf, all self-owned.
-- `vulnerability-scans.yaml` — Trivy scan (fixable vulnerabilities only) of every published image of
-  the latest release, weekly and after `release.yaml`; one code-scanning category per image.
-
-Published artifacts:
-
-| Artifact | Location |
-|----------|----------|
-| controller | `ghcr.io/kuzmenko-pavel/ingress-nginx/controller` |
-| controller-chroot | `ghcr.io/kuzmenko-pavel/ingress-nginx/controller-chroot` |
-| kube-webhook-certgen | `ghcr.io/kuzmenko-pavel/ingress-nginx/kube-webhook-certgen` |
-| Helm chart (OCI) | `oci://ghcr.io/kuzmenko-pavel/charts/ingress-nginx` |
-| NGINX base | `ghcr.io/kuzmenko-pavel/ingress-nginx/nginx` |
-| e2e test runner | `ghcr.io/kuzmenko-pavel/ingress-nginx/e2e-test-runner` |
-| custom-error-pages (default backend) | `ghcr.io/kuzmenko-pavel/ingress-nginx/custom-error-pages` |
-| Static manifests | GitHub Release assets `deploy-<provider>.yaml` |
 
 ## Versioning
 
-- Plain SemVer release tags only: `v1.15.1`, `v1.16.0`. **No vendor suffixes** (no `-kp.N`).
-- Image tags equal the release tag. Helm chart version is plain SemVer in
-  `charts/ingress-nginx/Chart.yaml` `.version` (bump every release); `appVersion` must equal
-  the release tag without `v`. certgen tag from `images/kube-webhook-certgen/TAG`.
-- Published tags and chart versions are immutable. Any change under `images/nginx/rootfs`
-  requires an `images/nginx/TAG` bump (CI enforces it); ship dependent template/Go changes
-  in the same PR — CI builds the base from source for it.
-- Record the upstream base tag/commit in release notes when known (workflow `upstream_base`
-  input or an `UPSTREAM_BASE` file at the repo root).
+The release tag `vX.Y.Z` is the only version source. Images, chart, plugin, manifests and docs take
+their version from it; the Makefile derives tags from `VERSION` and `CHANNEL`. Never write versions
+into files (Chart.yaml stays `0.0.0-latest`/`latest`, image tags in values.yaml stay empty).
+Dependency images are content addressed (`src-<hash>`) and need no version bumps.
 
-## Typical workflow for a change
+## Rules
 
-```bash
-git checkout -b feature/<short-name>
-# edit code / lua / template / chart / docs
-make test           # plus lua-test / helm-test / verify-docs as relevant
-git commit -m "<conventional message>"
-git push origin feature/<short-name>
-# open a PR into main within this repo; cut a tag vX.Y.Z to release
-```
+- Keep the user-facing API: annotation prefix `nginx.ingress.kubernetes.io`, IngressClass `nginx`,
+  controller value `k8s.io/ingress-nginx`, ConfigMap keys, metrics, command line arguments.
+- Commits follow Conventional Commits (`make code-lint-commits`). No AI attribution trailers or
+  footers in commits and pull requests.
+- Never force-push or rewrite history. Never publish, tag or push releases or images.
+- Never hand-edit generated files: `docs/user-guide/cli-arguments.md`,
+  `docs/user-guide/nginx-configuration/annotations-risk.md` (`make docs-generate`), the chart
+  `README.md` (`make helm-docs-generate`).
+- No changelog files: release notes come from the release tag.
+- Documentation describes the current state only; no history of decisions.
+- Tools are pinned in `tools/`; image inputs in `images/*/build-args.env`. CI workflows only call
+  make targets.
 
-## Hard rules (do not violate)
+## Read before
 
-- Do not reintroduce upstream-only bindings in workflows: `github.repository ==
-  'kubernetes/ingress-nginx'` guards, DockerHub secrets (`DOCKERHUB_*`), `PROJECT_WRITER`
-  (k8s org project board), krew-index publishing, or pushes to `registry.k8s.io` /
-  `ingressnginx/*`. (`registry.k8s.io/.../nginx` as a *base image pull* in `ci.yaml` is fine.)
-- `charts/ingress-nginx/values.yaml` references this distribution's images:
-  `global.image.registry: ghcr.io`, `controller.image.image: kuzmenko-pavel/ingress-nginx/controller`
-  with `tag` = the release tag, and `admissionWebhooks.patch.image` = our kube-webhook-certgen with
-  `tag` = `images/kube-webhook-certgen/TAG`, and `defaultBackend.image` = our custom-error-pages
-  with `tag` = `images/custom-error-pages/TAG` (the release preflight enforces this). Keep the
-  committed `digest` / `digestChroot` fields empty; the release workflow pins digests at packaging
-  time only. A user must be able to `helm install` the chart with no image overrides.
-- `deploy/static` is generated (`KUSTOMIZE='kubectl kustomize' hack/generate-deploy-scripts.sh`);
-  regenerate it with the chart, CI fails when it is stale. Releases attach digest-pinned copies.
-- Do not force-push and do not rewrite history.
-- Commit messages and PR descriptions contain no AI attribution: no `Co-Authored-By`,
-  `Claude-Session` or "Generated with Claude Code" trailers/footers.
-- Keep the Go module path `k8s.io/ingress-nginx`.
-- Never overwrite a published image tag or chart version; bump the version instead.
-- Do not reintroduce `registry.k8s.io/ingress-nginx/nginx` or a separately pinned base image
-  file: the base reference comes from `hack/nginx-base-image.sh`.
-- Don't hand-edit generated files: chart `README.md` (from `README.md.gotmpl` via helm-docs),
-  annotation docs (via `make verify-docs`).
-- Prefer pinned action SHAs and the project's existing tool versions when editing workflows.
+| Task | Page |
+|------|------|
+| any change | `docs/developer-guide/getting-started.md` |
+| tests, e2e | `docs/developer-guide/testing.md` |
+| images, NGINX base, patches | `docs/developer-guide/images.md`, `images/nginx/README.md` |
+| CI workflows | `docs/developer-guide/ci.md` |
+| versions, releases, hotfixes | `docs/developer-guide/release.md` |
+| kubectl plugin | `docs/kubectl-plugin.md` |
+| Helm chart | `charts/ingress-nginx-neo/README.md.gotmpl`, `docs/deploy/index.md` |
+| controller internals | `docs/how-it-works.md`, `docs/developer-guide/code-overview.md` |
