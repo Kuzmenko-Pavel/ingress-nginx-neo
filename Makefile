@@ -793,6 +793,14 @@ docs-publish: $(DOCS_VENV)/bin/mkdocs
 	MIKE=$(DOCS_VENV)/bin/mike CHANNEL=$(CHANNEL) VERSION=$(VERSION) DOCS_VERSION=$(DOCS_VERSION) \
 		tools/docs-publish.sh
 
+.PHONY: docs-publish-check
+## Run docs-publish for CHANNEL=latest into the local branch docs-publish-check, without pushing.
+docs-publish-check: $(DOCS_VENV)/bin/mkdocs
+	git branch -D docs-publish-check 2>/dev/null || true
+	MIKE=$(DOCS_VENV)/bin/mike CHANNEL=latest VERSION=$(VERSION) DOCS_VERSION=latest \
+		DOCS_BRANCH=docs-publish-check DOCS_PUSH=false tools/docs-publish.sh
+	git branch -D docs-publish-check
+
 
 GITHUB_REPO ?= Kuzmenko-Pavel/ingress-nginx-neo
 DELIVERED_IMAGES := controller controller-chroot kube-webhook-certgen custom-error-pages
