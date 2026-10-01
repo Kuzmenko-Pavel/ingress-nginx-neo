@@ -77,16 +77,16 @@ tests:
                             apiVersion: v1
                             fieldPath: metadata.namespace
 
-  - it: should create a Job with `ttlSecondsAfterFinished` 300 by default
+  - it: should create a Job with `ttlSecondsAfterFinished` 0 by default
+    asserts:
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 0
+
+  - it: should create a Job with `ttlSecondsAfterFinished` if `controller.admissionWebhooks.patchWebhookJob.ttlSecondsAfterFinished` is set
+    set:
+      controller.admissionWebhooks.patchWebhookJob.ttlSecondsAfterFinished: 300
     asserts:
       - equal:
           path: spec.ttlSecondsAfterFinished
           value: 300
-
-  - it: should create a Job with `ttlSecondsAfterFinished` if `controller.admissionWebhooks.patchWebhookJob.ttlSecondsAfterFinished` is set
-    set:
-      controller.admissionWebhooks.patchWebhookJob.ttlSecondsAfterFinished: 600
-    asserts:
-      - equal:
-          path: spec.ttlSecondsAfterFinished
-          value: 600
