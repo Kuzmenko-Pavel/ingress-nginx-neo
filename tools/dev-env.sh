@@ -30,6 +30,9 @@ for image in ${LOAD_IMAGES}; do
   "$KIND" load docker-image --name "${KIND_CLUSTER_NAME}" "${image}"
 done
 
+# Images keep the tag IMAGE_TAG across rebuilds; a new pod label rolls out the
+# pods that run them.
+deploy_date="$(date +%s)"
 "$HELM" upgrade --install "${RELEASE_NAME}" "${chart}" \
   --namespace "${NAMESPACE}" --create-namespace \
   --set "global.image.registry=${IMAGE_REGISTRY}" \
@@ -45,7 +48,8 @@ done
   --set "defaultBackend.image.pullPolicy=Never" \
   --set "controller.metrics.enabled=true" \
   --set-string "controller.config.worker-processes=1" \
-  --set-string "controller.podLabels.deploy-date=$(date +%s)" \
+  --set-string "controller.podLabels.deploy-date=${deploy_date}" \
+  --set-string "defaultBackend.podLabels.deploy-date=${deploy_date}" \
   --set "controller.updateStrategy.type=RollingUpdate" \
   --set "controller.updateStrategy.rollingUpdate.maxUnavailable=1" \
   --set "controller.hostPort.enabled=true" \
