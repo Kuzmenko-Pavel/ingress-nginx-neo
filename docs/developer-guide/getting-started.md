@@ -44,6 +44,20 @@ make check       # the fast checks CI runs on every pull request
 `helm-lint` and `helm-test`. Go and Lua unit tests run inside the `e2e-test-runner` image, which
 the Makefile pulls (or builds when its sources changed); see [Images](images.md).
 
+## Adding a make target
+
+A target appears in `make help` when the line directly above it is `## <description>`; a
+description that ends in `| <group>` starts a new group, and the following targets belong to it
+until the next group. Targets without such a line are internal. Recipes longer than a few lines
+live in `tools/*.sh`.
+
+```makefile
+.PHONY: helm-test
+## Run the helm-unittest suites. | Helm
+helm-test: $(HELM_UNITTEST)
+	$(HELM_UNITTEST) --file 'tests/**/*_test.yaml' $(CHART_DIR)
+```
+
 ## Development environment
 
 ```console
