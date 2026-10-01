@@ -44,13 +44,20 @@ image_args=(
   --set "defaultBackend.image.tag=${IMAGE_TAG}"
 )
 
+# Every values file gets its own namespace, deleted after the uninstall:
+# objects the release does not own outlive it (for example the admission
+# Secret written by cert-manager) and would change the next installation.
+i=0
 for values in "${values_dir}"/*-values.yaml; do
-  echo "--- $(basename "${values}")"
+  i=$((i + 1))
+  namespace="${NAMESPACE}-${i}"
+  echo "--- $(basename "${values}") (namespace ${namespace})"
   "$HELM" install "${RELEASE_NAME}" "${chart}" \
-    --namespace "${NAMESPACE}" --create-namespace \
+    --namespace "${namespace}" --create-namespace \
     --values "${values}" \
     "${image_args[@]}" \
     --wait --timeout 5m
-  "$KUBECTL" get pods --namespace "${NAMESPACE}"
-  "$HELM" uninstall "${RELEASE_NAME}" --namespace "${NAMESPACE}" --wait --timeout 5m
+  "$KUBECTL" get pods --namespace "${namespace}"
+  "$HELM" uninstall "${RELEASE_NAME}" --namespace "${namespace}" --wait --timeout 5m
+  "$KUBECTL" delete namespace "${namespace}" --wait --timeout 5m
 done

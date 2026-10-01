@@ -65,8 +65,8 @@ The specs are Ginkgo specs in `test/e2e`; `FOCUS` matches their descriptions, fo
 
 `make test-e2e-chart` packages the chart, creates a kind cluster with cert-manager (pinned manifest
 from `tools/versions.env`) and, for every `charts/ingress-nginx-neo/ci/*-values.yaml`, installs the
-package with the locally built images, waits until the release is ready and uninstalls it
-(`tools/e2e-chart.sh`).
+package with the locally built images in a namespace of its own, waits until the release is ready,
+uninstalls it and deletes the namespace (`tools/e2e-chart.sh`).
 
 ## kube-webhook-certgen e2e
 
