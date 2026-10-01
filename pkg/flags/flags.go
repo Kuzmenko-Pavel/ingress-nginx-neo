@@ -44,6 +44,24 @@ import (
 // ParseFlags generates a configuration for Ingress Controller based on the flags
 // provided by users
 func ParseFlags() (bool, *controller.Configuration, error) {
+	flags, configure := NewFlagSet()
+
+	flags.AddGoFlagSet(flag.CommandLine)
+	if err := flags.Parse(os.Args); err != nil {
+		return false, nil, err
+	}
+
+	pflag.VisitAll(func(flag *pflag.Flag) {
+		klog.V(2).InfoS("FLAG", flag.Name, flag.Value)
+	})
+
+	return configure()
+}
+
+// NewFlagSet defines the command line flags of the controller. It returns the
+// flag set and the function that builds the configuration once the flag set
+// has been parsed.
+func NewFlagSet() (set *pflag.FlagSet, configure func() (bool, *controller.Configuration, error)) {
 	var (
 		flags = pflag.NewFlagSet("", pflag.ExitOnError)
 
@@ -242,181 +260,174 @@ https://blog.maxmind.com/2019/12/significant-changes-to-accessing-and-using-geol
 	flags.IntVar(&nginx.MaxmindRetriesCount, "maxmind-retries-count", 1, "Number of attempts to download the GeoIP DB.")
 	flags.DurationVar(&nginx.MaxmindRetriesTimeout, "maxmind-retries-timeout", time.Second*0, "Maxmind downloading delay between 1st and 2nd attempt, 0s - do not retry to download if something went wrong.")
 
-	flags.AddGoFlagSet(flag.CommandLine)
-	if err := flags.Parse(os.Args); err != nil {
-		return false, nil, err
-	}
-
-	pflag.VisitAll(func(flag *pflag.Flag) {
-		klog.V(2).InfoS("FLAG", flag.Name, flag.Value)
-	})
-
-	if *showVersion {
-		return true, nil, nil
-	}
-
-	if *statusUpdateInterval < 5 {
-		klog.Warningf("The defined time to update the Ingress status too low (%v seconds). Adjusting to 5 seconds", *statusUpdateInterval)
-		status.UpdateInterval = 5
-	} else {
-		status.UpdateInterval = *statusUpdateInterval
-	}
-
-	parser.AnnotationsPrefix = *annotationsPrefix
-	parser.EnableAnnotationValidation = *enableAnnotationValidation
-
-	// check port collisions
-	if !ing_net.IsPortAvailable(*httpPort) {
-		return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --http-port", *httpPort)
-	}
-
-	if !ing_net.IsPortAvailable(*httpsPort) {
-		return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --https-port", *httpsPort)
-	}
-
-	if !ing_net.IsPortAvailable(*defServerPort) {
-		return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --default-server-port", *defServerPort)
-	}
-
-	if !ing_net.IsPortAvailable(*statusPort) {
-		return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --status-port", *statusPort)
-	}
-
-	if !ing_net.IsPortAvailable(*streamPort) {
-		return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --stream-port", *streamPort)
-	}
-
-	if !ing_net.IsPortAvailable(*profilerPort) {
-		return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --profiler-port", *profilerPort)
-	}
-
-	nginx.StatusPort = *statusPort
-	nginx.StreamPort = *streamPort
-	nginx.ProfilerPort = *profilerPort
-	nginx.ProfilerAddress = profilerAddress.String()
-
-	if *enableSSLPassthrough && !ing_net.IsPortAvailable(*sslProxyPort) {
-		return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --ssl-passthrough-proxy-port", *sslProxyPort)
-	}
-
-	if *publishSvc != "" && *publishStatusAddress != "" {
-		return false, nil, fmt.Errorf("flags --publish-service and --publish-status-address are mutually exclusive")
-	}
-
-	nginx.HealthPath = *defHealthzURL
-
-	if *defHealthCheckTimeout > 0 {
-		nginx.HealthCheckTimeout = time.Duration(*defHealthCheckTimeout) * time.Second
-	}
-
-	if *watchNamespace != "" && *watchNamespaceSelector != "" {
-		return false, nil, fmt.Errorf("flags --watch-namespace and --watch-namespace-selector are mutually exclusive")
-	}
-
-	var namespaceSelector labels.Selector
-	if *watchNamespaceSelector != "" {
-		var err error
-		namespaceSelector, err = labels.Parse(*watchNamespaceSelector)
-		if err != nil {
-			return false, nil, fmt.Errorf("failed to parse --watch-namespace-selector=%s, error: %v", *watchNamespaceSelector, err)
+	return flags, func() (bool, *controller.Configuration, error) {
+		if *showVersion {
+			return true, nil, nil
 		}
-	}
 
-	if *metricsPerUndefinedHost && !*metricsPerHost {
-		return false, nil, errors.New("--metrics-per-undefined-host=true must be passed with --metrics-per-host=true")
-	}
-
-	if *electionTTL <= 0 {
-		*electionTTL = 30 * time.Second
-	}
-
-	histogramBuckets := &collectors.HistogramBuckets{
-		TimeBuckets:   *timeBuckets,
-		LengthBuckets: *lengthBuckets,
-		SizeBuckets:   *sizeBuckets,
-	}
-
-	ngx_config.EnableSSLChainCompletion = *enableSSLChainCompletion
-
-	config := &controller.Configuration{
-		APIServerHost:               *apiserverHost,
-		KubeConfigFile:              *kubeConfigFile,
-		UpdateStatus:                *updateStatus,
-		ElectionID:                  *electionID,
-		ElectionTTL:                 *electionTTL,
-		EnableProfiling:             *profiling,
-		EnableMetrics:               *enableMetrics,
-		MetricsPerHost:              *metricsPerHost,
-		MetricsPerUndefinedHost:     *metricsPerUndefinedHost,
-		MetricsBuckets:              histogramBuckets,
-		MetricsBucketFactor:         *bucketFactor,
-		MetricsMaxBuckets:           *maxBuckets,
-		ReportStatusClasses:         *reportStatusClasses,
-		ExcludeSocketMetrics:        *excludeSocketMetrics,
-		MonitorMaxBatchSize:         *monitorMaxBatchSize,
-		DisableServiceExternalName:  *disableServiceExternalName,
-		EnableSSLPassthrough:        *enableSSLPassthrough,
-		DisableLeaderElection:       *disableLeaderElection,
-		ResyncPeriod:                *resyncPeriod,
-		DefaultService:              *defaultSvc,
-		Namespace:                   *watchNamespace,
-		WatchNamespaceSelector:      namespaceSelector,
-		ConfigMapName:               *configMap,
-		TCPConfigMapName:            *tcpConfigMapName,
-		UDPConfigMapName:            *udpConfigMapName,
-		DisableFullValidationTest:   *disableFullValidationTest,
-		DefaultSSLCertificate:       *defSSLCertificate,
-		DeepInspector:               *deepInspector,
-		PublishService:              *publishSvc,
-		PublishStatusAddress:        *publishStatusAddress,
-		UpdateStatusOnShutdown:      *updateStatusOnShutdown,
-		ShutdownGracePeriod:         *shutdownGracePeriod,
-		PostShutdownGracePeriod:     *postShutdownGracePeriod,
-		UseNodeInternalIP:           *useNodeInternalIP,
-		SyncRateLimit:               *syncRateLimit,
-		HealthCheckHost:             *healthzHost,
-		DynamicConfigurationRetries: *dynamicConfigurationRetries,
-		EnableTopologyAwareRouting:  *enableTopologyAwareRouting,
-		ListenPorts: &ngx_config.ListenPorts{
-			Default:  *defServerPort,
-			Health:   *healthzPort,
-			HTTP:     *httpPort,
-			HTTPS:    *httpsPort,
-			SSLProxy: *sslProxyPort,
-		},
-		IngressClassConfiguration: &ingressclass.Configuration{
-			Controller:         *ingressClassController,
-			AnnotationValue:    *ingressClassAnnotation,
-			WatchWithoutClass:  *watchWithoutClass,
-			IngressClassByName: *ingressClassByName,
-		},
-		DisableCatchAll:           *disableCatchAll,
-		ValidationWebhook:         *validationWebhook,
-		ValidationWebhookCertPath: *validationWebhookCert,
-		ValidationWebhookKeyPath:  *validationWebhookKey,
-		InternalLoggerAddress:     *internalLoggerAddress,
-		DisableSyncEvents:         *disableSyncEvents,
-	}
-
-	if *apiserverHost != "" {
-		config.RootCAFile = *rootCAFile
-	}
-
-	var err error
-	if nginx.MaxmindEditionIDs != "" {
-		if err := nginx.ValidateGeoLite2DBEditions(); err != nil {
-			return false, nil, err
+		if *statusUpdateInterval < 5 {
+			klog.Warningf("The defined time to update the Ingress status too low (%v seconds). Adjusting to 5 seconds", *statusUpdateInterval)
+			status.UpdateInterval = 5
+		} else {
+			status.UpdateInterval = *statusUpdateInterval
 		}
-		if nginx.MaxmindLicenseKey != "" || nginx.MaxmindMirror != "" {
-			klog.InfoS("downloading maxmind GeoIP2 databases")
-			if err = nginx.DownloadGeoLite2DB(nginx.MaxmindRetriesCount, nginx.MaxmindRetriesTimeout); err != nil {
-				klog.ErrorS(err, "unexpected error downloading GeoIP2 database")
+
+		parser.AnnotationsPrefix = *annotationsPrefix
+		parser.EnableAnnotationValidation = *enableAnnotationValidation
+
+		// check port collisions
+		if !ing_net.IsPortAvailable(*httpPort) {
+			return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --http-port", *httpPort)
+		}
+
+		if !ing_net.IsPortAvailable(*httpsPort) {
+			return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --https-port", *httpsPort)
+		}
+
+		if !ing_net.IsPortAvailable(*defServerPort) {
+			return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --default-server-port", *defServerPort)
+		}
+
+		if !ing_net.IsPortAvailable(*statusPort) {
+			return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --status-port", *statusPort)
+		}
+
+		if !ing_net.IsPortAvailable(*streamPort) {
+			return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --stream-port", *streamPort)
+		}
+
+		if !ing_net.IsPortAvailable(*profilerPort) {
+			return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --profiler-port", *profilerPort)
+		}
+
+		nginx.StatusPort = *statusPort
+		nginx.StreamPort = *streamPort
+		nginx.ProfilerPort = *profilerPort
+		nginx.ProfilerAddress = profilerAddress.String()
+
+		if *enableSSLPassthrough && !ing_net.IsPortAvailable(*sslProxyPort) {
+			return false, nil, fmt.Errorf("port %v is already in use. Please check the flag --ssl-passthrough-proxy-port", *sslProxyPort)
+		}
+
+		if *publishSvc != "" && *publishStatusAddress != "" {
+			return false, nil, fmt.Errorf("flags --publish-service and --publish-status-address are mutually exclusive")
+		}
+
+		nginx.HealthPath = *defHealthzURL
+
+		if *defHealthCheckTimeout > 0 {
+			nginx.HealthCheckTimeout = time.Duration(*defHealthCheckTimeout) * time.Second
+		}
+
+		if *watchNamespace != "" && *watchNamespaceSelector != "" {
+			return false, nil, fmt.Errorf("flags --watch-namespace and --watch-namespace-selector are mutually exclusive")
+		}
+
+		var namespaceSelector labels.Selector
+		if *watchNamespaceSelector != "" {
+			var err error
+			namespaceSelector, err = labels.Parse(*watchNamespaceSelector)
+			if err != nil {
+				return false, nil, fmt.Errorf("failed to parse --watch-namespace-selector=%s, error: %v", *watchNamespaceSelector, err)
 			}
 		}
-		config.MaxmindEditionFiles = &nginx.MaxmindEditionFiles
-	}
 
-	return false, config, err
+		if *metricsPerUndefinedHost && !*metricsPerHost {
+			return false, nil, errors.New("--metrics-per-undefined-host=true must be passed with --metrics-per-host=true")
+		}
+
+		if *electionTTL <= 0 {
+			*electionTTL = 30 * time.Second
+		}
+
+		histogramBuckets := &collectors.HistogramBuckets{
+			TimeBuckets:   *timeBuckets,
+			LengthBuckets: *lengthBuckets,
+			SizeBuckets:   *sizeBuckets,
+		}
+
+		ngx_config.EnableSSLChainCompletion = *enableSSLChainCompletion
+
+		config := &controller.Configuration{
+			APIServerHost:               *apiserverHost,
+			KubeConfigFile:              *kubeConfigFile,
+			UpdateStatus:                *updateStatus,
+			ElectionID:                  *electionID,
+			ElectionTTL:                 *electionTTL,
+			EnableProfiling:             *profiling,
+			EnableMetrics:               *enableMetrics,
+			MetricsPerHost:              *metricsPerHost,
+			MetricsPerUndefinedHost:     *metricsPerUndefinedHost,
+			MetricsBuckets:              histogramBuckets,
+			MetricsBucketFactor:         *bucketFactor,
+			MetricsMaxBuckets:           *maxBuckets,
+			ReportStatusClasses:         *reportStatusClasses,
+			ExcludeSocketMetrics:        *excludeSocketMetrics,
+			MonitorMaxBatchSize:         *monitorMaxBatchSize,
+			DisableServiceExternalName:  *disableServiceExternalName,
+			EnableSSLPassthrough:        *enableSSLPassthrough,
+			DisableLeaderElection:       *disableLeaderElection,
+			ResyncPeriod:                *resyncPeriod,
+			DefaultService:              *defaultSvc,
+			Namespace:                   *watchNamespace,
+			WatchNamespaceSelector:      namespaceSelector,
+			ConfigMapName:               *configMap,
+			TCPConfigMapName:            *tcpConfigMapName,
+			UDPConfigMapName:            *udpConfigMapName,
+			DisableFullValidationTest:   *disableFullValidationTest,
+			DefaultSSLCertificate:       *defSSLCertificate,
+			DeepInspector:               *deepInspector,
+			PublishService:              *publishSvc,
+			PublishStatusAddress:        *publishStatusAddress,
+			UpdateStatusOnShutdown:      *updateStatusOnShutdown,
+			ShutdownGracePeriod:         *shutdownGracePeriod,
+			PostShutdownGracePeriod:     *postShutdownGracePeriod,
+			UseNodeInternalIP:           *useNodeInternalIP,
+			SyncRateLimit:               *syncRateLimit,
+			HealthCheckHost:             *healthzHost,
+			DynamicConfigurationRetries: *dynamicConfigurationRetries,
+			EnableTopologyAwareRouting:  *enableTopologyAwareRouting,
+			ListenPorts: &ngx_config.ListenPorts{
+				Default:  *defServerPort,
+				Health:   *healthzPort,
+				HTTP:     *httpPort,
+				HTTPS:    *httpsPort,
+				SSLProxy: *sslProxyPort,
+			},
+			IngressClassConfiguration: &ingressclass.Configuration{
+				Controller:         *ingressClassController,
+				AnnotationValue:    *ingressClassAnnotation,
+				WatchWithoutClass:  *watchWithoutClass,
+				IngressClassByName: *ingressClassByName,
+			},
+			DisableCatchAll:           *disableCatchAll,
+			ValidationWebhook:         *validationWebhook,
+			ValidationWebhookCertPath: *validationWebhookCert,
+			ValidationWebhookKeyPath:  *validationWebhookKey,
+			InternalLoggerAddress:     *internalLoggerAddress,
+			DisableSyncEvents:         *disableSyncEvents,
+		}
+
+		if *apiserverHost != "" {
+			config.RootCAFile = *rootCAFile
+		}
+
+		var err error
+		if nginx.MaxmindEditionIDs != "" {
+			if err := nginx.ValidateGeoLite2DBEditions(); err != nil {
+				return false, nil, err
+			}
+			if nginx.MaxmindLicenseKey != "" || nginx.MaxmindMirror != "" {
+				klog.InfoS("downloading maxmind GeoIP2 databases")
+				if err = nginx.DownloadGeoLite2DB(nginx.MaxmindRetriesCount, nginx.MaxmindRetriesTimeout); err != nil {
+					klog.ErrorS(err, "unexpected error downloading GeoIP2 database")
+				}
+			}
+			config.MaxmindEditionFiles = &nginx.MaxmindEditionFiles
+		}
+
+		return false, config, err
+	}
 }
 
 // ResetForTesting clears all flag state and sets the usage function as directed.
