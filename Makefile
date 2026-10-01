@@ -439,7 +439,7 @@ deps-ensure-%:
 # Build one dependency image for the host platform into the local image store.
 deps-build-%:
 	$(if $(filter $*,$(DEPS_ON_BASE)),$(MAKE) --no-print-directory deps-ensure-nginx)
-	docker buildx build --builder default --load \
+	docker buildx build --builder $(LOCAL_BUILDER) --load \
 		--platform $(PLATFORM) \
 		$(call dep-build-args,$*) \
 		--tag $(DEP_IMAGE_$*) \
@@ -487,7 +487,7 @@ image-build-args = \
 ## Build delivered images for the host platform (IMAGES ?= controller controller-chroot kube-webhook-certgen custom-error-pages), load locally, tag IMAGE_TAG.
 docker-build:
 	$(if $(filter $(IMAGE_ON_BASE),$(IMAGES)),$(MAKE) --no-print-directory code-build deps-ensure-nginx)
-	$(foreach i,$(IMAGES),docker buildx build --builder default --load --platform $(PLATFORM) \
+	$(foreach i,$(IMAGES),docker buildx build --builder $(LOCAL_BUILDER) --load --platform $(PLATFORM) \
 		$(call image-build-args,$(i),$(BASE_IMAGE)) \
 		--tag $(REGISTRY)/$(i):$(IMAGE_TAG) $(IMAGE_CONTEXT_$(i))$(newline))
 
@@ -533,6 +533,10 @@ docker-publish-image-%: $(CRANE)
 comma := ,
 # DOCKER_CACHE=gha enables the GitHub Actions build cache, one scope per image and platform.
 DOCKER_CACHE ?=
+# Local builds use the docker-driver builder of the current context, which
+# sees the images in the local store (default on Linux, desktop-linux on
+# Docker Desktop).
+LOCAL_BUILDER ?= $(shell docker context show 2>/dev/null || echo default)
 cache-args = $(if $(DOCKER_CACHE),--cache-from type=$(DOCKER_CACHE),scope=$(1) --cache-to type=$(DOCKER_CACHE),mode=max,scope=$(1))
 
 .PHONY: docker-publish-deps
@@ -630,7 +634,7 @@ docker-build-e2e: $(GINKGO) helm-stage
 	cp -R $(STAGED_CHART) $(E2E_CONTEXT)/charts/
 	cp test/e2e/settings/ocsp/*.json test/e2e/settings/ocsp/*.db $(E2E_CONTEXT)/
 	GOOS=linux GOARCH=$(ARCH) CGO_ENABLED=0 $(GINKGO) build -trimpath -o $(CURDIR)/$(E2E_CONTEXT)/e2e.test ./test/e2e
-	docker buildx build --builder default --load --platform $(PLATFORM) \
+	docker buildx build --builder $(LOCAL_BUILDER) --load --platform $(PLATFORM) \
 		--build-arg E2E_BASE_IMAGE=$(RUNNER_IMAGE) \
 		--build-arg CFSSL_IMAGE=$(CFSSL_IMAGE) \
 		--tag $(E2E_IMAGE) $(E2E_CONTEXT)

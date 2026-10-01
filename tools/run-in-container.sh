@@ -30,7 +30,7 @@ if [[ "$(uname -s)" == Linux ]]; then
   user=(--user "$(id -u):$(id -g)")
 fi
 
-docker run --rm "${tty[@]}" "${user[@]}" \
+docker run --rm ${tty[@]+"${tty[@]}"} ${user[@]+"${user[@]}"} \
   --env HOME=/tmp \
   --env GOCACHE=/cache/go-build \
   --env GOMODCACHE=/cache/go-mod \
