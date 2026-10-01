@@ -13,6 +13,13 @@
 
 `make check` runs the fast checks (lint, unit tests, generated files, chart lint and tests).
 
+## Test first
+
+A bug fix or a change of behavior starts with a test that fails without it: a Go unit, Lua, chart
+or e2e test, or a lint rule when a test cannot express the defect. The code is then changed until
+the test passes, so the test proves both the defect and the fix. A change of behavior without such
+a test states the reason in the pull request.
+
 ## Unit tests
 
 Go and Lua unit tests run in the `e2e-test-runner` image (`tools/run-in-container.sh`), with the

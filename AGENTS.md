@@ -46,6 +46,10 @@ Dependency images are content addressed (`src-<hash>`) and need no version bumps
 
 - Keep the user-facing API: annotation prefix `nginx.ingress.kubernetes.io`, IngressClass `nginx`,
   controller value `k8s.io/ingress-nginx`, ConfigMap keys, metrics, command line arguments.
+- Test first: before a change of behavior or a bug fix, write a test that fails without it (Go
+  unit, Lua, chart or e2e test; a lint rule when a test cannot express the defect), then change
+  the code until it passes. A change of behavior without such a test states the reason in the
+  pull request.
 - Commits follow Conventional Commits (`make code-lint-commits`). No AI attribution trailers or
   footers in commits and pull requests.
 - Never force-push or rewrite history. Never publish, tag or push releases or images.

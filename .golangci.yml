@@ -132,6 +132,13 @@ linters:
         - BUG
         - FIXME
         - HACK
+    govet:
+      settings:
+        printf:
+          # Format strings of Kubernetes events, also before client-go marks them.
+          funcs:
+            - (k8s.io/client-go/tools/record.EventRecorder).Eventf
+            - (k8s.io/client-go/tools/record.EventRecorder).AnnotatedEventf
     nolintlint:
       require-explanation: false
       require-specific: true
