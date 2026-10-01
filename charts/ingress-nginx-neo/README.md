@@ -244,7 +244,7 @@ metadata:
 | controller.admissionWebhooks.createSecretJob.name | string | `"create"` |  |
 | controller.admissionWebhooks.createSecretJob.resources | object | `{}` |  |
 | controller.admissionWebhooks.createSecretJob.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":65532,"runAsNonRoot":true,"runAsUser":65532,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for secret creation containers |
-| controller.admissionWebhooks.createSecretJob.ttlSecondsAfterFinished | int | `0` | Seconds after the job finishes before it is eligible to be automatically deleted. If the field is set to 0, the Job will be eligible to be automatically deleted immediately after it finishes. |
+| controller.admissionWebhooks.createSecretJob.ttlSecondsAfterFinished | int | `300` | Seconds after the job finishes before it is eligible to be automatically deleted. Helm deletes a succeeded job itself (hook-delete-policy), so the TTL removes failed jobs. With 0 the job can be deleted before Helm 4 observes its completion, and the install waits until its timeout. |
 | controller.admissionWebhooks.createSecretJob.volumeMounts | list | `[]` | Volume mounts for secret creation containers |
 | controller.admissionWebhooks.createSecretJob.volumes | list | `[]` | Volumes for secret creation pod |
 | controller.admissionWebhooks.enabled | bool | `true` |  |
@@ -278,7 +278,7 @@ metadata:
 | controller.admissionWebhooks.patchWebhookJob.name | string | `"patch"` |  |
 | controller.admissionWebhooks.patchWebhookJob.resources | object | `{}` |  |
 | controller.admissionWebhooks.patchWebhookJob.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":65532,"runAsNonRoot":true,"runAsUser":65532,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for webhook patch containers |
-| controller.admissionWebhooks.patchWebhookJob.ttlSecondsAfterFinished | int | `0` | Seconds after the job finishes before it is eligible to be automatically deleted. If the field is set to 0, the Job will be eligible to be automatically deleted immediately after it finishes. |
+| controller.admissionWebhooks.patchWebhookJob.ttlSecondsAfterFinished | int | `300` | Seconds after the job finishes before it is eligible to be automatically deleted. Helm deletes a succeeded job itself (hook-delete-policy), so the TTL removes failed jobs. With 0 the job can be deleted before Helm 4 observes its completion, and the install waits until its timeout. |
 | controller.admissionWebhooks.patchWebhookJob.volumeMounts | list | `[]` | Volume mounts for webhook patch containers |
 | controller.admissionWebhooks.patchWebhookJob.volumes | list | `[]` | Volumes for webhook patch pod |
 | controller.admissionWebhooks.port | int | `8443` |  |
