@@ -316,7 +316,7 @@ jobs:
 
       - name: Lint chart
         run: |
-          ct lint --config .ct.yaml
+          helm lint --strict charts/ingress-nginx
           ah lint --path charts/ingress-nginx
 
       - name: Check docs

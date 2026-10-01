@@ -42,7 +42,7 @@ See `docs/maintained-distribution-release.md` for the full distribution/release 
 | Controller image | `rootfs/Dockerfile`, `rootfs/Dockerfile-chroot` | built by `make image` / `make release` |
 | Helm chart | `charts/ingress-nginx/` | `Chart.yaml`, `values.yaml`, `templates/`, helm-unittest `tests/` |
 | Aux/base images | `images/` (`images/Makefile`, `images/nginx/Makefile`) | nginx base (patches in `images/nginx/rootfs/patches`), kube-webhook-certgen, test runner, e2e helper images |
-| E2E + unit test harness | `test/` | `test/e2e/` (ginkgo, kind), `test/test.sh`, `test/k6/` |
+| E2E + unit test harness | `test/` | `test/e2e/` (ginkgo, kind), `test/test.sh` |
 | Docs (mkdocs) | `docs/` | `how-it-works.md`, `developer-guide/`, `user-guide/`, `maintained-distribution-release.md` |
 | CI/CD | `.github/workflows/` | see "CI/CD & release" below |
 
@@ -71,7 +71,7 @@ make kind-e2e-chart-tests # helm chart e2e on kind
 ```
 
 Linting: `golangci-lint` (config `.golangci.yml`), `luacheck` (`.luacheckrc`), chart lint via
-`ct` (`.ct.yaml`) + Artifact Hub `ah`, and `helm-docs` (chart `README.md` is generated from
+`helm lint` + Artifact Hub `ah`, and `helm-docs` (chart `README.md` is generated from
 `README.md.gotmpl` — regenerate, don't hand-edit). CI (`ci.yaml`) runs all of these on PRs;
 run the relevant target locally before pushing.
 

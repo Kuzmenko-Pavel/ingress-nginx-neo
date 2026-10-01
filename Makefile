@@ -128,18 +128,6 @@ clean: ## Remove .gocache directory.
 verify-docs: ## Verify doc generation
 	hack/verify-annotation-docs.sh
 
-.PHONY: static-check
-static-check: ## Run verification script for boilerplate, codegen, gofmt, golint, lualint and chart-lint.
-	@build/run-in-docker.sh \
-	    MAC_OS=$(MAC_OS) \
-		hack/verify-all.sh
-
-.PHONY: golint-check
-golint-check:
-	@build/run-in-docker.sh \
-	    MAC_OS=$(MAC_OS) \
-		hack/verify-golint.sh
-
 ###############################
 # Tests for ingress-nginx
 ###############################
@@ -184,23 +172,9 @@ e2e-test-binary:  ## Build binary for e2e tests.
 		MAC_OS=$(MAC_OS) \
 		ginkgo build ./test/e2e
 
-.PHONY: print-e2e-suite
-print-e2e-suite: e2e-test-binary ## Prints information about the suite of e2e tests.
-	@build/run-in-docker.sh \
-		MAC_OS=$(MAC_OS) \
-		hack/print-e2e-suite.sh
-
 .PHONY: vet
 vet:
 	@go vet $(shell go list ${PKG}/internal/... | grep -v vendor)
-
-.PHONY: check_dead_links
-check_dead_links: ## Check if the documentation contains dead links.
-	@docker run ${PLATFORM_FLAG} ${PLATFORM} -t \
-	  -w /tmp \
-	  -v $$PWD:/tmp dkhamsing/awesome_bot:1.20.0 \
-	  --allow-dupe \
-	  --allow-redirect $(shell find $$PWD -mindepth 1 -name vendor -prune -o -name .modcache -prune -o -iname Changelog.md -prune -o -name "*.md" | sed -e "s#$$PWD/##")
 
 .PHONY: dev-env
 dev-env:  ## Starts a local Kubernetes cluster using kind, building and deploying the ingress controller.
@@ -231,10 +205,6 @@ misspell:  ## Check for spelling errors.
 		-locale US \
 		-error \
 		cmd/* internal/* deploy/* docs/* design/* test/* README.md
-
-.PHONY: run-ingress-controller
-run-ingress-controller: ## Run the ingress controller locally using a kubectl proxy connection.
-	@build/run-ingress-controller.sh
 
 .PHONY: builder
 builder:

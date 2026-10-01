@@ -40,10 +40,8 @@ jobs:
       cfssl: ${{ steps.filter.outputs.cfssl }}
       fastcgi-helloserver: ${{ steps.filter.outputs.fastcgi-helloserver }}
       e2e-test-echo: ${{ steps.filter.outputs.e2e-test-echo }}
-      go-grpc-greeter-server: ${{ steps.filter.outputs.go-grpc-greeter-server }}
       httpbun: ${{ steps.filter.outputs.httpbun }}
       kube-webhook-certgen: ${{ steps.filter.outputs.kube-webhook-certgen }}
-      ext-auth-example-authsvc: ${{ steps.filter.outputs.ext-auth-example-authsvc }}
 
     steps:
       - name: Checkout
@@ -61,14 +59,10 @@ jobs:
               - 'images/fastcgi-helloserver/**'
             e2e-test-echo:
               - 'images/e2e-test-echo/**'
-            go-grpc-greeter-server:
-              - 'images/go-grpc-greeter-server/**'
             httpbun:
               - 'images/httpbun/**'
             kube-webhook-certgen:
               - 'images/kube-webhook-certgen/**'
-            ext-auth-example-authsvc:
-              - 'images/ext-auth-example-authsvc/**'
 
   #### TODO: Make the below jobs 'less dumb' and use the job name as parameter (the github.job context does not work here)
   cfssl:
@@ -100,15 +94,6 @@ jobs:
       name: e2e-test-echo
     secrets: inherit
 
-  ext-auth-example-authsvc:
-    needs: changes
-    if: |
-      (needs.changes.outputs.ext-auth-example-authsvc == 'true')
-    uses: ./.github/workflows/zz-tmpl-images.yaml
-    with:
-      name: ext-auth-example-authsvc
-    secrets: inherit
-
   fastcgi-helloserver:
     needs: changes
     if: |
@@ -116,15 +101,6 @@ jobs:
     uses: ./.github/workflows/zz-tmpl-images.yaml
     with:
       name: fastcgi-helloserver
-    secrets: inherit
-
-  go-grpc-greeter-server:
-    needs: changes
-    if: |
-      (needs.changes.outputs.go-grpc-greeter-server == 'true')
-    uses: ./.github/workflows/zz-tmpl-images.yaml
-    with:
-      name: go-grpc-greeter-server
     secrets: inherit
 
   httpbun:
@@ -184,9 +160,7 @@ jobs:
       - cfssl
       - custom-error-pages
       - e2e-test-echo
-      - ext-auth-example-authsvc
       - fastcgi-helloserver
-      - go-grpc-greeter-server
       - httpbun
       - kube-webhook-certgen
     steps:

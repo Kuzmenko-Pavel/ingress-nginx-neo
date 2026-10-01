@@ -100,11 +100,8 @@ Alternatively, if you use the Prometheus Operator, you can enable ServiceMonitor
 
 ### ingress-nginx nginx\_status page/stats server
 
-Previous versions of this chart had a `controller.stats.*` configuration block, which is now obsolete due to the following changes in Ingress-Nginx Controller:
-
-- In [0.16.1](https://github.com/kubernetes/ingress-nginx/blob/main/Changelog.md#0161), the vts (virtual host traffic status) dashboard was removed
-- In [0.23.0](https://github.com/kubernetes/ingress-nginx/blob/main/Changelog.md#0230), the status page at port 18080 is now a unix socket webserver only available at localhost.
-  You can use `curl --unix-socket /tmp/nginx-status-server.sock http://localhost/nginx_status` inside the controller container to access it locally, or use the snippet from [nginx-ingress changelog](https://github.com/kubernetes/ingress-nginx/blob/main/Changelog.md#0230) to re-enable the http server
+The NGINX status page is served on a unix socket inside the controller container. Access it locally with
+`curl --unix-socket /tmp/nginx-status-server.sock http://localhost/nginx_status`.
 
 ### ExternalDNS Service Configuration
 

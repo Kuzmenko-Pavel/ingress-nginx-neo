@@ -206,7 +206,6 @@ mime.types
 modsecurity
 modules
 nginx.conf
-opentracing.json
 owasp-modsecurity-crs
 template
 ```

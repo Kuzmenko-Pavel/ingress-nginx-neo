@@ -5,7 +5,7 @@ to a backend service.
 
 Sample configuration includes:
 
-* Sample authentication service producing several response headers
+* Sample authentication service (plain NGINX configured through a ConfigMap) producing several response headers
   * Authentication logic is based on HTTP header: requests with header `User` containing string `internal` are considered authenticated
   * After successful authentication service generates response headers `UserID` and `UserRole`
 * Sample echo service displaying header information
@@ -13,14 +13,13 @@ Sample configuration includes:
   * Public, which allows access from unauthenticated users
   * Private, which allows access from authenticated users only
 
-You can deploy the controller as
-follows:
+Deploy the example from this directory:
 
 ```console
-$ kubectl create -f deploy/
+$ kubectl create -f auth-service.yaml -f echo-service.yaml
+configmap "demo-auth-service" created
 deployment "demo-auth-service" created
 service "demo-auth-service" created
-ingress "demo-auth-service" created
 deployment "demo-echo-service" created
 service "demo-echo-service" created
 ingress "public-demo-echo-service" created

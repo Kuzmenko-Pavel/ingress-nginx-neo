@@ -6,23 +6,16 @@ This example demonstrates how to route traffic to a gRPC service through the Ing
 
 1. You have a kubernetes cluster running.
 2. You have a domain name such as `example.com` that is configured to route traffic to the Ingress-NGINX controller.
-3. You have the ingress-nginx-controller installed as per docs.
-4. You have a backend application running a gRPC server listening for TCP traffic.  If you want, you can use <https://github.com/grpc/grpc-go/blob/91e0aeb192456225adf27966d04ada4cf8599915/examples/features/reflection/server/main.go> as an example.
+3. You have the ingress-nginx-neo controller installed as per the [installation guide](../../deploy/index.md).
+4. You have a backend application running a gRPC server listening for TCP traffic.  Step 1 deploys a public test server if you don't have one.
 5. You're also responsible for provisioning an SSL certificate for the ingress. So you need to have a valid SSL certificate, deployed as a Kubernetes secret of type `tls`, in the same namespace as the gRPC application.
 
-### Step 1: Create a Kubernetes `Deployment` for gRPC app
+### Step 1: Create a Kubernetes `Deployment` for the gRPC app
 
-- Make sure your gRPC application pod is running and listening for connections. For example you can try a kubectl command like this below:
-  ```console
-  $ kubectl get po -A -o wide | grep go-grpc-greeter-server
-  ```
-- If you have a gRPC app deployed in your cluster, then skip further notes in this Step 1, and continue from Step 2 below.
+- If you already have a gRPC application deployed in your cluster, skip this step and continue from Step 2.
 
-- As an example gRPC application, we can use this app <https://github.com/grpc/grpc-go/blob/91e0aeb192456225adf27966d04ada4cf8599915/examples/features/reflection/server/main.go>.
-
-- To create a container image for this app, you can use [this Dockerfile](https://github.com/kubernetes/ingress-nginx/blob/main/images/go-grpc-greeter-server/rootfs/Dockerfile). 
-
-- If you use the Dockerfile mentioned above, to create a image, then you can use the following example Kubernetes manifest to create a deployment resource that uses that image. If necessary edit this manifest to suit your needs.
+- This example uses [grpcbin](https://github.com/moul/grpcbin), a public gRPC test server with server reflection.
+  It serves plaintext gRPC on port `9000`:
 
   ```
   cat <<EOF | kubectl apply -f -
@@ -30,20 +23,23 @@ This example demonstrates how to route traffic to a gRPC service through the Ing
   kind: Deployment
   metadata:
     labels:
-      app: go-grpc-greeter-server
-    name: go-grpc-greeter-server
+      app: grpcbin
+    name: grpcbin
   spec:
     replicas: 1
     selector:
       matchLabels:
-        app: go-grpc-greeter-server
+        app: grpcbin
     template:
       metadata:
         labels:
-          app: go-grpc-greeter-server
+          app: grpcbin
       spec:
         containers:
-        - image: <reponame>/go-grpc-greeter-server   # Edit this for your reponame
+        - image: moul/grpcbin:latest@sha256:bd8f2ffdd02d0849fad2d1c754eff4402c867e7a3e0552b8992f4590f5687d20
+          name: grpcbin
+          ports:
+          - containerPort: 9000
           resources:
             limits:
               cpu: 100m
@@ -51,37 +47,29 @@ This example demonstrates how to route traffic to a gRPC service through the Ing
             requests:
               cpu: 50m
               memory: 50Mi
-          name: go-grpc-greeter-server
-          ports:
-          - containerPort: 50051
   EOF
   ```
 
 ### Step 2: Create the Kubernetes `Service` for the gRPC app
 
-- You can use the following example manifest to create a service of type ClusterIP. Edit the name/namespace/label/port to match your deployment/pod.
+- Create a service of type ClusterIP. Edit the name/namespace/label/port to match your deployment/pod.
   ```
   cat <<EOF | kubectl apply -f -
   apiVersion: v1
   kind: Service
   metadata:
     labels:
-      app: go-grpc-greeter-server
-    name: go-grpc-greeter-server
+      app: grpcbin
+    name: grpcbin
   spec:
     ports:
     - port: 80
       protocol: TCP
-      targetPort: 50051
+      targetPort: 9000
     selector:
-      app: go-grpc-greeter-server
+      app: grpcbin
     type: ClusterIP
   EOF
-  ```
-- You can save the above example manifest to a file with name `service.go-grpc-greeter-server.yaml` and edit it to match your deployment/pod, if required. You can create the service resource with a kubectl command like this:
-
-  ```
-  $ kubectl create -f service.go-grpc-greeter-server.yaml
   ```
 
 ### Step 3: Create the Kubernetes `Ingress` resource for the gRPC app
@@ -108,23 +96,17 @@ This example demonstrates how to route traffic to a gRPC service through the Ing
           pathType: Prefix
           backend:
             service:
-              name: go-grpc-greeter-server
+              name: grpcbin
               port:
                 number: 80
     tls:
     # This secret must exist beforehand
     # The cert must also contain the subj-name grpctest.dev.mydomain.com
-    # https://github.com/kubernetes/ingress-nginx/blob/master/docs/examples/PREREQUISITES.md#tls-certificates
+    # See ../PREREQUISITES.md#tls-certificates
     - secretName: wildcard.dev.mydomain.com
       hosts:
         - grpctest.dev.mydomain.com
   EOF
-  ```
-
-- If you save the above example manifest as a file named `ingress.go-grpc-greeter-server.yaml` and edit it to match your deployment and service, you can create the ingress like this:
-
-  ```
-  $ kubectl create -f ingress.go-grpc-greeter-server.yaml
   ```
 
 - The takeaway is that we are not doing any TLS configuration on the server (as we are terminating TLS at the ingress level, gRPC traffic will travel unencrypted inside the cluster and arrive "insecure").
@@ -142,9 +124,9 @@ This example demonstrates how to route traffic to a gRPC service through the Ing
 - Once we've applied our configuration to Kubernetes, it's time to test that we can actually talk to the backend.  To do this, we'll use the [grpcurl](https://github.com/fullstorydev/grpcurl) utility:
 
   ```
-  $ grpcurl grpctest.dev.mydomain.com:443 helloworld.Greeter/SayHello
+  $ grpcurl -d '{"greeting": "neo"}' grpctest.dev.mydomain.com:443 hello.HelloService/SayHello
   {
-    "message": "Hello "
+    "reply": "hello neo"
   }
   ```
 

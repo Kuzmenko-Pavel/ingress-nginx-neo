@@ -148,12 +148,6 @@ access_log /var/log/nginx/access.log main;
 
 ```
 
-## Kubernetes v1.22 Migration
-
-If you are using Ingress objects in your cluster (running Kubernetes older than
-version 1.22), and you plan to upgrade your Kubernetes version to K8S 1.22 or
-above, then please read [the migration guide here](./user-guide/k8s-122-migration.md).
-
 ## Validation Of **`path`**
 
 - For improving security and also following desired standards on Kubernetes API

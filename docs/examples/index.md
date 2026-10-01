@@ -3,9 +3,7 @@
 This directory contains a catalog of examples on how to run, configure and scale Ingress.
 Please review the [prerequisites](PREREQUISITES.md) before trying them.
 
-The examples on these pages include the `spec.ingressClassName` field which replaces the deprecated `kubernetes.io/ingress.class: nginx` annotation. Users of ingress-nginx < 1.0.0 (Helm chart < 4.0.0) should use the [legacy documentation](https://github.com/kubernetes/ingress-nginx/tree/legacy/docs/examples).
-
-For more information, check out the [Migration to apiVersion networking.k8s.io/v1](../user-guide/k8s-122-migration.md) guide.
+The examples on these pages use the `spec.ingressClassName` field to select the IngressClass.
 
 Category | Name | Description | Complexity Level
 ---------| ---- | ----------- | ----------------
