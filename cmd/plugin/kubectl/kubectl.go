@@ -135,6 +135,6 @@ func appendBoolFlag(out *[]string, in *bool, flag string) {
 
 func appendStringArrayFlag(out, in *[]string, flag string) {
 	if in != nil && len(*in) > 0 {
-		*out = append(*out, fmt.Sprintf("--%v=%v'", flag, strings.Join(*in, ",")))
+		*out = append(*out, fmt.Sprintf("--%v=%v", flag, strings.Join(*in, ",")))
 	}
 }
