@@ -11,12 +11,12 @@ func hello(w http.ResponseWriter, r *http.Request) {
 	keys, ok := r.URL.Query()["name"]
 
 	if !ok || len(keys[0]) < 1 {
-		fmt.Fprintf(w, "Hello world!")
+		fmt.Fprint(w, "Hello world!")
 		return
 	}
 
 	key := keys[0]
-	fmt.Fprintf(w, "Hello "+key+"!")
+	fmt.Fprint(w, "Hello "+key+"!")
 }
 
 func main() {
