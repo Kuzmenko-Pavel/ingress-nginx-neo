@@ -703,6 +703,7 @@ manifests-generate: helm-package $(HELM) $(KUSTOMIZE) ## Render deploy-<provider
 .PHONY: docs-generate
 docs-generate: ## Regenerate annotations-risk.md and cli-arguments.md
 	go run ./cmd/annotations -output docs/user-guide/nginx-configuration/annotations-risk.md
+	go run ./cmd/flagsdoc -output docs/user-guide/cli-arguments.md
 
 .PHONY: docs-verify
 docs-verify: docs-generate ## Fail if generated docs are stale
