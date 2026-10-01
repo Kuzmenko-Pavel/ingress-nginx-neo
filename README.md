@@ -1,5 +1,11 @@
 # ingress-nginx-neo
 
+[![CI](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/actions/workflows/ci.yaml?query=branch%3Amain)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Kuzmenko-Pavel/ingress-nginx-neo/badge)](https://scorecard.dev/viewer/?uri=github.com/Kuzmenko-Pavel/ingress-nginx-neo)
+[![Release](https://img.shields.io/github/v/release/Kuzmenko-Pavel/ingress-nginx-neo?sort=semver)](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases)
+[![License](https://img.shields.io/github/license/Kuzmenko-Pavel/ingress-nginx-neo)](./LICENSE)
+[![Docs](https://img.shields.io/badge/docs-latest-blue)](https://kuzmenko-pavel.github.io/ingress-nginx-neo/)
+
 An Ingress controller for Kubernetes using [NGINX](https://nginx.org/) as a reverse proxy and load
 balancer.
 
