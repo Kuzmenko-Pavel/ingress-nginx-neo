@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Create (or reuse) the development kind cluster, load the locally built
-# images and install the staged chart. The controller listens on localhost:80
-# and localhost:443. Called by `make dev-env-up`.
+# images and install the staged chart with the default backend
+# (custom-error-pages) and metrics enabled. The controller listens on
+# localhost:80 and localhost:443. Called by `make dev-env-up`.
 #
 # Usage: tools/dev-env.sh <staged chart dir>
 
@@ -36,6 +37,11 @@ done
   --set "controller.admissionWebhooks.patch.image.image=${IMAGE_PREFIX}/kube-webhook-certgen" \
   --set "controller.admissionWebhooks.patch.image.tag=${IMAGE_TAG}" \
   --set "controller.admissionWebhooks.patch.image.pullPolicy=Never" \
+  --set "defaultBackend.enabled=true" \
+  --set "defaultBackend.image.image=${IMAGE_PREFIX}/custom-error-pages" \
+  --set "defaultBackend.image.tag=${IMAGE_TAG}" \
+  --set "defaultBackend.image.pullPolicy=Never" \
+  --set "controller.metrics.enabled=true" \
   --set-string "controller.config.worker-processes=1" \
   --set-string "controller.podLabels.deploy-date=$(date +%s)" \
   --set "controller.updateStrategy.type=RollingUpdate" \

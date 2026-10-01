@@ -65,10 +65,12 @@ make dev-env-up      # kind cluster with the locally built controller and the ch
 make dev-env-down    # delete it
 ```
 
-`dev-env-up` builds the controller and certgen images for the host architecture, creates (or reuses)
-the kind cluster `ingress-nginx-neo-dev` with ports 80 and 443 mapped to localhost, and installs the
-chart from `charts/ingress-nginx-neo` as release `ingress-nginx-neo` in namespace
-`ingress-nginx-neo`. Run it again after a change to rebuild and redeploy.
+`dev-env-up` builds the controller, certgen and custom-error-pages images for the host architecture,
+creates (or reuses) the kind cluster `ingress-nginx-neo-dev` with ports 80 and 443 mapped to
+localhost, and installs the chart from `charts/ingress-nginx-neo` as release `ingress-nginx-neo` in
+namespace `ingress-nginx-neo`, with the default backend (custom-error-pages) and metrics enabled.
+Run it again after a change to rebuild and redeploy. `make test-load` runs load tests against it,
+see [Testing](testing.md#load-tests).
 
 ## Typical change
 
