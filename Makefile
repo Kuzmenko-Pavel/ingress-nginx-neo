@@ -691,6 +691,74 @@ docs-build: $(DOCS_VENV)/bin/mkdocs ## mkdocs build --strict
 docs-serve: $(DOCS_VENV)/bin/mkdocs ## Serve the site locally with live reload
 	$(DOCS_VENV)/bin/mkdocs serve
 
+.PHONY: docs-publish
+docs-publish: $(DOCS_VENV)/bin/mkdocs ## Publish the docs version for CHANNEL via mike
+	MIKE=$(DOCS_VENV)/bin/mike CHANNEL=$(CHANNEL) VERSION=$(VERSION) DOCS_VERSION=$(DOCS_VERSION) \
+		tools/docs-publish.sh
+
+##@ Release
+
+GITHUB_REPO ?= Kuzmenko-Pavel/ingress-nginx-neo
+DELIVERED_IMAGES := controller controller-chroot kube-webhook-certgen custom-error-pages
+RELEASE_NOTES := $(DIST)/release-notes.md
+
+.PHONY: release-tag
+release-tag: ## Create the signed annotated release tag with a generated changelog (interactive)
+	RELEASE_TAG_PATTERN='$(RELEASE_TAG_PATTERN)' RELEASE_VERSION='$(RELEASE_VERSION)' NOTES_FROM='$(NOTES_FROM)' \
+	REPO_SLUG=$(GITHUB_REPO) PROJECT=$(PROJECT) \
+		tools/release/changelog.sh
+
+.PHONY: release-verify
+release-verify: $(YQ) ## Verify RELEASE_TAG: format, annotated, trusted signature, branch, CI result, not released
+	test -n '$(RELEASE_TAG)' || { echo "set RELEASE_TAG=vX.Y.Z" >&2; exit 1; }
+	YQ=$(YQ) GITHUB_REPO=$(GITHUB_REPO) tools/release/verify-tag.sh '$(RELEASE_TAG)'
+
+.PHONY: release-notes
+release-notes: ## Render dist/release-notes.md
+	$(if $(filter release,$(CHANNEL)),,$(error release-notes needs CHANNEL=release))
+	DIGESTS_FILE=$(DIGESTS_FILE) CHART_DIGEST_FILE=$(DIST)/chart-digest.env PLUGIN_DIR=$(PLUGIN_DIR) \
+	MANIFESTS_DIR=$(DIST)/manifests CHART_REGISTRY=$(CHART_REGISTRY) CHART_NAME=$(CHART_NAME) \
+	RELEASE_NAME=$(RELEASE_NAME) NAMESPACE=$(NAMESPACE) REPO_URL=$(REPO_URL) \
+	DELIVERED_IMAGES='$(DELIVERED_IMAGES)' \
+		tools/release/notes.sh $(VERSION) $(RELEASE_NOTES)
+
+RELEASE_ASSETS = $(wildcard $(DIST)/manifests/deploy-*.yaml $(DIST)/manifests/deploy-manifests.sha256 \
+	$(PLUGIN_DIR)/kubectl-ingress_nginx_neo_* $(PLUGIN_DIR)/checksums.sha256 \
+	$(PLUGIN_DIR)/checksums.sha256.sigstore.json $(PLUGIN_DIR)/ingress-nginx-neo.yaml)
+
+.PHONY: release-publish
+release-publish: ## Create or update the draft GitHub Release with all assets
+	$(if $(filter release,$(CHANNEL)),,$(error release-publish needs CHANNEL=release))
+	GITHUB_REPO=$(GITHUB_REPO) tools/release/publish.sh publish $(VERSION) $(RELEASE_NOTES) $(RELEASE_ASSETS)
+
+.PHONY: release-finalize
+release-finalize: ## Publish the draft GitHub Release
+	$(if $(filter release,$(CHANNEL)),,$(error release-finalize needs CHANNEL=release))
+	GITHUB_REPO=$(GITHUB_REPO) tools/release/publish.sh finalize $(VERSION)
+
+# Check the invariants of the publishing channel once, before any publishing
+# target of the same job: latest publishes the tip of main only, release
+# publishes the tagged commit only.
+.PHONY: publish-guard
+publish-guard:
+ifeq ($(CHANNEL),latest)
+	git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
+	test "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" || \
+		{ echo "HEAD is not the tip of origin/main: a newer commit publishes latest" >&2; exit 1; }
+else ifeq ($(CHANNEL),release)
+	git rev-parse --verify --quiet 'refs/tags/$(VERSION)' >/dev/null || \
+		{ echo "tag $(VERSION) does not exist" >&2; exit 1; }
+	test "$$(git rev-parse HEAD)" = "$$(git rev-parse '$(VERSION)^{commit}')" || \
+		{ echo "HEAD is not the commit of $(VERSION)" >&2; exit 1; }
+else
+	@echo "publishing needs CHANNEL=latest or CHANNEL=release" >&2; exit 1
+endif
+
+.PHONY: print-latest-release
+print-latest-release:
+	@git ls-remote --tags --refs origin 'v*' | sed 's#.*refs/tags/##' | \
+		grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | sort -V | tail -n1
+
 ##@ Development
 
 DEV_KIND_CLUSTER ?= $(PROJECT)-dev
@@ -716,3 +784,19 @@ security-dependency-scan: $(GOVULNCHECK) ## govulncheck for all Go modules
 	for mod in $(GO_IMAGE_MODULES); do (cd "$$mod" && $(GOVULNCHECK) ./...); done
 
 GO_IMAGE_MODULES := images/kube-webhook-certgen/rootfs images/custom-error-pages/rootfs images/fastcgi-helloserver/rootfs
+
+SCAN_IMAGES := $(DELIVERED_IMAGES) nginx
+
+.PHONY: security-container-scan
+security-container-scan: ## Trivy scan of the latest published release images (or VERSION=) into dist/sarif/
+	version='$(if $(filter command line,$(origin VERSION)),$(VERSION))'; \
+	version="$${version:-$$($(MAKE) -s print-latest-release)}"; \
+	test -n "$$version" || { echo "no release to scan" >&2; exit 1; }; \
+	mkdir -p $(DIST)/sarif; \
+	for image in $(SCAN_IMAGES); do \
+		echo "--- $(REGISTRY)/$$image:$$version"; \
+		docker run --rm --volume $(CURDIR)/$(DIST)/sarif:/out --volume $(CURDIR)/$(CACHE)/trivy:/root/.cache/trivy \
+			$(if $(wildcard $(HELM_REGISTRY_CONFIG)),--volume $(HELM_REGISTRY_CONFIG):/root/.docker/config.json:ro) \
+			$(TRIVY_IMAGE) image --quiet --ignore-unfixed --format sarif \
+			--output /out/$$image.sarif "$(REGISTRY)/$$image:$$version"; \
+	done
