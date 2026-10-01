@@ -1,0 +1,18 @@
+apiVersion: v2
+name: ingress-nginx-neo
+description: Ingress controller for Kubernetes using NGINX as a reverse proxy and
+  load balancer
+# The version and appVersion are set from the release tag when the chart is
+# packaged (make helm-package).
+version: 0.0.0-latest
+appVersion: latest
+home: https://github.com/Kuzmenko-Pavel/ingress-nginx-neo
+sources:
+- https://github.com/Kuzmenko-Pavel/ingress-nginx-neo
+keywords:
+- ingress
+- nginx
+kubeVersion: '>=1.21.0-0'
+maintainers:
+- name: Kuzmenko-Pavel
+  url: https://github.com/Kuzmenko-Pavel

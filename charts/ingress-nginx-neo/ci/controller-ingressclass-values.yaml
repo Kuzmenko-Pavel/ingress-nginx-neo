@@ -1,0 +1,10 @@
+controller:
+  service:
+    type: ClusterIP
+
+  ingressClassResource:
+    name: custom-nginx
+    default: true
+    controllerValue: k8s.io/custom-nginx
+
+  watchIngressWithoutClass: true

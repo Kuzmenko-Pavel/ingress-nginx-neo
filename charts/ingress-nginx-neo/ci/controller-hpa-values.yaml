@@ -1,0 +1,13 @@
+controller:
+  service:
+    type: ClusterIP
+
+  autoscaling:
+    enabled: true
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 180

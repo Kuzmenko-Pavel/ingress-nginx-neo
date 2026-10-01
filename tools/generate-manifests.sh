@@ -1,63 +1,48 @@
-#!/bin/bash
-
-# Copyright 2020 The Kubernetes Authors.
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# Render the static install manifests deploy-<provider>[-<variant>].yaml from a
+# packaged chart, one per values.yaml under tools/manifest-templates/provider,
+# plus deploy-manifests.sha256.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Usage: tools/generate-manifests.sh <chart.tgz> <output dir>
+# Environment: HELM, KUSTOMIZE (binaries), RELEASE_NAME, NAMESPACE, CHART_NAME,
+#              K8S_MINOR (oldest supported Kubernetes minor, e.g. 1.34).
 
-if [ -n "$DEBUG" ]; then
-	set -x
-fi
+set -euo pipefail
 
-#set -o errexit
-set -o errexit
-set -o nounset
-set -o pipefail
+chart="$(realpath "${1:?usage: $0 <chart.tgz> <output dir>}")"
+out="${2:?usage: $0 <chart.tgz> <output dir>}"
+: "${HELM:?}" "${KUSTOMIZE:?}" "${RELEASE_NAME:?}" "${NAMESPACE:?}" "${CHART_NAME:?}" "${K8S_MINOR:?}"
 
-# Oldest Kubernetes minor in the supported window (see docs/maintained-distribution-release.md).
-K8S_VERSION="${K8S_VERSION:-1.34}"
-# kustomize build command; "kubectl kustomize" works as well (used in CI, where kubectl is available).
-KUSTOMIZE="${KUSTOMIZE:-kustomize build}"
+templates="$(cd "$(dirname "${BASH_SOURCE[0]}")/manifest-templates" && pwd)"
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
 
-DIR=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd -P)
+rm -rf "$out"
+mkdir -p "$out"
+cp -R "${templates}/." "${work}/"
 
-# clean
-rm -rf ${DIR}/deploy/static/provider/*
+cat >"${work}/common/namespace.yaml" <<NAMESPACE
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${NAMESPACE}
+  labels:
+    app.kubernetes.io/name: ${CHART_NAME}
+    app.kubernetes.io/instance: ${RELEASE_NAME}
+NAMESPACE
 
-TEMPLATE_DIR="${DIR}/hack/manifest-templates"
+while IFS= read -r values; do
+  target="$(dirname "${values#"${work}/provider/"}")"
+  name="deploy-${target//\//-}.yaml"
+  "$HELM" template "$RELEASE_NAME" "$chart" \
+    --values "$values" \
+    --namespace "$NAMESPACE" \
+    --kube-version "$K8S_MINOR" |
+    sed -e '/app.kubernetes.io\/managed-by: Helm/d' -e '/helm.sh\//d' >"${work}/common/manifest.yaml"
+  "$KUSTOMIZE" build --load-restrictor=LoadRestrictionsNone "$(dirname "$values")" >"${out}/${name}"
+  echo "rendered ${out}/${name}"
+done < <(find "${work}/provider" -name values.yaml | LC_ALL=C sort)
 
-# each helm values file `values.yaml` under `hack/manifest-templates/provider` will be generated as provider/<provider>[/variant]/deploy.yaml
-# TARGET is provider/<provider>[/variant]
-TARGETS=$(dirname $(cd $DIR/hack/manifest-templates/ && find . -type f -name "values.yaml" ) | cut -d'/' -f2-)
-for TARGET in ${TARGETS}
-do
-  TARGET_DIR="${TEMPLATE_DIR}/${TARGET}"
-  MANIFEST="${TEMPLATE_DIR}/common/manifest.yaml" # intermediate manifest
-  OUTPUT_DIR="${DIR}/deploy/static/${TARGET}"
-  echo $OUTPUT_DIR
-
-  mkdir -p ${OUTPUT_DIR}
-  cd ${TARGET_DIR}
-  helm template ingress-nginx ${DIR}/charts/ingress-nginx \
-    --values values.yaml \
-    --namespace ingress-nginx \
-    --kube-version ${K8S_VERSION} \
-    > $MANIFEST
-  sed -i.bak '/app.kubernetes.io\/managed-by: Helm/d' $MANIFEST
-  sed -i.bak '/helm.sh/d' $MANIFEST
-
-  ${KUSTOMIZE} --load-restrictor=LoadRestrictionsNone . > ${OUTPUT_DIR}/deploy.yaml
-  rm $MANIFEST $MANIFEST.bak
-  cd ~-
-  # automatically generate the (unsupported) kustomization.yaml for each target
-  sed "s_{TARGET}_${TARGET}_" $TEMPLATE_DIR/static-kustomization-template.yaml > ${OUTPUT_DIR}/kustomization.yaml
-done
+(cd "$out" && if command -v sha256sum >/dev/null; then sha256sum deploy-*.yaml; else shasum -a 256 deploy-*.yaml; fi >deploy-manifests.sha256)

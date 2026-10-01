@@ -1,0 +1,6 @@
+controller:
+  service:
+    type: ClusterIP
+
+  addHeaders:
+    X-Frame-Options: deny

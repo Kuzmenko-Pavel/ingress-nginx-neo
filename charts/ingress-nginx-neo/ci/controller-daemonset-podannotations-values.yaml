@@ -1,0 +1,11 @@
+controller:
+  service:
+    type: ClusterIP
+
+  kind: DaemonSet
+
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "10254"
+    prometheus.io/scheme: http
+    prometheus.io/path: /metrics

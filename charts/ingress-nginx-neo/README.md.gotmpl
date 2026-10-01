@@ -1,0 +1,229 @@
+{{ template "chart.header" . }}
+{{ template "chart.description" . }}.
+
+{{ template "chart.typeBadge" . }}
+
+This is the Helm chart of [ingress-nginx-neo](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo), an
+NGINX Ingress controller distribution based on the kubernetes/ingress-nginx codebase (Apache-2.0).
+It is not affiliated with the Kubernetes project, the CNCF or F5.
+
+Documentation: <https://kuzmenko-pavel.github.io/ingress-nginx-neo/>
+
+{{ template "chart.requirementsSection" . }}
+
+## Install Chart
+
+The chart is published as an OCI artifact. Releases are listed on
+<https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases>; a released chart pins every image by
+digest, so no image overrides are needed.
+
+```console
+helm install ingress-nginx-neo oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \
+  --version <version> \
+  --namespace ingress-nginx-neo --create-namespace
+```
+
+The chart version `0.0.0-latest` tracks the `main` branch and its `latest` images. Select it explicitly
+with `--version 0.0.0-latest`.
+
+To use the controller, set `spec.ingressClassName: nginx` on your Ingress resources.
+
+Show the chart or its default values:
+
+```console
+helm show chart oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo --version <version>
+helm show values oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo --version <version>
+```
+
+### Resource names
+
+Resource names and the `app.kubernetes.io/name` label derive from the chart name `ingress-nginx-neo`
+(for example `<release>-ingress-nginx-neo-controller`). Two settings keep the names of an existing
+kubernetes/ingress-nginx installation:
+
+- chart used as a dependency: `alias: ingress-nginx` in `Chart.yaml`;
+- release installed directly: `--set nameOverride=ingress-nginx`.
+
+See [Migrate from kubernetes/ingress-nginx](https://kuzmenko-pavel.github.io/ingress-nginx-neo/deploy/migrate/).
+
+## Uninstall Chart
+
+```console
+helm uninstall ingress-nginx-neo --namespace ingress-nginx-neo
+```
+
+This removes all the Kubernetes components associated with the chart and deletes the release.
+
+## Upgrading Chart
+
+```console
+helm upgrade ingress-nginx-neo oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \
+  --version <version> --namespace ingress-nginx-neo
+```
+
+See [Upgrade](https://kuzmenko-pavel.github.io/ingress-nginx-neo/deploy/upgrade/) for the versioning policy.
+
+## Configuration
+
+See [Customizing the Chart Before Installing](https://helm.sh/docs/intro/using_helm/#customizing-the-chart-before-installing).
+All configurable options are listed [below](#values) and in the chart's [values.yaml](./values.yaml).
+
+### PodDisruptionBudget
+
+Note that the PodDisruptionBudget resource will only be defined if the replicaCount is greater than one,
+else it would make it impossible to evacuate a node. See [gh issue #7127](https://github.com/helm/charts/issues/7127) for more info.
+
+### Prometheus Metrics
+
+The controller can export Prometheus metrics, by setting `controller.metrics.enabled` to `true`.
+
+You can add Prometheus annotations to the metrics service using `controller.metrics.service.annotations`.
+Alternatively, if you use the Prometheus Operator, you can enable ServiceMonitor creation using `controller.metrics.serviceMonitor.enabled`. And set `controller.metrics.serviceMonitor.additionalLabels.release="prometheus"`. "release=prometheus" should match the label configured in the prometheus servicemonitor ( see `kubectl get servicemonitor prometheus-kube-prom-prometheus -oyaml -n prometheus`)
+
+### NGINX status page
+
+The NGINX status page is served on a unix socket inside the controller container. Access it locally with
+`curl --unix-socket /tmp/nginx-status-server.sock http://localhost/nginx_status`.
+
+### ExternalDNS Service Configuration
+
+Add an [ExternalDNS](https://github.com/kubernetes-sigs/external-dns) annotation to the LoadBalancer service:
+
+```yaml
+controller:
+  service:
+    annotations:
+      external-dns.alpha.kubernetes.io/hostname: kubernetes-example.com.
+```
+
+### AWS L7 ELB with SSL Termination
+
+Terminate TLS on a classic AWS ELB and forward plain HTTP to the controller:
+
+```yaml
+controller:
+  service:
+    targetPorts:
+      http: http
+      https: http
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:XX-XXXX-X:XXXXXXXXX:certificate/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXX
+      service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+      service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "https"
+      service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: '3600'
+```
+
+### Additional Internal Load Balancer
+
+This setup is useful when you need both external and internal load balancers but don't want to have multiple ingress controllers and multiple ingress objects per application.
+
+By default, the ingress object will point to the external load balancer address, but if correctly configured, you can make use of the internal one if the URL you are looking up resolves to the internal load balancer's URL.
+
+You'll need to set both the following values:
+
+`controller.service.internal.enabled`
+`controller.service.internal.annotations`
+
+If one of them is missing the internal load balancer will not be deployed. Example you may have `controller.service.internal.enabled=true` but no annotations set, in this case no action will be taken.
+
+`controller.service.internal.annotations` varies with the cloud service you're using.
+
+Example for AWS:
+
+```yaml
+controller:
+  service:
+    internal:
+      enabled: true
+      annotations:
+        # Create internal NLB
+        service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+        # Create internal ELB(Deprecated)
+        # service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+        # Any other annotation can be declared here.
+```
+
+Example for GCE:
+
+```yaml
+controller:
+  service:
+    internal:
+      enabled: true
+      annotations:
+        # Create internal LB. More information: https://cloud.google.com/kubernetes-engine/docs/how-to/internal-load-balancing
+        # For GKE versions 1.17 and later
+        networking.gke.io/load-balancer-type: "Internal"
+        # For earlier versions
+        # cloud.google.com/load-balancer-type: "Internal"
+
+        # Any other annotation can be declared here.
+```
+
+Example for Azure:
+
+```yaml
+controller:
+  service:
+      annotations:
+        # Create internal LB
+        service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+        # Any other annotation can be declared here.
+```
+
+Example for Oracle Cloud Infrastructure:
+
+```yaml
+controller:
+  service:
+      annotations:
+        # Create internal LB
+        service.beta.kubernetes.io/oci-load-balancer-internal: "true"
+        # Any other annotation can be declared here.
+```
+
+The load balancer annotations of more cloud service providers can be found: [Internal load balancer](https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer).
+
+An use case for this scenario is having a split-view DNS setup where the public zone CNAME records point to the external balancer URL while the private zone CNAME records point to the internal balancer URL. This way, you only need one ingress kubernetes object.
+
+Optionally you can set `controller.service.loadBalancerIP` if you need a static IP for the resulting `LoadBalancer`.
+
+### Ingress Admission Webhooks
+
+The controller pod exposes a validating admission webhook that rejects invalid Ingress objects
+before they are stored. It is enabled by default.
+
+#### How the Chart Configures the Hooks
+A validating and configuration requires the endpoint to which the request is sent to use TLS. It is possible to set up custom certificates to do this, but in most cases, a self-signed certificate is enough. The setup of this component requires some more complex orchestration when using helm. The steps are created to be idempotent and to allow turning the feature on and off without running into helm quirks.
+
+1. A pre-install hook provisions a certificate into the same namespace using a format compatible with provisioning using end user certificates. If the certificate already exists, the hook exits.
+2. The Ingress-Nginx Controller pod is configured to use a TLS proxy container, which will load that certificate.
+3. Validating and Mutating webhook configurations are created in the cluster.
+4. A post-install hook reads the CA from the secret created by step 1 and patches the Validating and Mutating webhook configurations. This process will allow a custom CA provisioned by some other process to also be patched into the webhook configurations. The chosen failure policy is also patched into the webhook configurations
+
+#### Alternatives
+It should be possible to use [cert-manager/cert-manager](https://github.com/cert-manager/cert-manager) if a more complete solution is required.
+
+You can enable automatic self-signed TLS certificate provisioning via cert-manager by setting the `controller.admissionWebhooks.certManager.enabled` value to true.
+
+Please ensure that cert-manager is correctly installed and configured.
+
+### Pod Security Admission
+
+You can use Pod Security Admission by applying labels to the release namespace as instructed by the [documentation](https://kubernetes.io/docs/tasks/configure-pod-container/enforce-standards-namespace-labels).
+
+Example:
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx-neo
+  labels:
+    kubernetes.io/metadata.name: ingress-nginx-neo
+    name: ingress-nginx-neo
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.31
+```
+
+{{ template "chart.valuesSection" . }}

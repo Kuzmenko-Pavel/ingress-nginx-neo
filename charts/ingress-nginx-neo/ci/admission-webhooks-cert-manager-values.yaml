@@ -1,0 +1,7 @@
+controller:
+  service:
+    type: ClusterIP
+
+  admissionWebhooks:
+    certManager:
+      enabled: true

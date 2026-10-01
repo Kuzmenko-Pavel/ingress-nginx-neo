@@ -1,0 +1,10 @@
+controller:
+  service:
+    type: ClusterIP
+
+    internal:
+      enabled: true
+      labels:
+        external-dns.alpha.kubernetes.io/hostname: internal.example.com
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-internal: "true"

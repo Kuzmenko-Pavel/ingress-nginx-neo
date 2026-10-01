@@ -20,7 +20,7 @@ GO_PACKAGE := k8s.io/ingress-nginx
 
 REGISTRY ?= ghcr.io/kuzmenko-pavel/ingress-nginx-neo
 CHART_REGISTRY ?= oci://$(REGISTRY)/charts
-CHART_NAME ?= ingress-nginx
+CHART_NAME ?= ingress-nginx-neo
 CHART_DIR ?= charts/$(CHART_NAME)
 RELEASE_NAME ?= ingress-nginx-neo
 NAMESPACE ?= ingress-nginx-neo
@@ -399,6 +399,43 @@ helm-docs-generate: $(HELM_DOCS) ## Regenerate charts/ingress-nginx-neo/README.m
 helm-docs-verify: helm-docs-generate ## Fail if the chart README is stale
 	git diff --exit-code -- $(CHART_DIR)/README.md || \
 		{ echo "$(CHART_DIR)/README.md is stale: run make helm-docs-generate" >&2; exit 1; }
+
+# Image digests published by docker-publish: <name>=<repository>@<digest>.
+DIGESTS_FILE := $(DIST)/digests.env
+HELM_REGISTRY_CONFIG ?= $(or $(DOCKER_CONFIG),$(HOME)/.docker)/config.json
+
+.PHONY: helm-package
+helm-package: helm-stage $(HELM) $(YQ) ## Stage, (release: pin digests), package into dist/
+ifeq ($(CHANNEL),release)
+	test -s $(DIGESTS_FILE) || { echo "$(DIGESTS_FILE) is missing: run make docker-publish first" >&2; exit 1; }
+	digest() { sed -n "s/^$$1=.*@//p" $(DIGESTS_FILE); }; \
+	$(YQ) -i ".controller.image.digest = \"$$(digest controller)\" | \
+		.controller.image.digestChroot = \"$$(digest controller-chroot)\" | \
+		.controller.admissionWebhooks.patch.image.digest = \"$$(digest kube-webhook-certgen)\" | \
+		.defaultBackend.image.digest = \"$$(digest custom-error-pages)\"" $(STAGED_CHART)/values.yaml
+	$(HELM_ENV) $(HELM) template $(RELEASE_NAME) $(STAGED_CHART) --set controller.admissionWebhooks.enabled=true | \
+		grep -q '$(CONTROLLER_IMAGE):$(IMAGE_TAG)@sha256:' || { echo "the packaged chart does not pin the controller digest" >&2; exit 1; }
+endif
+	$(HELM_ENV) $(HELM) package $(STAGED_CHART) --version $(CHART_VERSION) --app-version $(APP_VERSION) --destination $(DIST)
+
+.PHONY: helm-publish
+helm-publish: $(HELM) $(COSIGN) ## Push dist/*.tgz to CHART_REGISTRY and sign it
+	test -s $(CHART_PACKAGE) || { echo "$(CHART_PACKAGE) is missing: run make helm-package first" >&2; exit 1; }
+	$(HELM_ENV) HELM_REGISTRY_CONFIG=$(HELM_REGISTRY_CONFIG) $(HELM) push $(CHART_PACKAGE) $(CHART_REGISTRY) 2>&1 | tee $(DIST)/helm-push.log
+	digest="$$(sed -n 's/^Digest: //p' $(DIST)/helm-push.log)"; \
+	test -n "$$digest"; \
+	echo "chart=$(REGISTRY)/charts/$(CHART_NAME)@$$digest" > $(DIST)/chart-digest.env; \
+	$(COSIGN) sign --yes "$(REGISTRY)/charts/$(CHART_NAME)@$$digest"
+
+##@ Manifests
+
+MANIFESTS_K8S_MINOR = $(shell sed -E 's/^v([0-9]+\.[0-9]+).*/\1/' <<< '$(firstword $(K8S_VERSIONS))')
+
+.PHONY: manifests-generate
+manifests-generate: helm-package $(HELM) $(KUSTOMIZE) ## Render deploy-<provider>.yaml from the packaged chart into dist/manifests (+ sha256)
+	$(HELM_ENV) HELM=$(HELM) KUSTOMIZE=$(KUSTOMIZE) RELEASE_NAME=$(RELEASE_NAME) NAMESPACE=$(NAMESPACE) \
+		CHART_NAME=$(CHART_NAME) K8S_MINOR=$(MANIFESTS_K8S_MINOR) \
+		tools/generate-manifests.sh $(CHART_PACKAGE) $(DIST)/manifests
 
 ##@ Docs
 

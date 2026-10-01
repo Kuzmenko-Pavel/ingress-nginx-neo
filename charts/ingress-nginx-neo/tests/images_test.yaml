@@ -1,0 +1,90 @@
+suite: Images
+templates:
+  - controller-deployment.yaml
+  - controller-daemonset.yaml
+  - admission-webhooks/job-patch/job-createSecret.yaml
+  - admission-webhooks/job-patch/job-patchWebhook.yaml
+  - default-backend-deployment.yaml
+chart:
+  appVersion: v9.8.7
+
+tests:
+  - it: should use the chart appVersion as the controller image tag by default
+    template: controller-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v9.8.7
+
+  - it: should use the chart appVersion as the controller image tag in a DaemonSet
+    template: controller-daemonset.yaml
+    set:
+      controller.kind: DaemonSet
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v9.8.7
+
+  - it: should prefer an explicit controller image tag over the appVersion
+    template: controller-deployment.yaml
+    set:
+      controller.image.tag: v1.2.3
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v1.2.3
+
+  - it: should append the digest only when it is set
+    template: controller-deployment.yaml
+    set:
+      controller.image.digest: sha256:faa2d18687f734994b6bd9e309e7a73852a81c30e1b8f63165fcd4f0a087e3cd
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v9.8.7@sha256:faa2d18687f734994b6bd9e309e7a73852a81c30e1b8f63165fcd4f0a087e3cd
+
+  - it: should use the chroot image and its digest when chroot is enabled
+    template: controller-deployment.yaml
+    set:
+      controller.image.chroot: true
+      controller.image.digest: sha256:faa2d18687f734994b6bd9e309e7a73852a81c30e1b8f63165fcd4f0a087e3cd
+      controller.image.digestChroot: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller-chroot:v9.8.7@sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+  - it: should use the chart appVersion as the certgen image tag in the createSecret job
+    template: admission-webhooks/job-patch/job-createSecret.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/kube-webhook-certgen:v9.8.7
+
+  - it: should use the chart appVersion as the certgen image tag in the patchWebhook job
+    template: admission-webhooks/job-patch/job-patchWebhook.yaml
+    set:
+      controller.admissionWebhooks.patch.image.digest: sha256:faa2d18687f734994b6bd9e309e7a73852a81c30e1b8f63165fcd4f0a087e3cd
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/kube-webhook-certgen:v9.8.7@sha256:faa2d18687f734994b6bd9e309e7a73852a81c30e1b8f63165fcd4f0a087e3cd
+
+  - it: should use the chart appVersion as the default backend image tag
+    template: default-backend-deployment.yaml
+    set:
+      defaultBackend.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/custom-error-pages:v9.8.7
+
+  - it: should prefer an explicit default backend image tag over the appVersion
+    template: default-backend-deployment.yaml
+    set:
+      defaultBackend.enabled: true
+      defaultBackend.image.tag: v0.0.1
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/custom-error-pages:v0.0.1

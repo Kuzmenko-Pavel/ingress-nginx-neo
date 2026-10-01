@@ -1,0 +1,6 @@
+controller:
+  service:
+    type: ClusterIP
+
+  proxySetHeaders:
+    X-Forwarded-Proto: https
