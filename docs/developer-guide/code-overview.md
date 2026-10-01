@@ -131,7 +131,8 @@ This site is built with [MkDocs](https://www.mkdocs.org/) and Material for MkDoc
 [docs](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/docs) and
 [mkdocs.yml](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/blob/main/mkdocs.yml):
 `make docs-serve` serves it locally, `make docs-build` builds it in strict mode. Versions are
-published with mike, see [Release](release.md).
+published with mike, see [Release](release.md); `make docs-publish-check` runs that publication
+into a local branch without pushing.
 
 ## Container Images
 

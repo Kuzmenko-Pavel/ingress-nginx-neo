@@ -130,6 +130,8 @@ KUBECTL := $(TOOLS_DIR)/kubectl
 HELM_UNITTEST := $(TOOLS_DIR)/helm-unittest
 CERT_MANAGER_MANIFEST := $(TOOLS_DIR)/cert-manager.yaml
 DOCS_VENV := $(CACHE)/docs-venv
+# mike runs mkdocs from PATH.
+DOCS_PATH := PATH="$(abspath $(DOCS_VENV))/bin:$$PATH"
 
 HELM_VERSION := $(shell awk '$$1 == "helm.sh/helm/v4" { print $$2; exit }' tools/go.mod)
 GINKGO_VERSION := $(shell awk '$$1 == "github.com/onsi/ginkgo/v2" { print $$2; exit }' go.mod)
@@ -790,14 +792,14 @@ docs-serve: $(DOCS_VENV)/bin/mkdocs
 .PHONY: docs-publish
 ## Publish the docs version for CHANNEL via mike.
 docs-publish: $(DOCS_VENV)/bin/mkdocs
-	MIKE=$(DOCS_VENV)/bin/mike CHANNEL=$(CHANNEL) VERSION=$(VERSION) DOCS_VERSION=$(DOCS_VERSION) \
+	$(DOCS_PATH) MIKE=$(DOCS_VENV)/bin/mike CHANNEL=$(CHANNEL) VERSION=$(VERSION) DOCS_VERSION=$(DOCS_VERSION) \
 		tools/docs-publish.sh
 
 .PHONY: docs-publish-check
 ## Run docs-publish for CHANNEL=latest into the local branch docs-publish-check, without pushing.
 docs-publish-check: $(DOCS_VENV)/bin/mkdocs
 	git branch -D docs-publish-check 2>/dev/null || true
-	MIKE=$(DOCS_VENV)/bin/mike CHANNEL=latest VERSION=$(VERSION) DOCS_VERSION=latest \
+	$(DOCS_PATH) MIKE=$(DOCS_VENV)/bin/mike CHANNEL=latest VERSION=$(VERSION) DOCS_VERSION=latest \
 		DOCS_BRANCH=docs-publish-check DOCS_PUSH=false tools/docs-publish.sh
 	git branch -D docs-publish-check
 
