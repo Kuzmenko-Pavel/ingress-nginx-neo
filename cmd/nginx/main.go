@@ -263,7 +263,7 @@ func handleFatalInitError(err error) {
 		"This could mean the cluster is misconfigured (e.g. it has invalid API server certificates "+
 		"or Service Accounts configuration). Reason: %s\n"+
 		"Refer to the troubleshooting guide for more information: "+
-		"https://kubernetes.github.io/ingress-nginx/troubleshooting/",
+		"https://kuzmenko-pavel.github.io/ingress-nginx-neo/troubleshooting/",
 		err)
 }
 
