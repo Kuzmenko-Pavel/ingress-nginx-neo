@@ -9,13 +9,15 @@ on:
     branches:
       - "main"
 
-# Declare default permissions as read only.
-permissions: read-all
+# Declare default permissions as read only; the job lists what it needs.
+permissions:
+  contents: read
 
 jobs:
   analysis:
     name: Scorecards analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       # Needed to upload the results to code-scanning dashboard.
       security-events: write

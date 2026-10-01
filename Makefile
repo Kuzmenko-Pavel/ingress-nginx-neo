@@ -27,7 +27,6 @@ NAMESPACE ?= ingress-nginx-neo
 
 DIST := dist
 CACHE := .cache
-TOOLS_DIR := $(CURDIR)/$(CACHE)/tools
 
 # ---------------------------------------------------------------------------
 # Versions: the git tag is the only version source
@@ -97,6 +96,12 @@ K8S_MINOR = $(shell sed -E 's/^v([0-9]+\.[0-9]+).*/\1/' <<< '$(K8S_VERSION)')
 
 include tools/versions.env
 
+# Tools live in a directory named after the hash of their pins, so a changed
+# pin builds a new set and a restored CI cache is used as is.
+TOOLS_HASH := $(shell cat tools/go.mod tools/go.sum tools/actionlint/go.mod tools/actionlint/go.sum tools/versions.env | \
+	{ sha256sum 2>/dev/null || shasum -a 256; } | cut -c1-12)
+TOOLS_DIR := $(CURDIR)/$(CACHE)/tools/$(TOOLS_HASH)-go$(GO_VERSION)
+
 GO_TOOLS := helm kind helm-docs yq kustomize kubeconform cosign crane govulncheck
 TOOL_PKG_helm := helm.sh/helm/v4/cmd/helm
 TOOL_PKG_kind := sigs.k8s.io/kind
@@ -119,7 +124,7 @@ COSIGN := $(TOOLS_DIR)/cosign
 CRANE := $(TOOLS_DIR)/crane
 GOVULNCHECK := $(TOOLS_DIR)/govulncheck
 ACTIONLINT := $(TOOLS_DIR)/actionlint
-GINKGO := $(TOOLS_DIR)/ginkgo
+GINKGO = $(CURDIR)/$(CACHE)/tools/ginkgo-$(GINKGO_VERSION)-go$(GO_VERSION)/ginkgo
 GOLANGCI_LINT := $(TOOLS_DIR)/golangci-lint
 KUBECTL := $(TOOLS_DIR)/kubectl
 HELM_UNITTEST := $(TOOLS_DIR)/helm-unittest
@@ -218,24 +223,22 @@ version: ## Print VERSION, CHANNEL and derived IMAGE_TAG/CHART_VERSION/APP_VERSI
 		GO_VERSION '$(GO_VERSION)' COMMIT '$(COMMIT)'
 
 .PHONY: tools
-tools: $(addprefix $(TOOLS_DIR)/,$(GO_TOOLS) actionlint ginkgo $(DOWNLOADED_TOOLS)) $(CERT_MANAGER_MANIFEST) ## Build/download all pinned tools into .cache/tools
+tools: $(addprefix $(TOOLS_DIR)/,$(GO_TOOLS) actionlint $(DOWNLOADED_TOOLS)) $(GINKGO) $(CERT_MANAGER_MANIFEST) ## Build/download all pinned tools into .cache/tools
 
-$(addprefix $(TOOLS_DIR)/,$(GO_TOOLS)): $(TOOLS_DIR)/%: tools/go.mod tools/go.sum
+$(addprefix $(TOOLS_DIR)/,$(GO_TOOLS)): $(TOOLS_DIR)/%:
 	go -C tools build -o $@ $(TOOL_PKG_$*)
 
-$(ACTIONLINT): tools/actionlint/go.mod tools/actionlint/go.sum
+$(ACTIONLINT):
 	go -C tools/actionlint build -o $@ github.com/rhysd/actionlint/cmd/actionlint
 
-$(GINKGO): go.mod go.sum
+$(GINKGO):
 	go build -o $@ github.com/onsi/ginkgo/v2/ginkgo
 
-$(addprefix $(TOOLS_DIR)/,$(DOWNLOADED_TOOLS)): $(TOOLS_DIR)/%: tools/versions.env
+$(addprefix $(TOOLS_DIR)/,$(DOWNLOADED_TOOLS)): $(TOOLS_DIR)/%:
 	tools/install.sh $* $(TOOLS_DIR)
-	touch $@
 
-$(CERT_MANAGER_MANIFEST): tools/versions.env
+$(CERT_MANAGER_MANIFEST):
 	tools/install.sh cert-manager $(TOOLS_DIR)
-	touch $@
 
 $(DOCS_VENV)/bin/mkdocs: docs/requirements.txt
 	python3 -m venv $(DOCS_VENV)
@@ -250,9 +253,32 @@ clean: ## Remove dist/, build outputs and local images built by this Makefile
 .PHONY: check
 check: code-lint test-unit test-unit-lua docs-verify helm-docs-verify helm-lint helm-test ## Fast local checks: code-lint test-unit test-unit-lua docs-verify helm-docs-verify helm-lint helm-test
 
+# CI matrices: [{"version": "<kindest/node tag@digest>", "name": "<tag>"}].
 .PHONY: print-k8s-versions
 print-k8s-versions:
-	@printf '%s\n' $(K8S_VERSIONS) | jq -R . | jq -cs .
+	@printf '%s\n' $(K8S_VERSIONS) | jq -R '{version: ., name: (. | split("@")[0])}' | jq -cs .
+
+# "true" when a dependency image src-* is not published for every platform.
+.PHONY: print-deps-missing
+print-deps-missing:
+	@missing=false; \
+	for image in $(foreach d,$(DEPS_ALL),$(DEP_IMAGE_$(d))); do \
+		rc=0; tools/image-exists.sh "$$image" $(DEPS_PLATFORMS) 2>/dev/null || rc=$$?; \
+		case $$rc in 0) ;; 1 | 3) missing=true ;; *) echo "cannot query $$image" >&2; exit $$rc ;; esac; \
+	done; \
+	echo "$$missing"
+
+.PHONY: print-scan-images
+print-scan-images:
+	@printf '%s\n' $(SCAN_IMAGES) | jq -R . | jq -cs .
+
+# The "CI result" check: RESULTS is the JSON of the needs context of the job.
+.PHONY: ci-result
+ci-result:
+	@jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$$RESULTS"
+	@if jq -e 'to_entries | any(.value.result == "failure" or .value.result == "cancelled")' <<< "$$RESULTS" > /dev/null; then \
+		echo "at least one job failed or was cancelled" >&2; exit 1; \
+	fi
 
 .PHONY: print-deps-platforms
 print-deps-platforms:
@@ -325,8 +351,8 @@ E2E_LOAD_IMAGES = $(REGISTRY)/$(E2E_CONTROLLER):$(IMAGE_TAG) $(CERTGEN_IMAGE):$(
 .PHONY: test-e2e
 test-e2e: $(KIND) $(KUBECTL) ## Controller e2e on kind (E2E_VARIANT=default|chroot, K8S_VERSION, FOCUS, E2E_NODES; SKIP_BUILD=1 uses already loaded images)
 	$(if $(filter-out default chroot,$(E2E_VARIANT)),$(error E2E_VARIANT must be default or chroot))
-ifeq ($(SKIP_BUILD),)
 	$(MAKE) --no-print-directory docker-build-deps
+ifeq ($(SKIP_BUILD),)
 	$(MAKE) --no-print-directory docker-build IMAGES="$(E2E_CONTROLLER) kube-webhook-certgen custom-error-pages"
 	$(MAKE) --no-print-directory docker-build-e2e
 endif
@@ -438,7 +464,7 @@ define newline
 endef
 
 .PHONY: docker-publish
-docker-publish: ## Build and push delivered images for PLATFORMS with IMAGE_TAG (CHANNEL=latest|release), write dist/digests.env
+docker-publish: $(CRANE) ## Build and push delivered images for PLATFORMS with IMAGE_TAG (CHANNEL=latest|release), write dist/digests.env
 	$(if $(filter dev,$(CHANNEL)),$(error docker-publish needs CHANNEL=latest or CHANNEL=release))
 	$(foreach p,$(subst $(comma), ,$(PLATFORMS)),$(MAKE) --no-print-directory code-build ARCH=$(notdir $(p))$(newline))
 	mkdir -p $(DIST)

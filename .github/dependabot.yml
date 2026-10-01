@@ -1,38 +1,72 @@
+# SPDX-License-Identifier: Apache-2.0
 version: 2
 
 updates:
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: "weekly"
-      day: "sunday"
+      interval: weekly
+      day: sunday
     open-pull-requests-limit: 3
+    commit-message:
+      prefix: build
+      prefix-development: build
+      include: scope
     groups:
       github-actions:
         patterns:
           - "*"
 
-  - package-ecosystem: "gomod"
+  - package-ecosystem: gomod
     directories:
-      - "/"
-      - "**/rootfs"
+      - /
+      - /tools
+      - /tools/actionlint
+      - /images/kube-webhook-certgen/rootfs
+      - /images/custom-error-pages/rootfs
+      - /images/fastcgi-helloserver/rootfs
     schedule:
-      interval: "weekly"
-      day: "sunday"
+      interval: weekly
+      day: sunday
     open-pull-requests-limit: 3
+    commit-message:
+      prefix: build
+      prefix-development: build
+      include: scope
     groups:
       go-dependencies:
         patterns:
           - "*"
 
-  - package-ecosystem: "docker"
+  - package-ecosystem: docker
     directories:
-      - "**/rootfs"
+      - /rootfs
+      - /images/*/rootfs
+      - /test/e2e-image
     schedule:
-      interval: "weekly"
-      day: "sunday"
+      interval: weekly
+      day: sunday
     open-pull-requests-limit: 3
+    commit-message:
+      prefix: build
+      prefix-development: build
+      include: scope
     groups:
       docker-images:
+        patterns:
+          - "*"
+
+  - package-ecosystem: pip
+    directory: /docs
+    schedule:
+      interval: weekly
+      day: sunday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: build
+      prefix-development: build
+      include: scope
+    groups:
+      docs:
         patterns:
           - "*"
