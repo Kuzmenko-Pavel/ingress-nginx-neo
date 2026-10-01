@@ -8,130 +8,134 @@ Sample configuration includes:
 * Sample authentication service (plain NGINX configured through a ConfigMap) producing several response headers
   * Authentication logic is based on HTTP header: requests with header `User` containing string `internal` are considered authenticated
   * After successful authentication service generates response headers `UserID` and `UserRole`
-* Sample echo service displaying header information
+* Sample echo service (`ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo`) displaying the request headers it receives
 * Two ingress objects pointing to echo service
-  * Public, which allows access from unauthenticated users
+  * Public, which allows access from unauthenticated users (its auth URL has the query `code=200`)
   * Private, which allows access from authenticated users only
 
-Deploy the example from this directory:
+Deploy the example from this directory. [echo-service.yaml](echo-service.yaml) references the echo image as
+`e2e-test-echo:<version>`; replace `<version>` with a release version
+(see the [releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases)):
 
 ```console
-$ kubectl create -f auth-service.yaml -f echo-service.yaml
-configmap "demo-auth-service" created
-deployment "demo-auth-service" created
-service "demo-auth-service" created
-deployment "demo-echo-service" created
-service "demo-echo-service" created
-ingress "public-demo-echo-service" created
-ingress "secure-demo-echo-service" created
+$ VERSION=<version>
+$ kubectl apply -f auth-service.yaml
+configmap/demo-auth-service created
+deployment.apps/demo-auth-service created
+service/demo-auth-service created
+
+$ sed "s/<version>/${VERSION}/" echo-service.yaml | kubectl apply -f -
+deployment.apps/demo-echo-service created
+service/demo-echo-service created
+ingress.networking.k8s.io/public-demo-echo-service created
+ingress.networking.k8s.io/secure-demo-echo-service created
 
 $ kubectl get po
-NAME                                        READY     STATUS    RESTARTS   AGE
-demo-auth-service-2769076528-7g9mh          1/1       Running            0          30s
-demo-echo-service-3636052215-3vw8c          1/1       Running            0          29s
+NAME                                 READY   STATUS    RESTARTS   AGE
+demo-auth-service-6d5f7b9c8d-7g9mh   1/1     Running   0          30s
+demo-echo-service-5c8f6d7b9f-3vw8c   1/1     Running   0          29s
 
-kubectl get ing
-NAME                       HOSTS                                 ADDRESS   PORTS     AGE
-public-demo-echo-service   public-demo-echo-service.kube.local             80        1m
-secure-demo-echo-service   secure-demo-echo-service.kube.local             80        1m
+$ kubectl get ing
+NAME                       CLASS   HOSTS                                 ADDRESS          PORTS   AGE
+public-demo-echo-service   nginx   public-demo-echo-service.kube.local   192.168.99.100   80      1m
+secure-demo-echo-service   nginx   secure-demo-echo-service.kube.local   192.168.99.100   80      1m
 ```
+
+The responses below are shortened to the relevant lines. The echo service prints the request headers it receives,
+so the headers propagated from the authentication service appear as `userid` and `userrole`.
 
 ## Test 1: public service with no auth header
 
 ```console
 $ curl -H 'Host: public-demo-echo-service.kube.local' -v 192.168.99.100
-* Rebuilt URL to: 192.168.99.100/
-*   Trying 192.168.99.100...
-* Connected to 192.168.99.100 (192.168.99.100) port 80 (#0)
 > GET / HTTP/1.1
 > Host: public-demo-echo-service.kube.local
-> User-Agent: curl/7.43.0
+> User-Agent: curl/8.5.0
 > Accept: */*
 >
 < HTTP/1.1 200 OK
-< Server: nginx/1.11.10
-< Date: Mon, 13 Mar 2017 20:19:21 GMT
-< Content-Type: text/plain; charset=utf-8
-< Content-Length: 20
-< Connection: keep-alive
+< Content-Type: text/plain
 <
-* Connection #0 to host 192.168.99.100 left intact
-UserID: , UserRole:
+...
+Request Headers:
+	accept=*/*
+	host=public-demo-echo-service.kube.local
+	user-agent=curl/8.5.0
+	x-forwarded-for=192.168.99.1
+	x-forwarded-host=public-demo-echo-service.kube.local
+	...
 ```
+
+The request is allowed, and no `userid` / `userrole` headers are passed to the backend.
 
 ## Test 2: secure service with no auth header
 
 ```console
 $ curl -H 'Host: secure-demo-echo-service.kube.local' -v 192.168.99.100
-* Rebuilt URL to: 192.168.99.100/
-*   Trying 192.168.99.100...
-* Connected to 192.168.99.100 (192.168.99.100) port 80 (#0)
 > GET / HTTP/1.1
 > Host: secure-demo-echo-service.kube.local
-> User-Agent: curl/7.43.0
+> User-Agent: curl/8.5.0
 > Accept: */*
 >
 < HTTP/1.1 403 Forbidden
-< Server: nginx/1.11.10
-< Date: Mon, 13 Mar 2017 20:18:48 GMT
 < Content-Type: text/html
-< Content-Length: 170
-< Connection: keep-alive
 <
 <html>
 <head><title>403 Forbidden</title></head>
-<body bgcolor="white">
+<body>
 <center><h1>403 Forbidden</h1></center>
-<hr><center>nginx/1.11.10</center>
+<hr><center>nginx</center>
 </body>
 </html>
-* Connection #0 to host 192.168.99.100 left intact
 ```
 
 ## Test 3: public service with valid auth header
 
 ```console
 $ curl -H 'Host: public-demo-echo-service.kube.local' -H 'User:internal' -v 192.168.99.100
-* Rebuilt URL to: 192.168.99.100/
-*   Trying 192.168.99.100...
-* Connected to 192.168.99.100 (192.168.99.100) port 80 (#0)
 > GET / HTTP/1.1
 > Host: public-demo-echo-service.kube.local
-> User-Agent: curl/7.43.0
+> User-Agent: curl/8.5.0
 > Accept: */*
 > User:internal
 >
 < HTTP/1.1 200 OK
-< Server: nginx/1.11.10
-< Date: Mon, 13 Mar 2017 20:19:59 GMT
-< Content-Type: text/plain; charset=utf-8
-< Content-Length: 44
-< Connection: keep-alive
+< Content-Type: text/plain
 <
-* Connection #0 to host 192.168.99.100 left intact
-UserID: 1443635317331776148, UserRole: admin
+...
+Request Headers:
+	accept=*/*
+	host=public-demo-echo-service.kube.local
+	user=internal
+	user-agent=curl/8.5.0
+	userid=8fcb328c9c812b05a7e79feb1b8a80b0
+	userrole=admin
+	...
 ```
 
 ## Test 4: secure service with valid auth header
 
 ```console
 $ curl -H 'Host: secure-demo-echo-service.kube.local' -H 'User:internal' -v 192.168.99.100
-* Rebuilt URL to: 192.168.99.100/
-*   Trying 192.168.99.100...
-* Connected to 192.168.99.100 (192.168.99.100) port 80 (#0)
 > GET / HTTP/1.1
 > Host: secure-demo-echo-service.kube.local
-> User-Agent: curl/7.43.0
+> User-Agent: curl/8.5.0
 > Accept: */*
 > User:internal
 >
 < HTTP/1.1 200 OK
-< Server: nginx/1.11.10
-< Date: Mon, 13 Mar 2017 20:17:23 GMT
-< Content-Type: text/plain; charset=utf-8
-< Content-Length: 43
-< Connection: keep-alive
+< Content-Type: text/plain
 <
-* Connection #0 to host 192.168.99.100 left intact
-UserID: 605394647632969758, UserRole: admin
+...
+Request Headers:
+	accept=*/*
+	host=secure-demo-echo-service.kube.local
+	user=internal
+	user-agent=curl/8.5.0
+	userid=1f1c2d4f7a9b4e0c8d6e5f4a3b2c1d0e
+	userrole=admin
+	...
 ```
+
+The header `Other` returned by the authentication service is not listed in
+`nginx.ingress.kubernetes.io/auth-response-headers`, so it is not passed to the backend.

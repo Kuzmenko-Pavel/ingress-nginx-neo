@@ -2,92 +2,89 @@
 
 This example uses 2 different certificates to terminate SSL for 2 hostnames.
 
-1. Create tls secrets for foo.bar.com and bar.baz.com as indicated in the yaml
-2. Create [multi-tls.yaml](multi-tls.yaml)
+1. Create TLS secrets for `foo.bar.com` and `bar.baz.com` (see [TLS certificates](../PREREQUISITES.md#tls-certificates)):
 
-This should generate a segment like:
+    ```console
+    $ openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout foobar.key -out foobar.crt \
+        -subj "/CN=foo.bar.com/O=foo.bar.com" -addext "subjectAltName = DNS:foo.bar.com"
+    $ kubectl create secret tls foobar --key foobar.key --cert foobar.crt
+    $ openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout barbaz.key -out barbaz.crt \
+        -subj "/CN=bar.baz.com/O=bar.baz.com" -addext "subjectAltName = DNS:bar.baz.com"
+    $ kubectl create secret tls barbaz --key barbaz.key --cert barbaz.crt
+    ```
+
+2. Create the backends and the Ingress from [multi-tls.yaml](multi-tls.yaml). The `http-svc` backend uses the
+   echo server image `ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo`; replace `<version>` with a release version
+   (see the [releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases)):
+
+    ```console
+    $ VERSION=<version>
+    $ curl -sL https://raw.githubusercontent.com/Kuzmenko-Pavel/ingress-nginx-neo/main/docs/examples/multi-tls/multi-tls.yaml \
+        | sed "s/<version>/${VERSION}/" | kubectl apply -f -
+    ```
+
+The controller generates one `server` block per host in `nginx.conf`. Certificates are served dynamically (selected by
+SNI in Lua), so `nginx.conf` does not contain per-host `ssl_certificate` paths:
+
 ```console
-$ kubectl exec -it ingress-nginx-controller-6vwd1 -- cat /etc/nginx/nginx.conf | grep "foo.bar.com" -B 7 -A 35
-    server {
-        listen 80;
-        listen 443 ssl http2;
-        ssl_certificate /etc/nginx-ssl/default-foobar.pem;
-        ssl_certificate_key /etc/nginx-ssl/default-foobar.pem;
-
-
-        server_name foo.bar.com;
-
-
-        if ($scheme = http) {
-            return 301 https://$host$request_uri;
-        }
-
-
-
-        location / {
-            proxy_set_header Host                   $host;
-
-            # Pass Real IP
-            proxy_set_header X-Real-IP              $remote_addr;
-
-            # Allow websocket connections
-            proxy_set_header                        Upgrade           $http_upgrade;
-            proxy_set_header                        Connection        $connection_upgrade;
-
-            proxy_set_header X-Forwarded-For        $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Host       $host;
-            proxy_set_header X-Forwarded-Proto      $pass_access_scheme;
-
-            proxy_connect_timeout                   5s;
-            proxy_send_timeout                      60s;
-            proxy_read_timeout                      60s;
-
-            proxy_redirect                          off;
-            proxy_buffering                         off;
-
-            proxy_http_version                      1.1;
-
-            proxy_pass http://default-http-svc-80;
-        }
+$ POD=$(kubectl -n ingress-nginx-neo get pods -l app.kubernetes.io/name=ingress-nginx-neo,app.kubernetes.io/component=controller -o name | head -1)
+$ kubectl -n ingress-nginx-neo exec "$POD" -- cat /etc/nginx/nginx.conf | grep -E "## start server|server_name"
+	## start server _
+		server_name "_" ;
+	## start server bar.baz.com
+		server_name "bar.baz.com" ;
+	## start server foo.bar.com
+		server_name "foo.bar.com" ;
 ```
 
-And you should be able to reach your nginx service or http-svc service using a hostname switch:
+You should be able to reach the nginx service or the http-svc service using a hostname switch:
+
 ```console
-$  kubectl get ing
-NAME      RULE          BACKEND   ADDRESS                         AGE
-foo-tls   -                       104.154.30.67                   13m
-          foo.bar.com
-          /             http-svc:80
-          bar.baz.com
-          /             nginx:80
+$ kubectl get ing foo-tls
+NAME      CLASS   HOSTS                     ADDRESS         PORTS     AGE
+foo-tls   nginx   foo.bar.com,bar.baz.com   104.154.30.67   80, 443   13m
 
-$ curl https://104.154.30.67 -H 'Host:foo.bar.com' -k
-CLIENT VALUES:
-client_address=10.245.0.6
-command=GET
-real path=/
-query=nil
-request_version=1.1
-request_uri=http://foo.bar.com:8080/
+$ curl -k --resolve foo.bar.com:443:104.154.30.67 https://foo.bar.com/
+Hostname: http-svc-66b7b8b4c6-zv8xl
+...
+Request Information:
+	client_address=10.245.0.6
+	method=GET
+	real path=/
+	query=
+	request_version=1.1
+	request_scheme=http
+	request_uri=http://foo.bar.com:80/
 
-SERVER VALUES:
-server_version=nginx: 1.9.11 - lua: 10001
+Request Headers:
+	accept=*/*
+	host=foo.bar.com
+	user-agent=curl/8.5.0
+	x-forwarded-for=10.245.0.1
+	x-forwarded-host=foo.bar.com
+	x-forwarded-proto=https
+...
 
-HEADERS RECEIVED:
-accept=*/*
-connection=close
-host=foo.bar.com
-user-agent=curl/7.35.0
-x-forwarded-for=10.245.0.1
-x-forwarded-host=foo.bar.com
-x-forwarded-proto=https
-
-$ curl https://104.154.30.67 -H 'Host:bar.baz.com' -k
+$ curl -k --resolve bar.baz.com:443:104.154.30.67 https://bar.baz.com/
 <!DOCTYPE html>
 <html>
 <head>
-<title>Welcome to nginx on Debian!</title>
+<title>Welcome to nginx!</title>
+...
+```
 
-$ curl 104.154.30.67
-default backend - 404
+Each host gets its own certificate:
+
+```console
+$ openssl s_client -connect 104.154.30.67:443 -servername bar.baz.com </dev/null 2>/dev/null | openssl x509 -noout -subject
+subject=CN = bar.baz.com, O = bar.baz.com
+```
+
+A request without a matching host is answered by the default backend:
+
+```console
+$ curl http://104.154.30.67/
+<html>
+<head><title>404 Not Found</title></head>
+...
 ```

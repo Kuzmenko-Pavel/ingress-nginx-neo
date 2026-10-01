@@ -1,3 +1,5 @@
+# Echo server used by the examples: replies with the request details (method, path, headers, body).
+# <version>: a release version, see https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,9 +16,9 @@ spec:
     spec:
       containers:
       - name: http-svc
-        image: registry.k8s.io/e2e-test-images/echoserver:2.3
+        image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo:<version>
         ports:
-        - containerPort: 8080
+        - containerPort: 80
         env:
           - name: NODE_NAME
             valueFrom:
@@ -46,7 +48,7 @@ metadata:
 spec:
   ports:
   - port: 80
-    targetPort: 8080
+    targetPort: 80
     protocol: TCP
     name: http
   selector:

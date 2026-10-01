@@ -5,7 +5,9 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: "0"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-    kubernetes.io/tls-acme: 'true'
+    # cert-manager issues the certificate into the secret registry-tls;
+    # replace letsencrypt-prod with the name of your ClusterIssuer.
+    cert-manager.io/cluster-issuer: letsencrypt-prod
   name: docker-registry
   namespace: docker-registry
 spec:

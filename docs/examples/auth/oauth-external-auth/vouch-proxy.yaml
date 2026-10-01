@@ -4,7 +4,7 @@ metadata:
   labels:
     k8s-app: vouch-proxy
   name: vouch-proxy
-  namespace: kube-system
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -18,7 +18,7 @@ spec:
       containers:
       - env:
         - name: VOUCH_ALLOWALLUSERS
-          value: true
+          value: "true"
         # Recommended: remove VOUCH_ALLOWALLUSERS and set an allowlist
         # - name: VOUCH_WHITELIST
         #   value: alice,bob
@@ -35,8 +35,7 @@ spec:
           value: <Client ID>
         - name: OAUTH_CLIENT_SECRET
           value: <Client Secret>
-        image: quay.io/vouch/vouch-proxy:latest
-        imagePullPolicy: Always
+        image: quay.io/vouch/vouch-proxy:0.45.1@sha256:c0298d3133183b87deb0129fa65ee07c423f57c256ca7e3d49eec7e3e77fa01d
         name: vouch-proxy
         ports:
         - containerPort: 9090
@@ -50,7 +49,7 @@ metadata:
   labels:
     k8s-app: vouch-proxy
   name: vouch-proxy
-  namespace: kube-system
+  namespace: default
 spec:
   ports:
   - name: http
@@ -66,7 +65,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: vouch-proxy
-  namespace: kube-system
+  namespace: default
 spec:
   ingressClassName: nginx
   rules:
@@ -94,7 +93,7 @@ metadata:
     nginx.ingress.kubernetes.io/auth-url: "https://$host/oauth2/validate"
     nginx.ingress.kubernetes.io/auth-signin: "https://$host/oauth2/login?url=$scheme://$http_host$request_uri"
   name: external-auth-oauth2
-  namespace: kube-system
+  namespace: default
 spec:
   ingressClassName: nginx
   rules:
@@ -105,6 +104,12 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: kubernetes-dashboard
+            # This assumes http-svc exists, see
+            # https://kuzmenko-pavel.github.io/ingress-nginx-neo/examples/PREREQUISITES/#test-http-service
+            name: http-svc
             port:
               number: 80
+  tls:
+  - hosts:
+    - __INGRESS_HOST__
+    secretName: __INGRESS_SECRET__

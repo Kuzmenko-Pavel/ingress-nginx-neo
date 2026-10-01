@@ -5,12 +5,12 @@
 Use an external service (Basic Auth) located in `https://httpbin.org`
 
 ```
-$ kubectl create -f ingress.yaml
-ingress "external-auth" created
+$ kubectl apply -f ingress.yaml
+ingress.networking.k8s.io/external-auth created
 
 $ kubectl get ing external-auth
-NAME            HOSTS                         ADDRESS       PORTS     AGE
-external-auth   external-auth-01.sample.com   172.17.4.99   80        13s
+NAME            CLASS   HOSTS                         ADDRESS       PORTS   AGE
+external-auth   nginx   external-auth-01.sample.com   172.17.4.99   80      13s
 
 $ kubectl get ing external-auth -o yaml
 apiVersion: networking.k8s.io/v1
@@ -23,9 +23,9 @@ metadata:
   name: external-auth
   namespace: default
   resourceVersion: "2068378"
-  selfLink: /apis/networking/v1/namespaces/default/ingresses/external-auth
   uid: 5c388f1d-8970-11e6-9004-080027d2dc94
 spec:
+  ingressClassName: nginx
   rules:
   - host: external-auth-01.sample.com
     http:
@@ -57,7 +57,7 @@ $ curl -k http://172.17.4.99 -v -H 'Host: external-auth-01.sample.com'
 > Accept: */*
 >
 < HTTP/1.1 401 Unauthorized
-< Server: nginx/1.11.3
+< Server: nginx
 < Date: Mon, 03 Oct 2016 14:52:08 GMT
 < Content-Type: text/html
 < Content-Length: 195
@@ -68,7 +68,7 @@ $ curl -k http://172.17.4.99 -v -H 'Host: external-auth-01.sample.com'
 <head><title>401 Authorization Required</title></head>
 <body bgcolor="white">
 <center><h1>401 Authorization Required</h1></center>
-<hr><center>nginx/1.11.3</center>
+<hr><center>nginx</center>
 </body>
 </html>
 * Connection #0 to host 172.17.4.99 left intact
@@ -89,37 +89,47 @@ $ curl -k http://172.17.4.99 -v -H 'Host: external-auth-01.sample.com' -u 'user:
 > Accept: */*
 >
 < HTTP/1.1 200 OK
-< Server: nginx/1.11.3
+< Server: nginx
 < Date: Mon, 03 Oct 2016 14:52:50 GMT
 < Content-Type: text/plain
 < Transfer-Encoding: chunked
 < Connection: keep-alive
 <
-CLIENT VALUES:
-client_address=10.2.60.2
-command=GET
-real path=/
-query=nil
-request_version=1.1
-request_uri=http://external-auth-01.sample.com:8080/
+Hostname: http-svc-66b7b8b4c6-zv8xl
 
-SERVER VALUES:
-server_version=nginx: 1.9.11 - lua: 10001
+Pod Information:
+	node name:	worker-1
+	pod name:	http-svc-66b7b8b4c6-zv8xl
+	pod namespace:	default
+	pod IP:	10.180.1.6
 
-HEADERS RECEIVED:
-accept=*/*
-authorization=Basic dXNlcjpwYXNzd2Q=
-connection=close
-host=external-auth-01.sample.com
-user-agent=curl/7.50.1
-x-forwarded-for=10.2.60.1
-x-forwarded-host=external-auth-01.sample.com
-x-forwarded-port=80
-x-forwarded-proto=http
-x-real-ip=10.2.60.1
-BODY:
+Server values:
+	server_version=nginx: 1.27.1 - lua: 10026
+
+Request Information:
+	client_address=10.2.60.2
+	method=GET
+	real path=/
+	query=
+	request_version=1.1
+	request_scheme=http
+	request_uri=http://external-auth-01.sample.com:80/
+
+Request Headers:
+	accept=*/*
+	authorization=Basic dXNlcjpwYXNzd2Q=
+	connection=close
+	host=external-auth-01.sample.com
+	user-agent=curl/7.50.1
+	x-forwarded-for=10.2.60.1
+	x-forwarded-host=external-auth-01.sample.com
+	x-forwarded-port=80
+	x-forwarded-proto=http
+	x-real-ip=10.2.60.1
+
+Request Body:
+	-no body in request-
 * Connection #0 to host 172.17.4.99 left intact
--no body in request-
 ```
 
 ## Test 3: invalid username/password (expect code 401)
@@ -137,7 +147,7 @@ curl -k http://172.17.4.99 -v -H 'Host: external-auth-01.sample.com' -u 'user:us
 > Accept: */*
 >
 < HTTP/1.1 401 Unauthorized
-< Server: nginx/1.11.3
+< Server: nginx
 < Date: Mon, 03 Oct 2016 14:53:04 GMT
 < Content-Type: text/html
 < Content-Length: 195
@@ -149,7 +159,7 @@ curl -k http://172.17.4.99 -v -H 'Host: external-auth-01.sample.com' -u 'user:us
 <head><title>401 Authorization Required</title></head>
 <body bgcolor="white">
 <center><h1>401 Authorization Required</h1></center>
-<hr><center>nginx/1.11.3</center>
+<hr><center>nginx</center>
 </body>
 </html>
 * Connection #0 to host 172.17.4.99 left intact

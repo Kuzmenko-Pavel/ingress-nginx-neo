@@ -5,11 +5,11 @@ metadata:
   name: nginx-errors
   labels:
     app.kubernetes.io/name: nginx-errors
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx-neo
 spec:
   selector:
     app.kubernetes.io/name: nginx-errors
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx-neo
   ports:
   - port: 80
     targetPort: 8080
@@ -21,25 +21,26 @@ metadata:
   name: nginx-errors
   labels:
     app.kubernetes.io/name: nginx-errors
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx-neo
 spec:
   replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: nginx-errors
-      app.kubernetes.io/part-of: ingress-nginx
+      app.kubernetes.io/part-of: ingress-nginx-neo
   template:
     metadata:
       labels:
         app.kubernetes.io/name: nginx-errors
-        app.kubernetes.io/part-of: ingress-nginx
+        app.kubernetes.io/part-of: ingress-nginx-neo
     spec:
       containers:
       - name: nginx-error-server
-        image: registry.k8s.io/ingress-nginx/custom-error-pages:v1.2.9@sha256:203d3020005dbdd735c1ad51f238d8663b9851399b52cc0c9c9e3f7273b6b299
+        # <version>: a release version, see https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases
+        image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/custom-error-pages:<version>
         ports:
         - containerPort: 8080
-        # Setting the environment variable DEBUG we can see the headers sent 
+        # Setting the environment variable DEBUG we can see the headers sent
         # by the ingress controller to the backend in the client response.
         # env:
         # - name: DEBUG
@@ -47,14 +48,14 @@ spec:
 
         # Mounting custom error page from configMap
         # volumeMounts:
-        # - name: custom_error_pages
+        # - name: custom-error-pages
         #   mountPath: /www
 
       # Mounting custom error page from configMap
       # volumes:
-      # - name: custom_error_pages
+      # - name: custom-error-pages
       #   configMap:
-      #     name: custom_error_pages
+      #     name: custom-error-pages
       #     items:
       #     - key: "404"
       #       path: "404.html"

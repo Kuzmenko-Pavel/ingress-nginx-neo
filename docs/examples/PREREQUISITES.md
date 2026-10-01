@@ -58,71 +58,62 @@ Once this is complete you can continue to follow the instructions [here](./auth/
 
 ## Test HTTP Service
 
-All examples that require a test HTTP Service use the standard http-svc pod,
-which you can deploy as follows
+All examples that require a test HTTP Service use the standard http-svc Deployment and Service from
+[http-svc.yaml](http-svc.yaml). It runs the echo server image `ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo`,
+which listens on port `80` and replies with the details of the request it received (pod information, method, path,
+query, headers and body).
+
+Set `VERSION` to a release version (see the [releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases))
+and deploy it as follows:
 
 ```console
-$ kubectl create -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/docs/examples/http-svc.yaml
-service "http-svc" created
-replicationcontroller "http-svc" created
+$ VERSION=<version>
+$ curl -sL https://raw.githubusercontent.com/Kuzmenko-Pavel/ingress-nginx-neo/main/docs/examples/http-svc.yaml \
+    | sed "s/<version>/${VERSION}/" | kubectl apply -f -
+deployment.apps/http-svc created
+service/http-svc created
 
 $ kubectl get po
-NAME             READY     STATUS    RESTARTS   AGE
-http-svc-p1t3t   1/1       Running   0          1d
-
-$ kubectl get svc
-NAME             CLUSTER-IP     EXTERNAL-IP   PORT(S)            AGE
-http-svc         10.0.122.116   <pending>     80:30301/TCP       1d
-```
-
-You can test that the HTTP Service works by exposing it temporarily
-
-```console
-$ kubectl patch svc http-svc -p '{"spec":{"type": "LoadBalancer"}}'
-"http-svc" patched
+NAME                        READY   STATUS    RESTARTS   AGE
+http-svc-66b7b8b4c6-zv8xl   1/1     Running   0          1m
 
 $ kubectl get svc http-svc
-NAME             CLUSTER-IP     EXTERNAL-IP   PORT(S)            AGE
-http-svc         10.0.122.116   <pending>     80:30301/TCP       1d
+NAME       TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+http-svc   ClusterIP   10.0.122.116   <none>        80/TCP    1m
+```
 
-$ kubectl describe svc http-svc
-Name:				    http-svc
-Namespace:			    default
-Labels:			        app=http-svc
-Selector:		        app=http-svc
-Type:			        LoadBalancer
-IP:			            10.0.122.116
-LoadBalancer Ingress:	108.59.87.136
-Port:			        http	80/TCP
-NodePort:		        http	30301/TCP
-Endpoints:		        10.180.1.6:8080
-Session Affinity:	    None
-Events:
-  FirstSeen	LastSeen	Count	From			SubObjectPath	Type		Reason			Message
-  ---------	--------	-----	----			-------------	--------	------			-------
-  1m		1m		1	{service-controller }			Normal		Type			ClusterIP -> LoadBalancer
-  1m		1m		1	{service-controller }			Normal		CreatingLoadBalancer	Creating load balancer
-  16s		16s		1	{service-controller }			Normal		CreatedLoadBalancer	Created load balancer
+You can test that the HTTP Service works with a port-forward:
 
-$ curl 108.59.87.136
-CLIENT VALUES:
-client_address=10.240.0.3
-command=GET
-real path=/
-query=nil
-request_version=1.1
-request_uri=http://108.59.87.136:8080/
+```console
+$ kubectl port-forward svc/http-svc 8080:80
+Forwarding from 127.0.0.1:8080 -> 80
 
-SERVER VALUES:
-server_version=nginx: 1.9.11 - lua: 10001
+$ curl http://127.0.0.1:8080/
+Hostname: http-svc-66b7b8b4c6-zv8xl
 
-HEADERS RECEIVED:
-accept=*/*
-host=108.59.87.136
-user-agent=curl/7.46.0
-BODY:
--no body in request-
+Pod Information:
+	node name:	worker-1
+	pod name:	http-svc-66b7b8b4c6-zv8xl
+	pod namespace:	default
+	pod IP:	10.180.1.6
 
-$ kubectl patch svc http-svc -p '{"spec":{"type": "NodePort"}}'
-"http-svc" patched
+Server values:
+	server_version=nginx: 1.27.1 - lua: 10026
+
+Request Information:
+	client_address=127.0.0.1
+	method=GET
+	real path=/
+	query=
+	request_version=1.1
+	request_scheme=http
+	request_uri=http://127.0.0.1:80/
+
+Request Headers:
+	accept=*/*
+	host=127.0.0.1:8080
+	user-agent=curl/8.5.0
+
+Request Body:
+	-no body in request-
 ```

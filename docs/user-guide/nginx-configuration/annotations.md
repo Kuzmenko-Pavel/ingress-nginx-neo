@@ -175,7 +175,7 @@ The only affinity type available for NGINX is `cookie`.
 
 The annotation `nginx.ingress.kubernetes.io/affinity-mode` defines the stickiness of a session. Setting this to `balanced` (default) will redistribute some sessions if a deployment gets scaled up, therefore rebalancing the load on the servers. Setting this to `persistent` will not rebalance sessions to new servers, therefore providing maximum stickiness.
 
-The annotation `nginx.ingress.kubernetes.io/affinity-canary-behavior` defines the behavior of canaries when session affinity is enabled. Setting this to `sticky` (default) will ensure that users that were served by canaries, will continue to be served by canaries. Setting this to `legacy` will restore original canary behavior, when session affinity was ignored.
+The annotation `nginx.ingress.kubernetes.io/affinity-canary-behavior` defines the behavior of canaries when session affinity is enabled. Setting this to `sticky` (default) will ensure that users that were served by canaries, will continue to be served by canaries. Setting this to `legacy` makes canaries ignore session affinity.
 
 !!! attention
     If more than one Ingress is defined for a host and at least one Ingress uses `nginx.ingress.kubernetes.io/affinity: cookie`, then only paths on the Ingress using `nginx.ingress.kubernetes.io/affinity` will use session cookie affinity. All paths defined on other Ingresses for the host will be load balanced through the random selection of a backend server.
@@ -356,7 +356,7 @@ metadata:
 ```
 
 !!! attention
-  First define the allowed response headers in [global-allowed-response-headers](https://github.com/kubernetes/ingress-nginx/blob/main/docs/user-guide/nginx-configuration/configmap.md#global-allowed-response-headers).
+  First define the allowed response headers in [global-allowed-response-headers](configmap.md#global-allowed-response-headers).
 
 ### Default Backend
 
@@ -539,7 +539,7 @@ nginx.ingress.kubernetes.io/auth-snippet: |
 
 #### Global External Authentication
 
-By default the controller redirects all requests to an existing service that provides authentication if `global-auth-url` is set in the Ingress NGINX ConfigMap. If you want to disable this behavior for that Ingress, you can use the `nginx.ingress.kubernetes.io/enable-global-auth: "false"` annotation.
+By default the controller redirects all requests to an existing service that provides authentication if `global-auth-url` is set in the controller ConfigMap. If you want to disable this behavior for that Ingress, you can use the `nginx.ingress.kubernetes.io/enable-global-auth: "false"` annotation.
 
 - `nginx.ingress.kubernetes.io/enable-global-auth`:
    indicates if GlobalExternalAuth configuration should be applied or not to this Ingress rule. Default values is set to `"true"`.
@@ -552,14 +552,14 @@ By default the controller redirects all requests to an existing service that pro
 These annotations define limits on connections and transmission rates.  These can be used to mitigate [DDoS Attacks](https://www.nginx.com/blog/mitigating-ddos-attacks-with-nginx-and-nginx-plus).
 
 !!! attention
-    Rate limits are applied per Ingress NGINX controller replica. 
+    Rate limits are applied per controller replica. 
     If you're running multiple replicas or using a horizontal pod autoscaler (HPA), the effective rate limit will be multiplied by the number of replicas.
     When using HPA, the exact rate limit becomes dynamic as the number of replicas may change based on load.
 
 * `nginx.ingress.kubernetes.io/limit-connections`: number of concurrent connections allowed from a single IP address per controller replica. A 503 error is returned when exceeding this limit.
-* `nginx.ingress.kubernetes.io/limit-rps`: number of requests accepted from a given IP each second per controller replica. The burst limit is set to this limit multiplied by the burst multiplier, the default multiplier is 5. When clients exceed this limit, [limit-req-status-code](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/#limit-req-status-code) ***default:*** 503 is returned.
-* `nginx.ingress.kubernetes.io/limit-rpm`: number of requests accepted from a given IP each minute per controller replica. The burst limit is set to this limit multiplied by the burst multiplier, the default multiplier is 5. When clients exceed this limit, [limit-req-status-code](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/#limit-req-status-code) ***default:*** 503 is returned.
-* `nginx.ingress.kubernetes.io/limit-burst-multiplier`: multiplier of the limit rate for burst size. The default burst multiplier is 5, this annotation override the default multiplier. When clients exceed this limit, [limit-req-status-code](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/#limit-req-status-code) ***default:*** 503 is returned.
+* `nginx.ingress.kubernetes.io/limit-rps`: number of requests accepted from a given IP each second per controller replica. The burst limit is set to this limit multiplied by the burst multiplier, the default multiplier is 5. When clients exceed this limit, [limit-req-status-code](configmap.md#limit-req-status-code) ***default:*** 503 is returned.
+* `nginx.ingress.kubernetes.io/limit-rpm`: number of requests accepted from a given IP each minute per controller replica. The burst limit is set to this limit multiplied by the burst multiplier, the default multiplier is 5. When clients exceed this limit, [limit-req-status-code](configmap.md#limit-req-status-code) ***default:*** 503 is returned.
+* `nginx.ingress.kubernetes.io/limit-burst-multiplier`: multiplier of the limit rate for burst size. The default burst multiplier is 5, this annotation override the default multiplier. When clients exceed this limit, [limit-req-status-code](configmap.md#limit-req-status-code) ***default:*** 503 is returned.
 * `nginx.ingress.kubernetes.io/limit-rate-after`: initial number of kilobytes after which the further transmission of a response to a given connection will be rate limited. This feature must be used with [proxy-buffering](#proxy-buffering) enabled.
 * `nginx.ingress.kubernetes.io/limit-rate`: number of kilobytes per second allowed to send to a given connection.  The zero value disables rate limiting. This feature must be used with [proxy-buffering](#proxy-buffering) enabled.
 * `nginx.ingress.kubernetes.io/limit-whitelist`: client IP source ranges to be excluded from rate-limiting. The value is a comma separated list of CIDRs.
@@ -601,7 +601,7 @@ the User guide.
 
 ### Service Upstream
 
-By default the Ingress-Nginx Controller uses a list of all endpoints (Pod IP/port) in the NGINX upstream configuration.
+By default the controller uses a list of all endpoints (Pod IP/port) in the NGINX upstream configuration.
 
 The `nginx.ingress.kubernetes.io/service-upstream` annotation disables that behavior and instead uses a single upstream in NGINX, the service's Cluster IP and port.
 
@@ -888,13 +888,6 @@ Note: If you use both `enable-owasp-core-rules` and `modsecurity-snippet` annota
 [recommended configuration](https://github.com/owasp-modsecurity/ModSecurity/blob/v3/master/modsecurity.conf-recommended) simply use the include
 statement:
 
-nginx 0.24.1 and below
-```yaml
-nginx.ingress.kubernetes.io/modsecurity-snippet: |
-  Include /etc/nginx/owasp-modsecurity-crs/nginx-modsecurity.conf
-  Include /etc/nginx/modsecurity/modsecurity.conf
-```
-nginx 0.25.0 and above
 ```yaml
 nginx.ingress.kubernetes.io/modsecurity-snippet: |
   Include /etc/nginx/owasp-modsecurity-crs/nginx-modsecurity.conf
@@ -902,7 +895,7 @@ nginx.ingress.kubernetes.io/modsecurity-snippet: |
 
 ### Backend Protocol
 
-Using `backend-protocol` annotations is possible to indicate how NGINX should communicate with the backend service. (Replaces `secure-backends` in older versions)
+Using `backend-protocol` annotations is possible to indicate how NGINX should communicate with the backend service. 
 Valid Values: HTTP, HTTPS, AUTO_HTTP, GRPC, GRPCS and FCGI
 
 By default NGINX uses `HTTP`.

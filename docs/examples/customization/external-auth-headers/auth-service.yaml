@@ -8,17 +8,22 @@ metadata:
 data:
   default.conf: |
     # Requests whose `User` header contains "internal" are authenticated and
-    # receive the UserID and UserRole response headers; all others get 403.
+    # receive the UserID and UserRole response headers. Other requests get 403,
+    # unless the auth URL has the query `code=200` (used by the public Ingress),
+    # in which case they are allowed without user headers.
     server {
       listen 8080;
       location / {
-        if ($http_user !~ "internal") {
-          return 403 "unauthorized";
+        if ($http_user ~ "internal") {
+          add_header UserID $request_id always;
+          add_header UserRole admin always;
+          add_header Other "not used" always;
+          return 200 "ok";
         }
-        add_header UserID $request_id always;
-        add_header UserRole admin always;
-        add_header Other "not used" always;
-        return 200 "ok";
+        if ($arg_code = "200") {
+          return 200 "ok";
+        }
+        return 403 "unauthorized";
       }
     }
 ---

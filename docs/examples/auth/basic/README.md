@@ -62,7 +62,7 @@ spec:
             name: http-svc
             port: 
               number: 80
-" | kubectl create -f -
+" | kubectl apply -f -
 ```
 
 ## Use curl to confirm authorization is required by the ingress
@@ -77,7 +77,7 @@ $ curl -v http://10.2.29.4/ -H 'Host: foo.bar.com'
 > Accept: */*
 >
 < HTTP/1.1 401 Unauthorized
-< Server: nginx/1.10.0
+< Server: nginx
 < Date: Wed, 11 May 2016 05:27:23 GMT
 < Content-Type: text/html
 < Content-Length: 195
@@ -88,7 +88,7 @@ $ curl -v http://10.2.29.4/ -H 'Host: foo.bar.com'
 <head><title>401 Authorization Required</title></head>
 <body bgcolor="white">
 <center><h1>401 Authorization Required</h1></center>
-<hr><center>nginx/1.10.0</center>
+<hr><center>nginx</center>
 </body>
 </html>
 * Connection #0 to host 10.2.29.4 left intact
@@ -108,37 +108,47 @@ $ curl -v http://10.2.29.4/ -H 'Host: foo.bar.com' -u 'foo:bar'
 > Accept: */*
 >
 < HTTP/1.1 200 OK
-< Server: nginx/1.10.0
+< Server: nginx
 < Date: Wed, 11 May 2016 06:05:26 GMT
 < Content-Type: text/plain
 < Transfer-Encoding: chunked
 < Connection: keep-alive
 < Vary: Accept-Encoding
 <
-CLIENT VALUES:
-client_address=10.2.29.4
-command=GET
-real path=/
-query=nil
-request_version=1.1
-request_uri=http://foo.bar.com:8080/
+Hostname: http-svc-66b7b8b4c6-zv8xl
 
-SERVER VALUES:
-server_version=nginx: 1.9.11 - lua: 10001
+Pod Information:
+	node name:	worker-1
+	pod name:	http-svc-66b7b8b4c6-zv8xl
+	pod namespace:	default
+	pod IP:	10.180.1.6
 
-HEADERS RECEIVED:
-accept=*/*
-connection=close
-host=foo.bar.com
-user-agent=curl/7.43.0
-x-request-id=e426c7829ef9f3b18d40730857c3eddb
-x-forwarded-for=10.2.29.1
-x-forwarded-host=foo.bar.com
-x-forwarded-port=80
-x-forwarded-proto=http
-x-real-ip=10.2.29.1
-x-scheme=http
-BODY:
+Server values:
+	server_version=nginx: 1.27.1 - lua: 10026
+
+Request Information:
+	client_address=10.2.29.4
+	method=GET
+	real path=/
+	query=
+	request_version=1.1
+	request_scheme=http
+	request_uri=http://foo.bar.com:80/
+
+Request Headers:
+	accept=*/*
+	connection=close
+	host=foo.bar.com
+	user-agent=curl/7.43.0
+	x-forwarded-for=10.2.29.1
+	x-forwarded-host=foo.bar.com
+	x-forwarded-port=80
+	x-forwarded-proto=http
+	x-real-ip=10.2.29.1
+	x-request-id=e426c7829ef9f3b18d40730857c3eddb
+	x-scheme=http
+
+Request Body:
+	-no body in request-
 * Connection #0 to host 10.2.29.4 left intact
--no body in request-
 ```

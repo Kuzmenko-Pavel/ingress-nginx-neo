@@ -1,11 +1,11 @@
 # gRPC
 
-This example demonstrates how to route traffic to a gRPC service through the Ingress-NGINX controller.
+This example demonstrates how to route traffic to a gRPC service through the ingress-nginx-neo controller.
 
 ## Prerequisites
 
 1. You have a kubernetes cluster running.
-2. You have a domain name such as `example.com` that is configured to route traffic to the Ingress-NGINX controller.
+2. You have a domain name such as `example.com` that is configured to route traffic to the ingress-nginx-neo controller.
 3. You have the ingress-nginx-neo controller installed as per the [installation guide](../../deploy/index.md).
 4. You have a backend application running a gRPC server listening for TCP traffic.  Step 1 deploys a public test server if you don't have one.
 5. You're also responsible for provisioning an SSL certificate for the ingress. So you need to have a valid SSL certificate, deployed as a Kubernetes secret of type `tls`, in the same namespace as the gRPC application.
@@ -133,16 +133,12 @@ This example demonstrates how to route traffic to a gRPC service through the Ing
 ### Debugging Hints
 
 1. Obviously, watch the logs on your app.
-2. Watch the logs for the ingress-nginx-controller (increasing verbosity as
-   needed).
+2. Watch the logs of the controller (increasing verbosity with `--v=` as
+   needed): `kubectl -n ingress-nginx-neo logs deploy/ingress-nginx-neo-controller`.
 3. Double-check your address and ports.
 4. Set the `GODEBUG=http2debug=2` environment variable to get detailed http/2
    logging on the client and/or server.
-5. Study RFC 7540 (http/2) <https://tools.ietf.org/html/rfc7540>.
-
-> If you are developing public gRPC endpoints, check out
-> https://proto.stack.build, a protocol buffer / gRPC build service that can use
-> to help make it easier for your users to consume your API.
+5. Study RFC 9113 (http/2) <https://www.rfc-editor.org/rfc/rfc9113>.
 
 > See also the specific gRPC settings of NGINX: https://nginx.org/en/docs/http/ngx_http_grpc_module.html
 

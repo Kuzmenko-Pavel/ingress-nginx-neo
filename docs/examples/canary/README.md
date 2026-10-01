@@ -1,8 +1,16 @@
 # Canary
 
-Ingress Nginx Has the ability to handle canary routing by setting specific
+The ingress-nginx-neo controller has the ability to handle canary routing by setting specific
 annotations, the following is an example of how to configure a canary
 deployment with weighted canary routing.
+
+Both deployments use the echo server image `ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo`, which replies with
+the name of the pod that served the request. Set `VERSION` to a release version
+(see the [releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases)) before running the commands below:
+
+```bash
+VERSION=<version>
+```
 
 ## Create your main deployment and service
 
@@ -31,7 +39,7 @@ spec:
     spec:
       containers:
       - name: production
-        image: registry.k8s.io/ingress-nginx/e2e-test-echo:v1.2.9@sha256:9920d084b452b38ee663005a455aa7ed12c15afa512741ea9596e206a189bdf0
+        image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo:${VERSION}
         ports:
         - containerPort: 80
         env:
@@ -97,7 +105,7 @@ spec:
     spec:
       containers:
       - name: canary
-        image: registry.k8s.io/ingress-nginx/e2e-test-echo:v1.2.9@sha256:9920d084b452b38ee663005a455aa7ed12c15afa512741ea9596e206a189bdf0
+        image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo:${VERSION}
         ports:
         - containerPort: 80
         env:
@@ -208,7 +216,7 @@ spec:
 ## Testing your setup
 
 You can use the following command to test your setup (replacing
-INGRESS_CONTROLLER_IP with your ingresse controllers IP Address)
+INGRESS_CONTROLLER_IP with the IP address of your ingress controller)
 
 ```bash
 for i in $(seq 1 10); do curl -s --resolve echo.prod.mydomain.com:80:$INGRESS_CONTROLLER_IP echo.prod.mydomain.com  | grep "Hostname"; done

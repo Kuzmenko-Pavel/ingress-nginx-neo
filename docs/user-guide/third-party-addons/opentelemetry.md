@@ -2,11 +2,11 @@
 
 Enables requests served by NGINX for distributed telemetry via The OpenTelemetry Project.
 
-Using the third party module [opentelemetry-cpp-contrib/nginx](https://github.com/open-telemetry/opentelemetry-cpp-contrib/tree/main/instrumentation/nginx) the Ingress-Nginx Controller can configure NGINX to enable [OpenTelemetry](http://opentelemetry.io) instrumentation.
+Using the third party module [opentelemetry-cpp-contrib/nginx](https://github.com/open-telemetry/opentelemetry-cpp-contrib/tree/main/instrumentation/nginx) the ingress-nginx-neo controller can configure NGINX to enable [OpenTelemetry](http://opentelemetry.io) instrumentation.
 By default this feature is disabled.
 
-Check out this demo showcasing OpenTelemetry in Ingress NGINX. The video provides an overview and
-practical demonstration of how OpenTelemetry can be utilized in Ingress NGINX for observability
+Check out this demo showcasing OpenTelemetry in the NGINX Ingress controller. The video provides an overview and
+practical demonstration of how OpenTelemetry can be utilized in the controller for observability
 and monitoring purposes.
 
 <p align="center">
@@ -15,7 +15,7 @@ and monitoring purposes.
   </a>
 </p>
 
-<p align="center">Demo: OpenTelemetry in Ingress NGINX.</p>
+<p align="center">Demo: OpenTelemetry in the NGINX Ingress controller.</p>
 
 ## Usage
 
@@ -119,7 +119,7 @@ graph TB
         zipkin["Zipkin"]
     end
 
-    subgraph ingress-nginx
+    subgraph ingress-nginx-neo
         ngx[nginx]
     end
 
@@ -132,7 +132,7 @@ graph TB
         app
         otel
         observability
-        ingress-nginx
+        ingress-nginx-neo
         om --> |otlp-gRPC| otc --> |jaeger| backend
         otc --> |zipkin| zipkin
         otc --> |otlp-gRPC| tempo --> grafana
@@ -165,10 +165,13 @@ To install the example and collectors run:
         otel-sampler-ratio: "1.0"
         otel-sampler-parent-based: "false"
       metadata:
-        name: ingress-nginx-controller
-        namespace: ingress-nginx
+        name: ingress-nginx-neo-controller
+        namespace: ingress-nginx-neo
       ' | kubectl replace -f -
     ```
+
+    When the controller is installed with the Helm chart, set the same keys in `controller.config` instead, so that
+    a later `helm upgrade` keeps them.
 
 2. Deploy otel-collector, grafana and Jaeger backend:
 
@@ -208,7 +211,7 @@ To install the example and collectors run:
 4. Make a few requests to the Service:
 
     ```bash
-    kubectl port-forward --namespace=ingress-nginx service/ingress-nginx-controller 8090:80
+    kubectl port-forward --namespace=ingress-nginx-neo service/ingress-nginx-neo-controller 8090:80
     curl http://esigo.dev:8090/hello/nginx
 
 
@@ -258,22 +261,22 @@ To install the example and collectors run:
     In the Zipkin interface we can see the details:
     ![zipkin screenshot](../../images/otel-zipkin-demo.png "zipkin screenshot")
 
-## Migration from OpenTracing, Jaeger, Zipkin and Datadog
+## OpenTelemetry equivalents of OpenTracing, Jaeger, Zipkin and Datadog settings
 
-If you are migrating from OpenTracing, Jaeger, Zipkin, or Datadog to OpenTelemetry,
-you may need to update various annotations and configurations. Here are the mappings
-for common annotations and configurations:
+The controller supports distributed tracing through OpenTelemetry only. OpenTracing, Jaeger, Zipkin and Datadog
+annotations and ConfigMap keys are not supported; the tables below list their OpenTelemetry equivalents, for example
+when you reuse Ingress manifests or ConfigMaps written for other NGINX Ingress controllers.
 
 ### Annotations
 
-| Legacy                                                        | OpenTelemetry                                                   |
+| Not supported                                                 | OpenTelemetry                                                   |
 |---------------------------------------------------------------|-----------------------------------------------------------------|
 | `nginx.ingress.kubernetes.io/enable-opentracing`              | `nginx.ingress.kubernetes.io/enable-opentelemetry`              |
 | `nginx.ingress.kubernetes.io/opentracing-trust-incoming-span` | `nginx.ingress.kubernetes.io/opentelemetry-trust-incoming-span` |
 
 ### Configs
 
-| Legacy                                | OpenTelemetry                                |
+| Not supported                         | OpenTelemetry                                |
 |---------------------------------------|----------------------------------------------|
 | `opentracing-operation-name`          | `opentelemetry-operation-name`               |
 | `opentracing-location-operation-name` | `opentelemetry-operation-name`               |

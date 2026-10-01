@@ -1,6 +1,6 @@
 # TLS termination
 
-This example demonstrates how to terminate TLS through the Ingress-Nginx Controller.
+This example demonstrates how to terminate TLS through the ingress-nginx-neo controller.
 
 ## Prerequisites
 
@@ -50,51 +50,63 @@ You can confirm that the Ingress works.
 
 ```console
 $ kubectl describe ing nginx-test
-Name:			nginx-test
-Namespace:		default
-Address:		104.198.183.6
-Default backend:	default-http-backend:80 (10.180.0.4:8080,10.240.0.2:8080)
+Name:             nginx-test
+Labels:           <none>
+Namespace:        default
+Address:          104.198.183.6
+Ingress Class:    nginx
+Default backend:  <default>
 TLS:
-  tls-secret terminates
+  tls-secret terminates foo.bar.com
 Rules:
-  Host	Path	Backends
-  ----	----	--------
-  *
-    	 	http-svc:80 (<none>)
-Annotations:
+  Host         Path  Backends
+  ----         ----  --------
+  foo.bar.com
+               /   http-svc:80 (10.180.1.6:80)
+Annotations:   <none>
 Events:
-  FirstSeen	LastSeen	Count	From				SubObjectPath	Type		Reason	Message
-  ---------	--------	-----	----				-------------	--------	------	-------
-  7s		7s		1	{ingress-nginx-controller }			Normal		CREATE	default/nginx-test
-  7s		7s		1	{ingress-nginx-controller }			Normal		UPDATE	default/nginx-test
-  7s		7s		1	{ingress-nginx-controller }			Normal		CREATE	ip: 104.198.183.6
-  7s		7s		1	{ingress-nginx-controller }			Warning		MAPPING	Ingress rule 'default/nginx-test' contains no path definition. Assuming /
+  Type    Reason  Age   From                      Message
+  ----    ------  ----  ----                      -------
+  Normal  Sync    7s    nginx-ingress-controller  Scheduled for sync
 
-$ curl 104.198.183.6 -L
-curl: (60) SSL certificate problem: self signed certificate
-More details here: http://curl.haxx.se/docs/sslcerts.html
+$ curl --resolve foo.bar.com:443:104.198.183.6 https://foo.bar.com/
+curl: (60) SSL certificate problem: self-signed certificate
+More details here: https://curl.se/docs/sslcerts.html
 
-$ curl 104.198.183.6 -Lk
-CLIENT VALUES:
-client_address=10.240.0.4
-command=GET
-real path=/
-query=nil
-request_version=1.1
-request_uri=http://35.186.221.137:8080/
+$ curl -k --resolve foo.bar.com:443:104.198.183.6 https://foo.bar.com/
+Hostname: http-svc-66b7b8b4c6-zv8xl
 
-SERVER VALUES:
-server_version=nginx: 1.9.11 - lua: 10001
+Pod Information:
+	node name:	worker-1
+	pod name:	http-svc-66b7b8b4c6-zv8xl
+	pod namespace:	default
+	pod IP:	10.180.1.6
 
-HEADERS RECEIVED:
-accept=*/*
-connection=Keep-Alive
-host=35.186.221.137
-user-agent=curl/7.46.0
-via=1.1 google
-x-cloud-trace-context=f708ea7e369d4514fc90d51d7e27e91d/13322322294276298106
-x-forwarded-for=104.132.0.80, 35.186.221.137
-x-forwarded-proto=https
-BODY:
+Server values:
+	server_version=nginx: 1.27.1 - lua: 10026
 
+Request Information:
+	client_address=10.240.0.4
+	method=GET
+	real path=/
+	query=
+	request_version=1.1
+	request_scheme=http
+	request_uri=http://foo.bar.com:80/
+
+Request Headers:
+	accept=*/*
+	host=foo.bar.com
+	user-agent=curl/8.5.0
+	x-forwarded-for=104.132.0.80
+	x-forwarded-host=foo.bar.com
+	x-forwarded-port=443
+	x-forwarded-proto=https
+	x-forwarded-scheme=https
+	x-real-ip=104.132.0.80
+	x-request-id=f708ea7e369d4514fc90d51d7e27e91d
+	x-scheme=https
+
+Request Body:
+	-no body in request-
 ```

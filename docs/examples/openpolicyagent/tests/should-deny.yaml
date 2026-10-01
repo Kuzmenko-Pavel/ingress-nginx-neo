@@ -4,6 +4,7 @@ metadata:
   creationTimestamp: null
   name: simple
 spec:
+  ingressClassName: nginx
   rules:
   - host: foo2.com
     http:

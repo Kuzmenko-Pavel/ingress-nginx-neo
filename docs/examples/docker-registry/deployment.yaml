@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: docker-registry
-          image: registry:2.6.2
+          image: registry:3.0.0@sha256:6c5666b861f3505b116bb9aa9b25175e71210414bd010d92035ff64018f9457e
           env:
             - name: REGISTRY_HTTP_ADDR
               value: ":5000"

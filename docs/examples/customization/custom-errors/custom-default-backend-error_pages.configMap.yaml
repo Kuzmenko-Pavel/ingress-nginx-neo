@@ -5,13 +5,13 @@ kind: ConfigMap
 metadata:
   name: custom-error-pages
 data:
-  404: |
+  "404": |
     <!DOCTYPE html>
     <html>
       <head><title>PAGE NOT FOUND</title></head>
       <body>PAGE NOT FOUND</body>
     </html>
-  503: |
+  "503": |
     <!DOCTYPE html>
     <html>
       <head><title>CUSTOM SERVICE UNAVAILABLE</title></head>

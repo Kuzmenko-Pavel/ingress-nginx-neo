@@ -3,9 +3,9 @@
 ConfigMaps allow you to decouple configuration artifacts from image content to keep containerized applications portable.
 
 The ConfigMap API resource stores configuration data as key-value pairs. The data provides the configurations for system
-components for the nginx-controller.
+components for the ingress-nginx-neo controller.
 
-In order to overwrite nginx-controller configuration values as seen in [config.go](https://github.com/kubernetes/ingress-nginx/blob/main/internal/ingress/controller/config/config.go),
+In order to overwrite the controller configuration values as seen in [config.go](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/blob/main/internal/ingress/controller/config/config.go),
 you can add key-value pairs to the data section of the config-map. For Example:
 
 ```yaml
@@ -98,7 +98,6 @@ The following table shows a configuration option's name, type, and the default v
 | [proxy-protocol-header-timeout](#proxy-protocol-header-timeout)                 | string       | "5s"                                                                                                                                                                                                                                                                                                                                                         |                                                                                     |
 | [enable-aio-write](#enable-aio-write)                                           | bool         | "true"                                                                                                                                                                                                                                                                                                                                                       |                                                                                     |
 | [use-gzip](#use-gzip)                                                           | bool         | "false"                                                                                                                                                                                                                                                                                                                                                      |                                                                                     |
-| [use-geoip](#use-geoip)                                                         | bool         | "true"                                                                                                                                                                                                                                                                                                                                                       |                                                                                     |
 | [use-geoip2](#use-geoip2)                                                       | bool         | "false"                                                                                                                                                                                                                                                                                                                                                      |                                                                                     |
 | [geoip2-autoreload-in-minutes](#geoip2-autoreload-in-minutes)                   | int          | "0"                                                                                                                                                                                                                                                                                                                                                          |                                                                                     |
 | [enable-brotli](#enable-brotli)                                                 | bool         | "false"                                                                                                                                                                                                                                                                                                                                                      |                                                                                     |
@@ -135,19 +134,6 @@ The following table shows a configuration option's name, type, and the default v
 | [compute-full-forwarded-for](#compute-full-forwarded-for)                       | bool         | "false"                                                                                                                                                                                                                                                                                                                                                      |                                                                                     |
 | [proxy-add-original-uri-header](#proxy-add-original-uri-header)                 | bool         | "false"                                                                                                                                                                                                                                                                                                                                                      |                                                                                     |
 | [generate-request-id](#generate-request-id)                                     | bool         | "true"                                                                                                                                                                                                                                                                                                                                                       |                                                                                     |
-| [jaeger-collector-host](#jaeger-collector-host)                                 | string       | ""                                                                                                                                                                                                                                                                                                                                                           |                                                                                     |
-| [jaeger-collector-port](#jaeger-collector-port)                                 | int          | 6831                                                                                                                                                                                                                                                                                                                                                         |                                                                                     |
-| [jaeger-endpoint](#jaeger-endpoint)                                             | string       | ""                                                                                                                                                                                                                                                                                                                                                           |                                                                                     |
-| [jaeger-service-name](#jaeger-service-name)                                     | string       | "nginx"                                                                                                                                                                                                                                                                                                                                                      |                                                                                     |
-| [jaeger-propagation-format](#jaeger-propagation-format)                         | string       | "jaeger"                                                                                                                                                                                                                                                                                                                                                     |                                                                                     |
-| [jaeger-sampler-type](#jaeger-sampler-type)                                     | string       | "const"                                                                                                                                                                                                                                                                                                                                                      |                                                                                     |
-| [jaeger-sampler-param](#jaeger-sampler-param)                                   | string       | "1"                                                                                                                                                                                                                                                                                                                                                          |                                                                                     |
-| [jaeger-sampler-host](#jaeger-sampler-host)                                     | string       | "http://127.0.0.1"                                                                                                                                                                                                                                                                                                                                           |                                                                                     |
-| [jaeger-sampler-port](#jaeger-sampler-port)                                     | int          | 5778                                                                                                                                                                                                                                                                                                                                                         |                                                                                     |
-| [jaeger-trace-context-header-name](#jaeger-trace-context-header-name)           | string       | uber-trace-id                                                                                                                                                                                                                                                                                                                                                |                                                                                     |
-| [jaeger-debug-header](#jaeger-debug-header)                                     | string       | uber-debug-id                                                                                                                                                                                                                                                                                                                                                |                                                                                     |
-| [jaeger-baggage-header](#jaeger-baggage-header)                                 | string       | jaeger-baggage                                                                                                                                                                                                                                                                                                                                               |                                                                                     |
-| [jaeger-trace-baggage-header-prefix](#jaeger-trace-baggage-header-prefix)       | string       | uberctx-                                                                                                                                                                                                                                                                                                                                                     |                                                                                     |
 | [enable-opentelemetry](#enable-opentelemetry)                                   | bool         | "false"                                                                                                                                                                                                                                                                                                                                                      |                                                                                     |
 | [opentelemetry-trust-incoming-span](#opentelemetry-trust-incoming-span)         | bool         | "true"                                                                                                                                                                                                                                                                                                                                                       |                                                                                     |
 | [opentelemetry-operation-name](#opentelemetry-operation-name)                   | string       | ""                                                                                                                                                                                                                                                                                                                                                           |                                                                                     |
@@ -222,7 +208,7 @@ The following table shows a configuration option's name, type, and the default v
 
 ## add-headers
 
-Sets custom headers from named configmap before sending traffic to the client. See [proxy-set-headers](#proxy-set-headers). [example](https://github.com/kubernetes/ingress-nginx/tree/main/docs/examples/customization/custom-headers)
+Sets custom headers from named configmap before sending traffic to the client. See [proxy-set-headers](#proxy-set-headers). [example](../../examples/customization/custom-headers/README.md)
 
 ## allow-backend-server-header
 
@@ -230,9 +216,9 @@ Enables the return of the header Server from the backend instead of the generic 
 
 ## allow-cross-namespace-resources
 
-Enables users to consume cross namespace resource on annotations, when was previously enabled . _**default:**_ false
+Enables users to consume resources from other namespaces in annotations. _**default:**_ false
 
-**Annotations that may be impacted with this change**:
+**Annotations that are affected by this option**:
 
 * `auth-secret`
 * `auth-proxy-set-header`
@@ -388,7 +374,7 @@ _**default:**_ is enabled
 
 ## retry-non-idempotent
 
-Since 1.9.13 NGINX will not retry non-idempotent requests (POST, LOCK, PATCH) in case of an error in the upstream server. The previous behavior can be restored using the value "true".
+NGINX does not retry non-idempotent requests (POST, LOCK, PATCH) in case of an error in the upstream server. Set the value "true" to retry them.
 
 ## error-log-level
 
@@ -400,7 +386,7 @@ _References:_
 ## http2-max-field-size
 
 !!! warning
-    This feature was deprecated in 1.1.3 and will be removed in 1.3.0. Use [large-client-header-buffers](#large-client-header-buffers) instead.
+    This option is deprecated: the NGINX directive `http2_max_field_size` is obsolete. Use [large-client-header-buffers](#large-client-header-buffers) instead.
 
 Limits the maximum size of an HPACK-compressed request header field.
 
@@ -410,7 +396,7 @@ _References:_
 ## http2-max-header-size
 
 !!! warning
-    This feature was deprecated in 1.1.3 and will be removed in 1.3.0. Use [large-client-header-buffers](#large-client-header-buffers) instead.
+    This option is deprecated: the NGINX directive `http2_max_header_size` is obsolete. Use [large-client-header-buffers](#large-client-header-buffers) instead.
 
 Limits the maximum size of the entire request header list after HPACK decompression.
 
@@ -420,7 +406,7 @@ _References:_
 ## http2-max-requests
 
 !!! warning
-    This feature was deprecated in 1.1.3 and will be removed in 1.3.0. Use [upstream-keepalive-requests](#upstream-keepalive-requests) instead.
+    This option is deprecated: the NGINX directive `http2_max_requests` is obsolete. Use [keep-alive-requests](#keep-alive-requests) instead.
 
 Sets the maximum number of requests (including push requests) that can be served through one HTTP/2 connection, after which the next client request will lead to connection closing and the need of establishing a new connection.
 
@@ -549,6 +535,16 @@ _**default:**_ 0
 
 Sets the bucket size for the [map variables hash tables](https://nginx.org/en/docs/http/ngx_http_map_module.html#map_hash_bucket_size). The details of setting up hash tables are provided in a separate [document](https://nginx.org/en/docs/hash.html).
 
+## nginx-status-ipv4-whitelist
+
+Comma-separated list of IPv4 addresses or CIDRs that are allowed to access the `/nginx_status` endpoint of the default
+(`_`) server. _**default:**_ 127.0.0.1
+
+## nginx-status-ipv6-whitelist
+
+Comma-separated list of IPv6 addresses or CIDRs that are allowed to access the `/nginx_status` endpoint of the default
+(`_`) server. _**default:**_ ::1
+
 ## proxy-real-ip-cidr
 
 If `use-forwarded-headers` or `use-proxy-protocol` is enabled, `proxy-real-ip-cidr` defines the default IP/network address of your external load balancer. Can be a comma-separated list of CIDR blocks.
@@ -556,7 +552,7 @@ _**default:**_ "0.0.0.0/0"
 
 ## proxy-set-headers
 
-Sets custom headers from named configmap before sending traffic to backends. The value format is namespace/name.  See [example](https://kubernetes.github.io/ingress-nginx/examples/customization/custom-headers/)
+Sets custom headers from named configmap before sending traffic to backends. The value format is namespace/name.  See [example](../../examples/customization/custom-headers/README.md)
 
 ## server-name-hash-max-size
 
@@ -610,7 +606,7 @@ The default cipher list is:
 
 The ordering of a ciphersuite is very important because it decides which algorithms are going to be selected in priority. The recommendation above prioritizes algorithms that provide perfect [forward secrecy](https://wiki.mozilla.org/Security/Server_Side_TLS#Forward_Secrecy).
 
-DHE-based cyphers will not be available until DH parameter is configured [Custom DH parameters for perfect forward secrecy](https://github.com/kubernetes/ingress-nginx/tree/main/docs/examples/customization/ssl-dh-param)
+DHE-based cyphers will not be available until DH parameter is configured [Custom DH parameters for perfect forward secrecy](../../examples/customization/ssl-dh-param/README.md)
 
 Please check the [Mozilla SSL Configuration Generator](https://mozilla.github.io/server-side-tls/ssl-config-generator/).
 
@@ -696,18 +692,11 @@ Enables or disables the directive [aio_write](https://nginx.org/en/docs/http/ngx
 
 Enables or disables compression of HTTP responses using the ["gzip" module](https://nginx.org/en/docs/http/ngx_http_gzip_module.html). MIME types to compress are controlled by [gzip-types](#gzip-types). _**default:**_ false
 
-## use-geoip
-
-Enables or disables ["geoip" module](https://nginx.org/en/docs/http/ngx_http_geoip_module.html) that creates variables with values depending on the client IP address, using the precompiled MaxMind databases.
-_**default:**_ true
-
-> __Note:__ MaxMind legacy databases are discontinued and will not receive updates after 2019-01-02, cf. [discontinuation notice](https://support.maxmind.com/geolite-legacy-discontinuation-notice/). Consider [use-geoip2](#use-geoip2) below.
-
 ## use-geoip2
 
 Enables the [geoip2 module](https://github.com/leev/ngx_http_geoip2_module) for NGINX.
-Since `0.27.0` and due to a [change in the MaxMind databases](https://blog.maxmind.com/2019/12/significant-changes-to-accessing-and-using-geolite2-databases/) a license is required to have access to the databases.
-For this reason, it is required to define a new flag `--maxmind-license-key` in the ingress controller deployment to download the databases needed during the initialization of the ingress controller.
+Due to a [change in the MaxMind databases](https://blog.maxmind.com/2019/12/significant-changes-to-accessing-and-using-geolite2-databases/) a license is required to have access to the databases.
+For this reason, it is required to define the flag `--maxmind-license-key` in the ingress controller deployment to download the databases needed during the initialization of the ingress controller.
 Alternatively, it is possible to use a volume to mount the files `/etc/ingress-controller/geoip/GeoLite2-City.mmdb` and `/etc/ingress-controller/geoip/GeoLite2-ASN.mmdb`, avoiding the overhead of the download.
 
 !!! important
@@ -768,6 +757,16 @@ _**default:**_ `application/atom+xml application/javascript application/x-javasc
 Sets the number of [worker processes](https://nginx.org/en/docs/ngx_core_module.html#worker_processes).
 The default of "auto" means number of available CPU cores.
 
+## enable-serial-reloads
+
+Limits the number of NGINX worker processes during configuration reloads. When enabled, a reload is not started while
+old worker processes are still shutting down, so that no more than twice the configured number of workers exists at any
+time; configuration changes are re-queued with an exponential backoff until the number of workers is the expected value.
+This avoids potential OOM situations and high CPU load caused by many reloads in a row. _**default:**_ false
+
+_References:_
+[https://nginx.org/en/docs/ngx_core_module.html#worker_processes](https://nginx.org/en/docs/ngx_core_module.html#worker_processes)
+
 ## worker-cpu-affinity
 
 Binds worker processes to the sets of CPUs. [worker_cpu_affinity](https://nginx.org/en/docs/ngx_core_module.html#worker_cpu_affinity).
@@ -787,7 +786,7 @@ Sets the algorithm to use for load balancing.
 The value can either be:
 
 - round_robin: to use the default round robin loadbalancer
-- ewma: to use the Peak EWMA method for routing ([implementation](https://github.com/kubernetes/ingress-nginx/blob/main/rootfs/etc/nginx/lua/balancer/ewma.lua))
+- ewma: to use the Peak EWMA method for routing ([implementation](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/blob/main/rootfs/etc/nginx/lua/balancer/ewma.lua))
 
 The default is `round_robin`.
 
@@ -923,60 +922,6 @@ Adds an X-Original-Uri header with the original request URI to the backend reque
 
 Ensures that X-Request-ID is defaulted to a random value, if no X-Request-ID is present in the request
 
-## jaeger-collector-host
-
-Specifies the host to use when uploading traces. It must be a valid URL.
-
-## jaeger-collector-port
-
-Specifies the port to use when uploading traces. _**default:**_ 6831
-
-## jaeger-endpoint
-
-Specifies the endpoint to use when uploading traces to a collector. This takes priority over `jaeger-collector-host` if both are specified.
-
-## jaeger-service-name
-
-Specifies the service name to use for any traces created. _**default:**_ nginx
-
-## jaeger-propagation-format
-
-Specifies the traceparent/tracestate propagation format. _**default:**_ jaeger
-
-## jaeger-sampler-type
-
-Specifies the sampler to be used when sampling traces. The available samplers are: const, probabilistic, ratelimiting, remote. _**default:**_ const
-
-## jaeger-sampler-param
-
-Specifies the argument to be passed to the sampler constructor. Must be a number.
-For const this should be 0 to never sample and 1 to always sample. _**default:**_ 1
-
-## jaeger-sampler-host
-
-Specifies the custom remote sampler host to be passed to the sampler constructor. Must be a valid URL.
-Leave blank to use default value (localhost). _**default:**_ http://127.0.0.1
-
-## jaeger-sampler-port
-
-Specifies the custom remote sampler port to be passed to the sampler constructor. Must be a number. _**default:**_ 5778
-
-## jaeger-trace-context-header-name
-
-Specifies the header name used for passing trace context. _**default:**_ uber-trace-id
-
-## jaeger-debug-header
-
-Specifies the header name used for force sampling. _**default:**_ jaeger-debug-id
-
-## jaeger-baggage-header
-
-Specifies the header name used to submit baggage if there is no root span. _**default:**_ jaeger-baggage
-
-## jaeger-tracer-baggage-header-prefix
-
-Specifies the header prefix used to propagate baggage. _**default:**_ uberctx-
-
 ## enable-opentelemetry
 
 Enables the nginx OpenTelemetry extension. _**default:**_ is disabled
@@ -1014,6 +959,18 @@ Enables or disables using spans from incoming requests as parent for created one
 
 Uses sampler implementation which by default will take a sample if parent Activity is sampled. _**default:**_ true
 
+## otel-max-queuesize
+
+The maximum queue size of spans waiting to be exported. After the size is reached, spans are dropped. _**default:**_ 2048
+
+## otel-schedule-delay-millis
+
+The delay interval in milliseconds between two consecutive exports. _**default:**_ 5000
+
+## otel-max-export-batch-size
+
+The maximum batch size of every export. It must be smaller or equal to `otel-max-queuesize`. _**default:**_ 512
+
 ## otel-sampler-ratio
 
 Specifies sample rate for any traces created. _**default:**_ 0.01
@@ -1042,7 +999,7 @@ Adds custom configuration to the stream section of the nginx configuration.
 
 Adds custom configuration to all the locations in the nginx configuration.
 
-You can not use this to add new locations that proxy to the Kubernetes pods, as the snippet does not have access to the Go template functions. If you want to add custom locations you will have to [provide your own nginx.tmpl](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/custom-template/).
+You can not use this to add new locations that proxy to the Kubernetes pods, as the snippet does not have access to the Go template functions. If you want to add custom locations you will have to [provide your own nginx.tmpl](custom-template.md).
 
 ## custom-http-errors
 
@@ -1220,7 +1177,7 @@ _**default:**_ "/.well-known/acme-challenge"
 
 ## global-allowed-response-headers
 
-A comma-separated list of allowed response headers inside the [custom headers annotations](https://github.com/kubernetes/ingress-nginx/blob/main/docs/user-guide/nginx-configuration/annotations.md#custom-headers)
+A comma-separated list of allowed response headers inside the [custom headers annotations](annotations.md#custom-headers)
 
 ## global-auth-url
 
@@ -1229,7 +1186,7 @@ Similar to the Ingress rule annotation `nginx.ingress.kubernetes.io/auth-url`.
 Locations that should not get authenticated can be listed using `no-auth-locations` See [no-auth-locations](#no-auth-locations). In addition, each service can be excluded from authentication via annotation `enable-global-auth` set to "false".
 _**default:**_ ""
 
-_References:_ [https://github.com/kubernetes/ingress-nginx/blob/main/docs/user-guide/nginx-configuration/annotations.md#external-authentication](https://github.com/kubernetes/ingress-nginx/blob/main/docs/user-guide/nginx-configuration/annotations.md#external-authentication)
+_References:_ [External Authentication annotations](annotations.md#external-authentication)
 
 ## global-auth-method
 

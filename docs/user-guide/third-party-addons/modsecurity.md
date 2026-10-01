@@ -17,7 +17,7 @@ Using `enable-owasp-modsecurity-crs: "true"` we enable the use of the rules.
 
 ## Supported annotations
 
-For more info on supported annotations, please see [annotations/#modsecurity](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/#modsecurity)
+For more info on supported annotations, please see [annotations/#modsecurity](../nginx-configuration/annotations.md#modsecurity)
 
 ## Example of using ModSecurity with plugins via the helm chart
 
@@ -61,7 +61,7 @@ If you're using the helm chart, you can pass in the following parameters in your
 ```yaml
 controller:
   config:
-    # Enables Modsecurity
+    # Enables ModSecurity
     enable-modsecurity: "true"
 
     # Update ModSecurity config and rules

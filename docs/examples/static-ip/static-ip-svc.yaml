@@ -1,23 +1,28 @@
-# This is the backend service
+# LoadBalancer Service in front of the ingress-nginx-neo controller pods
+# (Helm release ingress-nginx-neo in the namespace ingress-nginx-neo).
 apiVersion: v1
 kind: Service
 metadata:
-  name: ingress-nginx-lb
+  name: ingress-nginx-neo-lb
+  namespace: ingress-nginx-neo
   labels:
-    app.kubernetes.io/name: ingress-nginx
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx-neo
+    app.kubernetes.io/instance: ingress-nginx-neo
+    app.kubernetes.io/component: controller
 spec:
   externalTrafficPolicy: Local
   type: LoadBalancer
-  loadBalancerIP: 104.154.109.191
+  # Set to the reserved static IP, see "Promote ephemeral to static IP".
+  # loadBalancerIP: 104.154.109.191
   ports:
   - port: 80
     name: http
-    targetPort: 80
+    targetPort: http
   - port: 443
     name: https
-    targetPort: 443
+    targetPort: https
   selector:
-    # Selects ingress-nginx-controller pods
-    app.kubernetes.io/name: ingress-nginx
-    app.kubernetes.io/part-of: ingress-nginx
+    # Selects the ingress-nginx-neo controller pods
+    app.kubernetes.io/name: ingress-nginx-neo
+    app.kubernetes.io/instance: ingress-nginx-neo
+    app.kubernetes.io/component: controller

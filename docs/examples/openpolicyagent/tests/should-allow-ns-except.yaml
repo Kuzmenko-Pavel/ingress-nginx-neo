@@ -5,6 +5,7 @@ metadata:
   name: simple
   namespace: privileged
 spec:
+  ingressClassName: nginx
   rules:
   - host: foo1.com
     http:

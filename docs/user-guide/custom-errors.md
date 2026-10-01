@@ -22,10 +22,13 @@ could decide to return the error payload as a JSON document instead of HTML.
     The custom backend is expected to return the correct HTTP status code instead of `200`.
     NGINX does not change the response from the custom default backend.
 
-An example of such custom backend is available inside the source repository at [images/custom-error-pages][img-custom-error-pages].
+The [custom-error-pages][img-custom-error-pages] image (`ghcr.io/kuzmenko-pavel/ingress-nginx-neo/custom-error-pages`)
+is such a custom backend. It is the default image of the chart's default backend (`defaultBackend.image`), listens on
+port `8080` and serves the file `<code>.<ext>` (or `<first digit>xx.<ext>`) from the directory `ERROR_FILES_PATH`
+(default `/www`), where the extension is derived from `X-Format` (default `DEFAULT_RESPONSE_FORMAT`, `text/html`).
 
 See also the [Custom errors][example-custom-errors] example.
 
 [cm-custom-http-errors]: ./nginx-configuration/configmap.md#custom-http-errors
-[img-custom-error-pages]: https://github.com/kubernetes/ingress-nginx/tree/main/images/custom-error-pages
+[img-custom-error-pages]: https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/images/custom-error-pages
 [example-custom-errors]: ../examples/customization/custom-errors/README.md

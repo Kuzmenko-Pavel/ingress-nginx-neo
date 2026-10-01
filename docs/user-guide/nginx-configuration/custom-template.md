@@ -19,6 +19,20 @@ This includes using a [Configmap](https://kubernetes.io/docs/concepts/storage/vo
               path: nginx.tmpl
 ```
 
+With the Helm chart, store the template in a ConfigMap in the controller namespace and set
+`controller.customTemplate.configMapName` and `controller.customTemplate.configMapKey`; the chart mounts it at
+`/etc/nginx/template`:
+
+```yaml
+controller:
+  customTemplate:
+    configMapName: nginx-template
+    configMapKey: nginx.tmpl
+```
+
+The default template is [`rootfs/etc/nginx/template/nginx.tmpl`](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/blob/main/rootfs/etc/nginx/template/nginx.tmpl);
+start from the version that matches the release of your controller image.
+
 **Please note the template is tied to the Go code. Do not change names in the variable `$cfg`.**
 
 For more information about the template syntax please check the [Go template package](https://golang.org/pkg/text/template/).

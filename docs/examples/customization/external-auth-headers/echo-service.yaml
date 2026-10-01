@@ -1,3 +1,4 @@
+# <version>: a release version, see https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,16 +19,16 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: echo-service
-        image: registry.k8s.io/ingress-nginx/e2e-test-echo:v1.2.9@sha256:9920d084b452b38ee663005a455aa7ed12c15afa512741ea9596e206a189bdf0
+        image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo:<version>
         ports:
-        - containerPort: 8080
+        - containerPort: 80
         resources:
           limits:
-            cpu: 10m
-            memory: 20Mi
+            cpu: 50m
+            memory: 64Mi
           requests:
             cpu: 10m
-            memory: 20Mi
+            memory: 32Mi
 ---
 apiVersion: v1
 kind: Service
@@ -39,7 +40,7 @@ metadata:
 spec:
   ports:
   - port: 80
-    targetPort: 8080
+    targetPort: 80
   selector:
     k8s-app: demo-echo-service
 ---

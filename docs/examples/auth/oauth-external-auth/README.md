@@ -5,9 +5,6 @@
 The `auth-url` and `auth-signin` annotations allow you to use an external
 authentication provider to protect your Ingress resources.
 
-!!! Important
-    This annotation requires `ingress-nginx-controller v0.9.0` or greater.
-
 ### Key Detail
 
 This functionality is enabled by deploying multiple Ingress objects for a single host.
@@ -29,18 +26,15 @@ metadata:
 ...
 ```
 
-### Example: OAuth2 Proxy + Kubernetes-Dashboard
+### Example: OAuth2 Proxy
 
-This example will show you how to deploy [`oauth2_proxy`](https://github.com/pusher/oauth2_proxy)
-into a Kubernetes cluster and use it to protect the Kubernetes Dashboard using GitHub as the OAuth2 provider.
+This example will show you how to deploy [OAuth2 Proxy](https://github.com/oauth2-proxy/oauth2-proxy)
+into a Kubernetes cluster and use it to protect an application (the [test HTTP service](../../PREREQUISITES.md#test-http-service) `http-svc`) using GitHub as the OAuth2 provider.
 
 #### Prepare
 
-1. Install the kubernetes dashboard
-
-    ```console
-    kubectl create -f https://raw.githubusercontent.com/kubernetes/kops/master/addons/kubernetes-dashboard/v1.10.1.yaml
-    ```
+1. Deploy the [test HTTP service](../../PREREQUISITES.md#test-http-service) `http-svc` in the `default` namespace
+   and create a TLS Secret for your host (see [TLS certificates](../../PREREQUISITES.md#tls-certificates))
 
 2. Create a [custom GitHub OAuth application](https://github.com/settings/applications/new)
 
@@ -51,11 +45,11 @@ into a Kubernetes cluster and use it to protect the Kubernetes Dashboard using G
 
     ![Register OAuth2 Application](images/register-oauth-app-2.png)
 
-3. Configure values in the file [`oauth2-proxy.yaml`](https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/docs/examples/auth/oauth-external-auth/oauth2-proxy.yaml) with the values:
+3. Configure values in the file [`oauth2-proxy.yaml`](oauth2-proxy.yaml) with the values:
 
     - OAUTH2_PROXY_CLIENT_ID with the github `<Client ID>`
     - OAUTH2_PROXY_CLIENT_SECRET with the github `<Client Secret>`
-    - OAUTH2_PROXY_COOKIE_SECRET with value of `python -c 'import os,base64; print(base64.b64encode(os.urandom(16)).decode("ascii"))'`
+    - OAUTH2_PROXY_COOKIE_SECRET with value of `dd if=/dev/urandom bs=32 count=1 2>/dev/null | base64 | tr -d -- '\n' | tr -- '+/' '-_'; echo`
     - (optional, but recommended) OAUTH2_PROXY_GITHUB_USERS with GitHub usernames to allow to login
     - `__INGRESS_HOST__` with a valid FQDN (e.g. `foo.bar.com`)
     - `__INGRESS_SECRET__` with a Secret with a valid SSL certificate
@@ -63,7 +57,7 @@ into a Kubernetes cluster and use it to protect the Kubernetes Dashboard using G
 4. Deploy the oauth2 proxy and the ingress rules by running:
 
     ```console
-    $ kubectl create -f oauth2-proxy.yaml
+    $ kubectl apply -f oauth2-proxy.yaml
     ```
 
 #### Test
@@ -74,21 +68,18 @@ Test the integration by accessing the configured URL, e.g. `https://foo.bar.com`
 
 ![GitHub authentication](images/oauth-login.png)
 
-![Kubernetes dashboard](images/dashboard.png)
+After a successful login, the request is forwarded to `http-svc`, which echoes the request details.
 
 
-### Example: Vouch Proxy + Kubernetes-Dashboard
+### Example: Vouch Proxy
 
-This example will show you how to deploy [`Vouch Proxy`](https://github.com/vouch/vouch-proxy)
-into a Kubernetes cluster and use it to protect the Kubernetes Dashboard using GitHub as the OAuth2 provider.
+This example will show you how to deploy [Vouch Proxy](https://github.com/vouch/vouch-proxy)
+into a Kubernetes cluster and use it to protect an application (the [test HTTP service](../../PREREQUISITES.md#test-http-service) `http-svc`) using GitHub as the OAuth2 provider.
 
 #### Prepare
 
-1. Install the kubernetes dashboard
-
-    ```console
-    kubectl create -f https://raw.githubusercontent.com/kubernetes/kops/master/addons/kubernetes-dashboard/v1.10.1.yaml
-    ```
+1. Deploy the [test HTTP service](../../PREREQUISITES.md#test-http-service) `http-svc` in the `default` namespace
+   and create a TLS Secret for your host (see [TLS certificates](../../PREREQUISITES.md#tls-certificates))
 
 2. Create a [custom GitHub OAuth application](https://github.com/settings/applications/new)
 
@@ -99,7 +90,7 @@ into a Kubernetes cluster and use it to protect the Kubernetes Dashboard using G
 
     ![Register OAuth2 Application](images/register-oauth-app-2.png)
 
-3. Configure Vouch Proxy values in the file [`vouch-proxy.yaml`](https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/docs/examples/auth/oauth-external-auth/vouch-proxy.yaml) with the values:
+3. Configure Vouch Proxy values in the file [`vouch-proxy.yaml`](vouch-proxy.yaml) with the values:
 
     - VOUCH_COOKIE_DOMAIN with value of `<Ingress Host>`
     - OAUTH_CLIENT_ID with the github `<Client ID>`
@@ -111,7 +102,7 @@ into a Kubernetes cluster and use it to protect the Kubernetes Dashboard using G
 4. Deploy Vouch Proxy and the ingress rules by running:
 
     ```console
-    $ kubectl create -f vouch-proxy.yaml
+    $ kubectl apply -f vouch-proxy.yaml
     ```
 
 #### Test
@@ -122,4 +113,4 @@ Test the integration by accessing the configured URL, e.g. `https://foo.bar.com`
 
 ![GitHub authentication](images/oauth-login.png)
 
-![Kubernetes dashboard](images/dashboard.png)
+After a successful login, the request is forwarded to `http-svc`, which echoes the request details.

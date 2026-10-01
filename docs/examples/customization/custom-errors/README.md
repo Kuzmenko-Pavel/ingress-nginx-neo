@@ -2,51 +2,81 @@
 
 This example demonstrates how to use a custom backend to render custom error pages.
 
-If you are using the Helm Chart, look at [example values](https://github.com/kubernetes/ingress-nginx/blob/main/docs/examples/customization/custom-errors/custom-default-backend.helm.values.yaml) and don't forget to add the [ConfigMap](https://github.com/kubernetes/ingress-nginx/blob/main/docs/examples/customization/custom-errors/custom-default-backend-error_pages.configMap.yaml) to your deployment. Otherwise, continue with [Customized default backend](#customized-default-backend) manual deployment.
+The error backend is the [custom-error-pages](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/images/custom-error-pages)
+image `ghcr.io/kuzmenko-pavel/ingress-nginx-neo/custom-error-pages`. It listens on port `8080`, serves `/healthz` and
+`/metrics`, and answers every other request with the page for the status code passed by the controller in the `X-Code`
+header, in the format requested by the `X-Format` header (see [Custom errors](../../../user-guide/custom-errors.md)).
 
-## Customized default backend
+## With the Helm chart
+
+The chart deploys this image as its default backend and points the controller to it. Use the
+[example values](custom-default-backend.helm.values.yaml), which enable the default backend, set `custom-http-errors`
+and mount the pages from the [ConfigMap](custom-default-backend-error_pages.configMap.yaml) into `/www`:
+
+```console
+$ kubectl -n ingress-nginx-neo apply -f custom-default-backend-error_pages.configMap.yaml
+configmap/custom-error-pages created
+
+$ helm upgrade ingress-nginx-neo oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \
+    --namespace ingress-nginx-neo \
+    --reuse-values \
+    -f custom-default-backend.helm.values.yaml
+```
+
+The default backend uses the chart's default image; you do not need to set `defaultBackend.image`.
+Remove `extraVolumes` / `extraVolumeMounts` from the values to keep the built-in pages of the image
+(HTML and JSON for 404, 4xx, 500 and 5xx).
+
+## Without Helm
+
+### Customized default backend
 
 First, create the custom `default-backend`. It will be used by the Ingress controller later on.
 
-To do that, you can take a look at the [example manifest](https://github.com/kubernetes/ingress-nginx/blob/main/docs/examples/customization/custom-errors/custom-default-backend.yaml)
-in this project's GitHub repository.
+To do that, use the [example manifest](custom-default-backend.yaml). Replace `<version>` with a release version
+(see the [releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases)) and create it in the namespace
+of the controller:
 
-```
-$ kubectl create -f custom-default-backend.yaml
-service "nginx-errors" created
-deployment.apps "nginx-errors" created
+```console
+$ VERSION=<version>
+$ sed "s/<version>/${VERSION}/" custom-default-backend.yaml | kubectl -n ingress-nginx-neo apply -f -
+service/nginx-errors created
+deployment.apps/nginx-errors created
 ```
 
 This should have created a Deployment and a Service with the name `nginx-errors`.
 
-```
-$ kubectl get deploy,svc
-NAME                           DESIRED   CURRENT   READY     AGE
-deployment.apps/nginx-errors   1         1         1         10s
+```console
+$ kubectl -n ingress-nginx-neo get deploy,svc nginx-errors
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/nginx-errors   1/1     1            1           10s
 
 NAME                   TYPE        CLUSTER-IP  EXTERNAL-IP   PORT(S)   AGE
 service/nginx-errors   ClusterIP   10.0.0.12   <none>        80/TCP    10s
 ```
 
-## Ingress controller configuration
+### Ingress controller configuration
 
-If you do not already have an instance of the Ingress-Nginx Controller running, deploy it according to the
+If you do not already have an instance of the ingress-nginx-neo controller running, deploy it according to the
 [deployment guide][deploy], then follow these steps:
 
-1. Edit the `ingress-nginx-controller` Deployment and set the value of the `--default-backend-service` flag to the name of the
-   newly created error backend.
+1. Edit the `ingress-nginx-neo-controller` Deployment and set the value of the `--default-backend-service` flag to
+   `ingress-nginx-neo/nginx-errors`, the newly created error backend.
 
-2. Edit the `ingress-nginx-controller` ConfigMap and create the key `custom-http-errors` with a value of `404,503`.
+2. Edit the `ingress-nginx-neo-controller` ConfigMap and create the key `custom-http-errors` with a value of `404,503`.
 
-3. Take note of the IP address assigned to the Ingress-Nginx Controller Service.
-   ```
-   $ kubectl get svc ingress-nginx
-   NAME            TYPE        CLUSTER-IP  EXTERNAL-IP   PORT(S)          AGE
-   ingress-nginx   ClusterIP   10.0.0.13   <none>        80/TCP,443/TCP   10m
-   ```
+## Find the controller address
+
+Take note of the IP address assigned to the controller Service:
+
+```console
+$ kubectl -n ingress-nginx-neo get svc ingress-nginx-neo-controller
+NAME                           TYPE        CLUSTER-IP  EXTERNAL-IP   PORT(S)          AGE
+ingress-nginx-neo-controller   ClusterIP   10.0.0.13   <none>        80/TCP,443/TCP   10m
+```
 
 !!! note
-    The `ingress-nginx` Service is of type `ClusterIP` in this example. This may vary depending on your environment.
+    The `ingress-nginx-neo-controller` Service is of type `ClusterIP` in this example. This may vary depending on your environment.
     Make sure you can use the Service to reach NGINX before proceeding with the rest of this example.
 
 [deploy]: ../../../deploy/index.md
@@ -55,14 +85,14 @@ If you do not already have an instance of the Ingress-Nginx Controller running, 
 
 Let us send a couple of HTTP requests using cURL and validate everything is working as expected.
 
-A request to the default backend returns a 404 error with a custom message:
+A request to the default backend returns a 404 error with a custom message (the built-in page of the image; with the
+ConfigMap from this example, the body is the `404` page of the ConfigMap):
 
-```
+```console
 $ curl -D- http://10.0.0.13/
 HTTP/1.1 404 Not Found
-Server: nginx/1.13.12
 Date: Tue, 12 Jun 2018 19:11:24 GMT
-Content-Type: */*
+Content-Type: text/html
 Transfer-Encoding: chunked
 Connection: keep-alive
 
@@ -71,15 +101,13 @@ Connection: keep-alive
 
 A request with a custom `Accept` header returns the corresponding document type (JSON):
 
-```
+```console
 $ curl -D- -H 'Accept: application/json' http://10.0.0.13/
 HTTP/1.1 404 Not Found
-Server: nginx/1.13.12
 Date: Tue, 12 Jun 2018 19:12:36 GMT
 Content-Type: application/json
 Transfer-Encoding: chunked
 Connection: keep-alive
-Vary: Accept-Encoding
 
 { "message": "The page you're looking for could not be found" }
 ```
@@ -97,5 +125,5 @@ To do that:
 
 - Enable a **custom error page for the 503 HTTP error**, by following the guide above
 - Set the value of the `--watch-namespace-selector` flag to the name of some non-existent namespace, e.g. `nonexistent-namespace`
-  - This effectively prevents the NGINX Ingress Controller from reading `Ingress` resources from any namespace in the Kubernetes cluster
-- Set your `location-snippet` to `return 503;`, to make the NGINX Ingress Controller always return the 503 HTTP error page for all the requests
+  - This effectively prevents the controller from reading `Ingress` resources from any namespace in the Kubernetes cluster
+- Set your `location-snippet` to `return 503;`, to make the controller always return the 503 HTTP error page for all the requests

@@ -10,7 +10,7 @@ Session affinity can be configured using the following annotations:
 | --- | --- | --- |
 |nginx.ingress.kubernetes.io/affinity|Type of the affinity, set this to `cookie` to enable session affinity|string (NGINX only supports `cookie`)|
 |nginx.ingress.kubernetes.io/affinity-mode|The affinity mode defines how sticky a session is. Use `balanced` to redistribute some sessions when scaling pods or `persistent` for maximum stickiness.|`balanced` (default) or `persistent`|
-|nginx.ingress.kubernetes.io/affinity-canary-behavior|Defines session affinity behavior of canaries. By default the behavior is `sticky`, and canaries respect session affinity configuration. Set this to `legacy` to restore original canary behavior, when session affinity parameters were not respected.|`sticky` (default) or `legacy`|
+|nginx.ingress.kubernetes.io/affinity-canary-behavior|Defines session affinity behavior of canaries. By default the behavior is `sticky`, and canaries respect session affinity configuration. Set this to `legacy` to make canaries ignore the session affinity configuration.|`sticky` (default) or `legacy`|
 |nginx.ingress.kubernetes.io/session-cookie-name|Name of the cookie that will be created|string (defaults to `INGRESSCOOKIE`)|
 |nginx.ingress.kubernetes.io/session-cookie-secure|Set the cookie as secure regardless the protocol of the incoming request|`"true"` or `"false"`|
 |nginx.ingress.kubernetes.io/session-cookie-path|Path that will be set on the cookie (required if your [Ingress paths][ingress-paths] use regular expressions)|string (defaults to the currently [matched path][ingress-paths])|
@@ -24,7 +24,7 @@ Session affinity can be configured using the following annotations:
 You can create the [session affinity example Ingress](ingress.yaml) to test this:
 
 ```console
-kubectl create -f ingress.yaml
+kubectl apply -f ingress.yaml
 ```
 
 ## Validation
@@ -33,41 +33,37 @@ You can confirm that the Ingress works:
 
 ```console
 $ kubectl describe ing nginx-test
-Name:			nginx-test
-Namespace:		default
-Address:
-Default backend:	default-http-backend:80 (10.180.0.4:8080,10.240.0.2:8080)
+Name:             nginx-test
+Labels:           <none>
+Namespace:        default
+Address:          104.198.183.6
+Ingress Class:    nginx
+Default backend:  <default>
 Rules:
-  Host	                        Path	Backends
-  ----	                        ----	--------
+  Host                       Path  Backends
+  ----                       ----  --------
   stickyingress.example.com
-                                /   	 nginx-service:80 (<none>)
-Annotations:
-  affinity:	cookie
-  session-cookie-name:		INGRESSCOOKIE
-  session-cookie-expires: 172800
-  session-cookie-max-age: 172800
+                             /   http-svc:80 (10.180.1.6:80)
+Annotations:                 nginx.ingress.kubernetes.io/affinity: cookie
+                             nginx.ingress.kubernetes.io/session-cookie-expires: 172800
+                             nginx.ingress.kubernetes.io/session-cookie-max-age: 172800
+                             nginx.ingress.kubernetes.io/session-cookie-name: route
 Events:
-  FirstSeen	LastSeen	Count	From				SubObjectPath	Type		Reason	Message
-  ---------	--------	-----	----				-------------	--------	------	-------
-  7s		7s		1	{ingress-nginx-controller }			Normal		CREATE	default/nginx-test
+  Type    Reason  Age   From                      Message
+  ----    ------  ----  ----                      -------
+  Normal  Sync    7s    nginx-ingress-controller  Scheduled for sync
 
 
 $ curl -I http://stickyingress.example.com
 HTTP/1.1 200 OK
-Server: nginx/1.11.9
 Date: Fri, 10 Feb 2017 14:11:12 GMT
-Content-Type: text/html
-Content-Length: 612
+Content-Type: text/plain
 Connection: keep-alive
-Set-Cookie: INGRESSCOOKIE=a9907b79b248140b56bb13723f72b67697baac3d; Expires=Sun, 12-Feb-17 14:11:12 GMT; Max-Age=172800; Path=/; HttpOnly
-Last-Modified: Tue, 24 Jan 2017 14:02:19 GMT
-ETag: "58875e6b-264"
-Accept-Ranges: bytes
+Set-Cookie: route=1707574272.384.35.581215|a9907b79b248140b56bb13723f72b676; Expires=Sun, 12-Feb-17 14:11:12 GMT; Max-Age=172800; Path=/; HttpOnly
 ```
 
 In the example above, you can see that the response contains a `Set-Cookie` header with the settings we have defined.
-This cookie is created by the Ingress-Nginx Controller, it contains a randomly generated key corresponding to the upstream used for that request (selected using [consistent hashing][consistent-hashing]) and has an `Expires` directive.
+This cookie is created by the controller, it contains a randomly generated key corresponding to the upstream server selected for that request (using [consistent hashing][consistent-hashing]) and has an `Expires` directive.
 If a client sends a cookie that doesn't correspond to an upstream, NGINX selects an upstream and creates a corresponding cookie.
 
 If the backend pool grows NGINX will keep sending the requests through the same server of the first request, even if it's overloaded.

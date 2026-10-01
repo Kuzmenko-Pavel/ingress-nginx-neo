@@ -5,7 +5,7 @@ This example demonstrates how to use `Rewrite` annotations.
 ## Prerequisites
 
 You will need to make sure your Ingress targets exactly one Ingress
-controller by specifying the [ingress.class annotation](../../user-guide/multiple-ingress.md),
+controller by specifying the [IngressClass](../../user-guide/multiple-ingress.md) with `spec.ingressClassName`,
 and that you have an ingress controller [running](../../deploy/index.md) in your cluster.
 
 ## Deployment
@@ -25,7 +25,7 @@ Rewriting can be controlled using the following annotations:
 ### Rewrite Target
 
 !!! attention
-    Starting in Version 0.22.0, ingress definitions using the annotation `nginx.ingress.kubernetes.io/rewrite-target` are not backwards compatible with previous versions. In Version 0.22.0 and beyond, any substrings within the request URI that need to be passed to the rewritten path must explicitly be defined in a [capture group](https://www.regular-expressions.info/refcapture.html).
+    With the annotation `nginx.ingress.kubernetes.io/rewrite-target`, any substrings within the request URI that need to be passed to the rewritten path must explicitly be defined in a [capture group](https://www.regular-expressions.info/refcapture.html).
 
 !!! note
     [Captured groups](https://www.regular-expressions.info/refcapture.html) are saved in numbered placeholders, chronologically, in the form `$1`, `$2` ... `$n`. These placeholders can be used as parameters in the `rewrite-target` annotation.
@@ -58,7 +58,7 @@ spec:
             name: http-svc
             port: 
               number: 80
-' | kubectl create -f -
+' | kubectl apply -f -
 ```
 
 In this ingress definition, any characters captured by `(.*)` will be assigned to the placeholder `$2`, which is then used as a parameter in the `rewrite-target` annotation.
@@ -94,7 +94,7 @@ spec:
             name: http-svc
             port: 
               number: 80
-" | kubectl create -f -
+" | kubectl apply -f -
 ```
 
 Check the rewrite is working
@@ -102,7 +102,6 @@ Check the rewrite is working
 ```
 $ curl -I -k http://approot.bar.com/
 HTTP/1.1 302 Moved Temporarily
-Server: nginx/1.11.10
 Date: Mon, 13 Mar 2017 14:57:15 GMT
 Content-Type: text/html
 Content-Length: 162

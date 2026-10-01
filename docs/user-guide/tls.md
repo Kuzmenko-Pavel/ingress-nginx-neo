@@ -39,7 +39,8 @@ accessing the catch-all server.
 If this flag is not provided NGINX will use a self-signed certificate.
 
 For instance, if you have a TLS secret `foo-tls` in the `default` namespace,
-add `--default-ssl-certificate=default/foo-tls` in the `nginx-controller` deployment.
+add `--default-ssl-certificate=default/foo-tls` to the arguments of the `ingress-nginx-neo-controller` Deployment
+(with the chart: `controller.extraArgs.default-ssl-certificate=default/foo-tls`).
 
 If the `tls:` section is not set, NGINX will provide the default certificate but will not force HTTPS redirect.
 
@@ -124,7 +125,7 @@ spec:
 
 To provide the most secure baseline configuration possible,
 
-ingress-nginx defaults to using TLS 1.2 and 1.3 only, with a [secure set of TLS ciphers][ssl-ciphers].
+ingress-nginx-neo defaults to using TLS 1.2 and 1.3 only, with a [secure set of TLS ciphers][ssl-ciphers].
 
 ### Legacy TLS
 
@@ -132,18 +133,19 @@ The default configuration, though secure, does not support some older browsers a
 
 For instance, TLS 1.1+ is only enabled by default from Android 5.0 on. At the time of writing,
 May 2018, [approximately 15% of Android devices](https://developer.android.com/about/dashboards/#Platform)
-are not compatible with ingress-nginx's default configuration.
+are not compatible with the default configuration.
 
 To change this default behavior, use a [ConfigMap][ConfigMap].
 
 A sample ConfigMap fragment to allow these older clients to connect could look something like the following
-(generated using the Mozilla SSL Configuration Generator)[mozilla-ssl-config-old]:
+(generated using the [Mozilla SSL Configuration Generator][mozilla-ssl-config-old]):
 
-```
+```yaml
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: nginx-config
+  name: ingress-nginx-neo-controller
+  namespace: ingress-nginx-neo
 data:
   ssl-ciphers: "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA256:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA"
   ssl-protocols: "TLSv1.2 TLSv1.3"
@@ -156,6 +158,6 @@ data:
 [ssl-ciphers]: ./nginx-configuration/configmap.md#ssl-ciphers
 [SNI]: https://en.wikipedia.org/wiki/Server_Name_Indication
 [mozilla-ssl-config-old]: https://ssl-config.mozilla.org/#server=nginx&config=old
-[cert-manager]: https://github.com/jetstack/cert-manager/
+[cert-manager]: https://github.com/cert-manager/cert-manager/
 [full-cert-manager-example]:https://cert-manager.io/docs/tutorials/acme/nginx-ingress/
 [cert-manager-issuer-config]:https://cert-manager.io/docs/configuration/

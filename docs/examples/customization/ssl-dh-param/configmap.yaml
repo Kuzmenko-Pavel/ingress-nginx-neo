@@ -1,10 +1,10 @@
 apiVersion: v1
 data:
-  ssl-dh-param: "ingress-nginx/lb-dhparam"
+  ssl-dh-param: "ingress-nginx-neo/lb-dhparam"
 kind: ConfigMap
 metadata:
-  name: ingress-nginx-controller
-  namespace: ingress-nginx
+  name: ingress-nginx-neo-controller
+  namespace: ingress-nginx-neo
   labels:
-    app.kubernetes.io/name: ingress-nginx
-    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx-neo
+    app.kubernetes.io/component: controller
