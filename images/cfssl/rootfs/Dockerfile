@@ -12,14 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.23.3
+ARG GOLANG_VERSION
 
-RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
-RUN apk update \
-    && apk upgrade &&  \
-    apk add --no-cache \
-    bash \
-    cfssl@testing
+FROM golang:${GOLANG_VERSION}-alpine3.23 AS builder
+
+ARG CFSSL_VERSION
+
+# cfssl needs cgo for its sqlite certificate database.
+RUN apk add --no-cache gcc musl-dev \
+  && CGO_ENABLED=1 go install \
+    github.com/cloudflare/cfssl/cmd/cfssl@${CFSSL_VERSION} \
+    github.com/cloudflare/cfssl/cmd/cfssljson@${CFSSL_VERSION}
+
+FROM alpine:3.23.3@sha256:25109184c71bdad752c8312a8623239686a9a2071e8825f20acb8f2198c3f659
+
+RUN apk add --no-cache bash sqlite-libs
+
+COPY --from=builder /go/bin/cfssl /go/bin/cfssljson /usr/local/bin/
 
 EXPOSE 8888
 

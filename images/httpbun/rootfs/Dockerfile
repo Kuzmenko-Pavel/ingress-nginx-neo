@@ -18,7 +18,7 @@ FROM golang:${GOLANG_VERSION} AS builder
 
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
-ENV HTTPBUN_COMMIT=a6b387c438b664322734250e426b6966966c2fe4
+ARG HTTPBUN_COMMIT
 
 RUN git clone https://github.com/sharat87/httpbun.git
 WORKDIR httpbun

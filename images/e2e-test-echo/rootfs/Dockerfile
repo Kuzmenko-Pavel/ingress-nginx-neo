@@ -15,6 +15,8 @@ RUN wget -O /tmp/luarocks.tgz \
   && ./configure \
   && make install
 
-RUN luarocks install lua-resty-template
+ARG LUA_RESTY_TEMPLATE_VERSION
+
+RUN luarocks install lua-resty-template ${LUA_RESTY_TEMPLATE_VERSION}
 
 COPY nginx.conf /etc/nginx/nginx.conf

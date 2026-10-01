@@ -1,265 +1,429 @@
-# Copyright 2017 The Kubernetes Authors.
+# SPDX-License-Identifier: Apache-2.0
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# The project API: humans, agents and CI call the same targets.
+# Run `make help` for the list of targets.
 
-# Add the following 'help' target to your Makefile
-# And add help text after each target name starting with '\#\#'
+SHELL := /bin/bash
+.SHELLFLAGS := -euo pipefail -c
+.DEFAULT_GOAL := help
+.DELETE_ON_ERROR:
+MAKEFLAGS += --no-builtin-rules
+-include .env # optional local overrides, gitignored
 
-.DEFAULT_GOAL:=help
+# ---------------------------------------------------------------------------
+# Project coordinates
+# ---------------------------------------------------------------------------
 
-.EXPORT_ALL_VARIABLES:
+PROJECT := ingress-nginx-neo
+REPO_URL := https://github.com/Kuzmenko-Pavel/ingress-nginx-neo
+GO_PACKAGE := k8s.io/ingress-nginx
 
-ifndef VERBOSE
-.SILENT:
+REGISTRY ?= ghcr.io/kuzmenko-pavel/ingress-nginx-neo
+CHART_REGISTRY ?= oci://$(REGISTRY)/charts
+CHART_NAME ?= ingress-nginx
+CHART_DIR ?= charts/$(CHART_NAME)
+RELEASE_NAME ?= ingress-nginx-neo
+NAMESPACE ?= ingress-nginx-neo
+
+DIST := dist
+CACHE := .cache
+TOOLS_DIR := $(CURDIR)/$(CACHE)/tools
+
+# ---------------------------------------------------------------------------
+# Versions: the git tag is the only version source
+# ---------------------------------------------------------------------------
+
+RELEASE_TAG_PATTERN := v[0-9]*.[0-9]*.[0-9]*
+CHANNEL ?= dev
+ifeq ($(filter $(CHANNEL),dev latest release),)
+$(error CHANNEL must be one of dev, latest, release (got "$(CHANNEL)"))
 endif
 
-# set default shell
-SHELL=/bin/bash -o pipefail -o errexit
+ifeq ($(CHANNEL),release)
+RELEASE_TAG ?= $(or $(GITHUB_REF_NAME),$(if $(filter command line environment,$(origin VERSION)),$(VERSION)))
+ifeq ($(filter command line environment,$(origin VERSION)),)
+VERSION := $(RELEASE_TAG)
+endif
+ifneq ($(shell [[ "$(VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$$ ]] && echo ok),ok)
+$(error CHANNEL=release needs a release tag vX.Y.Z in RELEASE_TAG (got "$(VERSION)"))
+endif
+else ifeq ($(origin VERSION),undefined)
+VERSION := $(or $(shell git describe --tags --match '$(RELEASE_TAG_PATTERN)' 2>/dev/null),v0.0.0-dev)
+endif
 
-# Use the 0.0 tag for testing, it shouldn't clobber any release builds
-TAG ?= $(shell cat TAG)
+ifeq ($(CHANNEL),release)
+IMAGE_TAG := $(VERSION)
+CHART_VERSION := $(VERSION:v%=%)
+APP_VERSION := $(VERSION)
+DOCS_VERSION := $(word 1,$(subst ., ,$(CHART_VERSION))).$(word 2,$(subst ., ,$(CHART_VERSION)))
+else ifeq ($(CHANNEL),latest)
+IMAGE_TAG := latest
+CHART_VERSION := 0.0.0-latest
+APP_VERSION := latest
+DOCS_VERSION := latest
+else
+IMAGE_TAG := dev
+CHART_VERSION := 0.0.0-dev
+APP_VERSION := dev
+DOCS_VERSION :=
+endif
 
-# The env below is called GO_VERSION and not GOLANG_VERSION because 
-# the gcb image we use to build already defines GOLANG_VERSION and is a 
-# really old version
-GO_VERSION ?= $(shell cat GOLANG_VERSION)
+COMMIT := $(shell git rev-parse HEAD 2>/dev/null)
 
-# e2e settings
-# Allow limiting the scope of the e2e tests. By default run everything
+# Go version: toolchain line of go.mod, else its go line. Used for every Go
+# build, native or in a container.
+GO_VERSION := $(or $(shell awk '$$1 == "toolchain" { sub(/^go/, "", $$2); print $$2; exit }' go.mod),$(shell awk '$$1 == "go" { print $$2; exit }' go.mod))
+ifeq ($(GO_VERSION),)
+$(error cannot read the Go version from go.mod)
+endif
+export GOTOOLCHAIN := go$(GO_VERSION)
+
+ARCH ?= $(shell go env GOARCH)
+PLATFORM ?= linux/$(ARCH)
+PLATFORMS ?= linux/amd64,linux/arm64
+
+# Kubernetes versions under test: the EKS standard support window. Each entry
+# is a kindest/node tag with the digest built by the pinned kind version.
+K8S_VERSIONS := \
+	v1.34.11@sha256:44e222ee2132dab25ff87301682f89eb82c7880ea3a1bf543bfe9708fd08d67d \
+	v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0 \
+	v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed
+K8S_VERSION ?= $(lastword $(K8S_VERSIONS))
+K8S_MINOR = $(shell sed -E 's/^v([0-9]+\.[0-9]+).*/\1/' <<< '$(K8S_VERSION)')
+
+# ---------------------------------------------------------------------------
+# Tools (pinned in tools/)
+# ---------------------------------------------------------------------------
+
+include tools/versions.env
+
+GO_TOOLS := helm kind helm-docs yq kustomize kubeconform cosign crane govulncheck
+TOOL_PKG_helm := helm.sh/helm/v4/cmd/helm
+TOOL_PKG_kind := sigs.k8s.io/kind
+TOOL_PKG_helm-docs := github.com/norwoodj/helm-docs/cmd/helm-docs
+TOOL_PKG_yq := github.com/mikefarah/yq/v4
+TOOL_PKG_kustomize := sigs.k8s.io/kustomize/kustomize/v5
+TOOL_PKG_kubeconform := github.com/yannh/kubeconform/cmd/kubeconform
+TOOL_PKG_cosign := github.com/sigstore/cosign/v3/cmd/cosign
+TOOL_PKG_crane := github.com/google/go-containerregistry/cmd/crane
+TOOL_PKG_govulncheck := golang.org/x/vuln/cmd/govulncheck
+DOWNLOADED_TOOLS := golangci-lint kubectl helm-unittest
+
+HELM := $(TOOLS_DIR)/helm
+KIND := $(TOOLS_DIR)/kind
+HELM_DOCS := $(TOOLS_DIR)/helm-docs
+YQ := $(TOOLS_DIR)/yq
+KUSTOMIZE := $(TOOLS_DIR)/kustomize
+KUBECONFORM := $(TOOLS_DIR)/kubeconform
+COSIGN := $(TOOLS_DIR)/cosign
+CRANE := $(TOOLS_DIR)/crane
+GOVULNCHECK := $(TOOLS_DIR)/govulncheck
+ACTIONLINT := $(TOOLS_DIR)/actionlint
+GINKGO := $(TOOLS_DIR)/ginkgo
+GOLANGCI_LINT := $(TOOLS_DIR)/golangci-lint
+KUBECTL := $(TOOLS_DIR)/kubectl
+HELM_UNITTEST := $(TOOLS_DIR)/helm-unittest
+CERT_MANAGER_MANIFEST := $(TOOLS_DIR)/cert-manager.yaml
+DOCS_VENV := $(CACHE)/docs-venv
+
+HELM_VERSION := $(shell awk '$$1 == "helm.sh/helm/v4" { print $$2; exit }' tools/go.mod)
+GINKGO_VERSION := $(shell awk '$$1 == "github.com/onsi/ginkgo/v2" { print $$2; exit }' go.mod)
+
+# Helm keeps its configuration and caches inside the repository.
+HELM_ENV := HELM_CACHE_HOME=$(CURDIR)/$(CACHE)/helm/cache HELM_CONFIG_HOME=$(CURDIR)/$(CACHE)/helm/config HELM_DATA_HOME=$(CURDIR)/$(CACHE)/helm/data
+
+# ---------------------------------------------------------------------------
+# Images
+# ---------------------------------------------------------------------------
+
+# Delivered images: tagged with IMAGE_TAG, rebuilt for every channel.
+IMAGES ?= controller controller-chroot kube-webhook-certgen custom-error-pages
+CONTROLLER_IMAGE := $(REGISTRY)/controller
+CERTGEN_IMAGE := $(REGISTRY)/kube-webhook-certgen
+ERROR_PAGES_IMAGE := $(REGISTRY)/custom-error-pages
+E2E_IMAGE := $(PROJECT)-e2e:$(IMAGE_TAG)
+
+# Dependency images: content addressed (src-<hash of their inputs>), built once
+# per source state and reused. Listed in build order.
+DEPS ?= nginx e2e-test-runner e2e-test-echo httpbun fastcgi-helloserver cfssl
+DEPS_ALL := nginx e2e-test-runner e2e-test-echo httpbun fastcgi-helloserver cfssl
+DEPS_PLATFORMS := linux/amd64 linux/arm64
+
+CONTENT_TAG := tools/content-tag.sh
+NGINX_TAG := $(shell $(CONTENT_TAG) images/nginx)
+RUNNER_TAG := $(shell $(CONTENT_TAG) images/test-runner -- $(NGINX_TAG) $(GO_VERSION) $(GINKGO_VERSION) $(HELM_VERSION))
+ECHO_TAG := $(shell $(CONTENT_TAG) images/e2e-test-echo -- $(NGINX_TAG))
+HTTPBUN_TAG := $(shell $(CONTENT_TAG) images/httpbun -- $(GO_VERSION))
+FASTCGI_TAG := $(shell $(CONTENT_TAG) images/fastcgi-helloserver -- $(GO_VERSION))
+CFSSL_TAG := $(shell $(CONTENT_TAG) images/cfssl -- $(GO_VERSION))
+
+NGINX_IMAGE := $(REGISTRY)/nginx:$(NGINX_TAG)
+BASE_IMAGE := $(NGINX_IMAGE)
+RUNNER_IMAGE := $(REGISTRY)/e2e-test-runner:$(RUNNER_TAG)
+ECHO_IMAGE := $(REGISTRY)/e2e-test-echo:$(ECHO_TAG)
+HTTPBUN_IMAGE := $(REGISTRY)/httpbun:$(HTTPBUN_TAG)
+FASTCGI_IMAGE := $(REGISTRY)/fastcgi-helloserver:$(FASTCGI_TAG)
+CFSSL_IMAGE := $(REGISTRY)/cfssl:$(CFSSL_TAG)
+
+DEP_DIR_nginx := images/nginx
+DEP_DIR_e2e-test-runner := images/test-runner
+DEP_DIR_e2e-test-echo := images/e2e-test-echo
+DEP_DIR_httpbun := images/httpbun
+DEP_DIR_fastcgi-helloserver := images/fastcgi-helloserver
+DEP_DIR_cfssl := images/cfssl
+DEP_IMAGE_nginx := $(NGINX_IMAGE)
+DEP_IMAGE_e2e-test-runner := $(RUNNER_IMAGE)
+DEP_IMAGE_e2e-test-echo := $(ECHO_IMAGE)
+DEP_IMAGE_httpbun := $(HTTPBUN_IMAGE)
+DEP_IMAGE_fastcgi-helloserver := $(FASTCGI_IMAGE)
+DEP_IMAGE_cfssl := $(CFSSL_IMAGE)
+DEP_ARGS_nginx :=
+DEP_ARGS_e2e-test-runner := --build-arg GOLANG_VERSION=$(GO_VERSION) --build-arg GINKGO_VERSION=$(GINKGO_VERSION) --build-arg HELM_VERSION=$(HELM_VERSION)
+DEP_ARGS_e2e-test-echo :=
+DEP_ARGS_httpbun := --build-arg GOLANG_VERSION=$(GO_VERSION)
+DEP_ARGS_fastcgi-helloserver := --build-arg GOLANG_VERSION=$(GO_VERSION)
+DEP_ARGS_cfssl := --build-arg GOLANG_VERSION=$(GO_VERSION)
+# Images built FROM the nginx base.
+DEPS_ON_BASE := e2e-test-runner e2e-test-echo
+
+DOCKER_CACHE_ARGS ?=
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+E2E_VARIANT ?= default
 FOCUS ?=
-# number of parallel test
 E2E_NODES ?= 7
-# run e2e test suite with tests that check for memory leaks? (default is false)
 E2E_CHECK_LEAKS ?=
+SKIP_BUILD ?=
+BASE ?= origin/main
 
-REPO_INFO ?= $(shell git config --get remote.origin.url)
-COMMIT_SHA ?= git-$(shell git rev-parse --short HEAD)
-BUILD_ID ?= "UNSET"
+##@ General
 
-PKG = k8s.io/ingress-nginx
+.PHONY: help
+help: ## Show this help
+	@awk 'BEGIN { FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m [VAR=value ...]\n" } \
+		/^[a-zA-Z0-9_-]+:.*##/ { printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2 } \
+		/^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) }' $(MAKEFILE_LIST)
 
-HOST_ARCH = $(shell which go >/dev/null 2>&1 && go env GOARCH)
-ARCH ?= $(HOST_ARCH)
-ifeq ($(ARCH),)
-    $(error mandatory variable ARCH is empty, either set it when calling the command or make sure 'go env GOARCH' works)
-endif
+.PHONY: version
+version: ## Print VERSION, CHANNEL and derived IMAGE_TAG/CHART_VERSION/APP_VERSION/DOCS_VERSION
+	@printf '%-14s %s\n' VERSION '$(VERSION)' CHANNEL '$(CHANNEL)' IMAGE_TAG '$(IMAGE_TAG)' \
+		CHART_VERSION '$(CHART_VERSION)' APP_VERSION '$(APP_VERSION)' DOCS_VERSION '$(DOCS_VERSION)' \
+		GO_VERSION '$(GO_VERSION)' COMMIT '$(COMMIT)'
 
-ifneq ($(PLATFORM),)
-	PLATFORM_FLAG="--platform"
-endif
+.PHONY: tools
+tools: $(addprefix $(TOOLS_DIR)/,$(GO_TOOLS) actionlint ginkgo $(DOWNLOADED_TOOLS)) $(CERT_MANAGER_MANIFEST) ## Build/download all pinned tools into .cache/tools
 
-REGISTRY ?= ghcr.io/kuzmenko-pavel/ingress-nginx
+$(addprefix $(TOOLS_DIR)/,$(GO_TOOLS)): $(TOOLS_DIR)/%: tools/go.mod tools/go.sum
+	go -C tools build -o $@ $(TOOL_PKG_$*)
 
-BASE_IMAGE ?= $(shell hack/nginx-base-image.sh)
+$(ACTIONLINT): tools/actionlint/go.mod tools/actionlint/go.sum
+	go -C tools/actionlint build -o $@ github.com/rhysd/actionlint/cmd/actionlint
 
-GOARCH=$(ARCH)
+$(GINKGO): go.mod go.sum
+	go build -o $@ github.com/onsi/ginkgo/v2/ginkgo
 
-help:  ## Display this help
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+$(addprefix $(TOOLS_DIR)/,$(DOWNLOADED_TOOLS)): $(TOOLS_DIR)/%: tools/versions.env
+	tools/install.sh $* $(TOOLS_DIR)
+	touch $@
 
-.PHONY: image
-image: clean-image ## Build image for a particular arch.
-	echo "Building docker image ($(ARCH))..."
-	docker build \
-		${PLATFORM_FLAG} ${PLATFORM} \
-		--no-cache \
-		--build-arg BASE_IMAGE="$(BASE_IMAGE)" \
-		--build-arg VERSION="$(TAG)" \
-		--build-arg TARGETARCH="$(ARCH)" \
-		--build-arg COMMIT_SHA="$(COMMIT_SHA)" \
-		--build-arg BUILD_ID="$(BUILD_ID)" \
-		-t $(REGISTRY)/controller:$(TAG) rootfs
+$(CERT_MANAGER_MANIFEST): tools/versions.env
+	tools/install.sh cert-manager $(TOOLS_DIR)
+	touch $@
 
-.PHONY: gosec
-gosec:
-	docker run --rm -it -w /source/ -v "$(pwd)"/:/source securego/gosec:2.11.0 -exclude=G109,G601,G104,G204,G304,G306,G307 -tests=false -exclude-dir=test -exclude-dir=images/  -exclude-dir=docs/ /source/...
-
-.PHONY: image-chroot
-image-chroot: clean-chroot-image ## Build image for a particular arch.
-	echo "Building docker image ($(ARCH))..."
-	docker build \
-		--no-cache \
-		--build-arg BASE_IMAGE="$(BASE_IMAGE)" \
-		--build-arg VERSION="$(TAG)" \
-		--build-arg TARGETARCH="$(ARCH)" \
-		--build-arg COMMIT_SHA="$(COMMIT_SHA)" \
-		--build-arg BUILD_ID="$(BUILD_ID)" \
-		-t $(REGISTRY)/controller-chroot:$(TAG) rootfs -f rootfs/Dockerfile-chroot
-
-.PHONY: clean-image
-clean-image: ## Removes local image
-	echo "removing old image $(REGISTRY)/controller:$(TAG)"
-	@docker rmi -f $(REGISTRY)/controller:$(TAG) || true
-
-
-.PHONY: clean-chroot-image
-clean-chroot-image: ## Removes local image
-	echo "removing old image $(REGISTRY)/controller-chroot:$(TAG)"
-	@docker rmi -f $(REGISTRY)/controller-chroot:$(TAG) || true
-
-
-.PHONY: build
-build:  ## Build ingress controller, debug tool and pre-stop hook.
-	E2E_IMAGE=golang:$(GO_VERSION)-alpine3.23 USE_SHELL=/bin/sh build/run-in-docker.sh \
-		MAC_OS=$(MAC_OS) \
-		PKG=$(PKG) \
-		ARCH=$(ARCH) \
-		COMMIT_SHA=$(COMMIT_SHA) \
-		REPO_INFO=$(REPO_INFO) \
-		TAG=$(TAG) \
-		build/build.sh
-
+$(DOCS_VENV)/bin/mkdocs: docs/requirements.txt
+	python3 -m venv $(DOCS_VENV)
+	$(DOCS_VENV)/bin/pip install --quiet --require-virtualenv -r docs/requirements.txt
+	touch $@
 
 .PHONY: clean
-clean: ## Remove .gocache directory.
-	rm -rf bin/ .gocache/ .cache/
+clean: ## Remove dist/, build outputs and local images built by this Makefile
+	rm -rf $(DIST) rootfs/bin site test/e2e/e2e.test test/junitreports
+	-docker image rm --force $(foreach i,controller controller-chroot kube-webhook-certgen custom-error-pages,$(REGISTRY)/$(i):$(IMAGE_TAG)) $(E2E_IMAGE) 2>/dev/null
 
-.PHONY: verify-docs
-verify-docs: ## Verify doc generation
-	hack/verify-annotation-docs.sh
+.PHONY: check
+check: code-lint test-unit test-unit-lua docs-verify helm-docs-verify helm-lint helm-test ## Fast local checks: code-lint test-unit test-unit-lua docs-verify helm-docs-verify helm-lint helm-test
 
-###############################
-# Tests for ingress-nginx
-###############################
+.PHONY: print-k8s-versions
+print-k8s-versions:
+	@printf '%s\n' $(K8S_VERSIONS) | jq -R . | jq -cs .
 
-.PHONY: test
-test:  ## Run go unit tests.
-	@build/run-in-docker.sh \
-		PKG=$(PKG) \
-		MAC_OS=$(MAC_OS) \
-		ARCH=$(ARCH) \
-		COMMIT_SHA=$(COMMIT_SHA) \
-		REPO_INFO=$(REPO_INFO) \
-		TAG=$(TAG) \
-		GOFLAGS="-buildvcs=false" \
-		test/test.sh
+.PHONY: print-deps-platforms
+print-deps-platforms:
+	@jq -cn '[{arch: "amd64", platform: "linux/amd64", runner: "ubuntu-latest"}, {arch: "arm64", platform: "linux/arm64", runner: "ubuntu-24.04-arm"}]'
+
+.PHONY: print-%
+print-%:
+	@echo '$($*)'
+
+##@ Code
+
+.PHONY: code-fmt
+code-fmt: $(GOLANGCI_LINT) ## Format Go code
+	$(GOLANGCI_LINT) fmt
+
+.PHONY: code-lint
+code-lint: $(GOLANGCI_LINT) $(ACTIONLINT) deps-runner ## golangci-lint, luacheck, actionlint
+	$(GOLANGCI_LINT) run
+	tools/run-in-container.sh $(RUNNER_IMAGE) tools/lint-lua.sh
+	$(ACTIONLINT)
+
+.PHONY: code-lint-commits
+code-lint-commits: ## Check Conventional Commits in BASE..HEAD (BASE ?= origin/main)
+	tools/lint-commits.sh '$(BASE)'
+
+.PHONY: code-build
+code-build: ## Build controller, dbg, wait-shutdown (GOOS=linux, ARCH) into rootfs/bin/$(ARCH)
+	for cmd in nginx:nginx-ingress-controller dbg:dbg waitshutdown:wait-shutdown; do \
+		GOOS=linux GOARCH=$(ARCH) CGO_ENABLED=0 go build -trimpath -buildvcs=false \
+			-ldflags '-buildid= -s -w $(VERSION_LDFLAGS)' \
+			-o rootfs/bin/$(ARCH)/$${cmd#*:} ./cmd/$${cmd%%:*}; \
+	done
+
+VERSION_LDFLAGS = -X $(GO_PACKAGE)/version.RELEASE=$(VERSION) -X $(GO_PACKAGE)/version.COMMIT=$(COMMIT) -X $(GO_PACKAGE)/version.REPO=$(REPO_URL)
+
+##@ Test
+
+.PHONY: test-unit
+test-unit: deps-runner ## Go unit tests: root module (excluding test/e2e, images, docs/examples) + images/{kube-webhook-certgen,custom-error-pages,fastcgi-helloserver}/rootfs
+	tools/run-in-container.sh $(RUNNER_IMAGE) test/test.sh
+
+.PHONY: test-unit-lua
+test-unit-lua: deps-runner ## Lua unit tests inside e2e-test-runner
+	tools/run-in-container.sh $(RUNNER_IMAGE) test/test-lua.sh
+
+##@ Images
+
+.PHONY: docker-build-deps
+docker-build-deps: ## Ensure every dependency image src-* (DEPS ?= nginx e2e-test-runner e2e-test-echo httpbun fastcgi-helloserver cfssl): pull if published, otherwise build for the host platform, in dependency order
+	for dep in $(filter $(DEPS),$(DEPS_ALL)); do \
+		$(MAKE) --no-print-directory deps-ensure-$$dep; \
+	done
+
+# Make a dependency image available locally: present, pulled or built.
+deps-ensure-%:
+	image='$(DEP_IMAGE_$*)'; \
+	if docker image inspect "$$image" >/dev/null 2>&1; then \
+		echo "$$image: present"; \
+	elif tools/image-exists.sh "$$image" $(PLATFORM); then \
+		docker pull --platform $(PLATFORM) "$$image"; \
+	else \
+		rc=$$?; [[ $$rc -eq 1 || $$rc -eq 3 ]] || exit $$rc; \
+		$(MAKE) --no-print-directory deps-build-$*; \
+	fi
+
+# Build one dependency image for the host platform into the local image store.
+deps-build-%:
+	$(if $(filter $*,$(DEPS_ON_BASE)),$(MAKE) --no-print-directory deps-ensure-nginx)
+	docker buildx build --builder default --load \
+		--platform $(PLATFORM) \
+		$(call dep-build-args,$*) \
+		--tag $(DEP_IMAGE_$*) \
+		$(DEP_DIR_$*)/rootfs
+
+dep-build-args = \
+	$(DEP_ARGS_$(1)) \
+	$(if $(filter $(1),$(DEPS_ON_BASE)),--build-arg BASE_IMAGE=$(or $(DEP_BASE_IMAGE),$(BASE_IMAGE))) \
+	$(if $(wildcard $(DEP_DIR_$(1))/build-args.env),$(foreach a,$(shell grep -Ev '^[[:space:]]*(\#|$$)' $(DEP_DIR_$(1))/build-args.env),--build-arg $(a))) \
+	--label org.opencontainers.image.source=$(REPO_URL) \
+	--label org.opencontainers.image.revision=$(COMMIT) \
+	--label org.opencontainers.image.licenses=Apache-2.0 \
+	--label org.opencontainers.image.title=$(1) \
+	--label org.opencontainers.image.version=$(notdir $(subst :,/,$(DEP_IMAGE_$(1))))
+
+# The runner image backs code-lint, test-unit and test-unit-lua.
+.PHONY: deps-runner
+deps-runner:
+	$(MAKE) --no-print-directory docker-build-deps DEPS=e2e-test-runner
+
+SAVE ?= deps controller controller-chroot kube-webhook-certgen e2e
+SAVE_IMAGES_deps = $(foreach d,$(DEPS),$(DEP_IMAGE_$(d)))
+SAVE_IMAGES_controller = $(CONTROLLER_IMAGE):$(IMAGE_TAG)
+SAVE_IMAGES_controller-chroot = $(CONTROLLER_IMAGE)-chroot:$(IMAGE_TAG)
+SAVE_IMAGES_kube-webhook-certgen = $(CERTGEN_IMAGE):$(IMAGE_TAG)
+SAVE_IMAGES_custom-error-pages = $(ERROR_PAGES_IMAGE):$(IMAGE_TAG)
+SAVE_IMAGES_e2e = $(E2E_IMAGE)
+
+.PHONY: docker-save
+docker-save: ## Save images listed by SAVE ?= (default: everything e2e needs) into dist/images-<name>.tar
+	mkdir -p $(DIST)
+	$(foreach s,$(SAVE),docker save --output $(DIST)/images-$(s).tar $(SAVE_IMAGES_$(s));)
+
+.PHONY: docker-load
+docker-load: ## Load dist/images-*.tar
+	for f in $(wildcard $(DIST)/images-*.tar); do docker load --input "$$f"; done
+
+##@ Helm
+
+STAGED_CHART := $(DIST)/chart/$(CHART_NAME)
+CHART_PACKAGE := $(DIST)/$(CHART_NAME)-$(CHART_VERSION).tgz
+
+# Copy the chart into dist/chart and set its version; the source chart is
+# never modified.
+.PHONY: helm-stage
+helm-stage: $(YQ)
+	rm -rf $(STAGED_CHART)
+	mkdir -p $(dir $(STAGED_CHART))
+	cp -R $(CHART_DIR) $(STAGED_CHART)
+	rm -rf $(STAGED_CHART)/tests
+	$(YQ) -i '.version = "$(CHART_VERSION)" | .appVersion = "$(APP_VERSION)"' $(STAGED_CHART)/Chart.yaml
+
+.PHONY: helm-lint
+helm-lint: helm-stage $(HELM) $(KUBECONFORM) ## helm lint --strict + kubeconform on the staged chart for every ci values file
+	for values in $(STAGED_CHART)/ci/*-values.yaml; do \
+		echo "--- $$values"; \
+		$(HELM_ENV) $(HELM) lint --strict --values "$$values" $(STAGED_CHART); \
+		$(HELM_ENV) $(HELM) template $(RELEASE_NAME) $(STAGED_CHART) --namespace $(NAMESPACE) \
+			--kube-version $(K8S_MINOR) --values "$$values" | \
+			$(KUBECONFORM) -strict -ignore-missing-schemas -summary -kubernetes-version $(K8S_MINOR).0; \
+	done
 
 .PHONY: helm-test
-helm-test: ## Run helm unit tests.
-	helm unittest charts/ingress-nginx --file "tests/**/*_test.yaml"
+helm-test: $(HELM_UNITTEST) ## helm-unittest
+	$(HELM_UNITTEST) --file 'tests/**/*_test.yaml' $(CHART_DIR)
 
-.PHONY: lua-test
-lua-test: ## Run lua unit tests.
-	@build/run-in-docker.sh \
-		MAC_OS=$(MAC_OS) \
-		test/test-lua.sh
+.PHONY: helm-template
+helm-template: helm-stage $(HELM) ## Render the staged chart into dist/rendered/
+	mkdir -p $(DIST)/rendered
+	$(HELM_ENV) $(HELM) template $(RELEASE_NAME) $(STAGED_CHART) --namespace $(NAMESPACE) \
+		--kube-version $(K8S_MINOR) > $(DIST)/rendered/$(CHART_NAME).yaml
+	@echo "rendered $(DIST)/rendered/$(CHART_NAME).yaml"
 
-.PHONY: e2e-test
-e2e-test:  ## Run e2e tests (expects access to a working Kubernetes cluster).
-	@test/e2e/run-e2e-suite.sh
+.PHONY: helm-docs-generate
+helm-docs-generate: $(HELM_DOCS) ## Regenerate charts/ingress-nginx-neo/README.md
+	$(HELM_DOCS) --chart-search-root charts
 
-.PHONY: kind-e2e-test
-kind-e2e-test:  ## Run e2e tests using kind.
-	@test/e2e/run-kind-e2e.sh
+.PHONY: helm-docs-verify
+helm-docs-verify: helm-docs-generate ## Fail if the chart README is stale
+	git diff --exit-code -- $(CHART_DIR)/README.md || \
+		{ echo "$(CHART_DIR)/README.md is stale: run make helm-docs-generate" >&2; exit 1; }
 
-.PHONY: kind-e2e-chart-tests
-kind-e2e-chart-tests: ## Run helm chart e2e tests
-	@test/e2e/run-chart-test.sh
+##@ Docs
 
-.PHONY: e2e-test-binary
-e2e-test-binary:  ## Build binary for e2e tests.
-	@build/run-in-docker.sh \
-		MAC_OS=$(MAC_OS) \
-		ginkgo build ./test/e2e
+.PHONY: docs-generate
+docs-generate: ## Regenerate annotations-risk.md and cli-arguments.md
+	go run ./cmd/annotations -output docs/user-guide/nginx-configuration/annotations-risk.md
 
-.PHONY: vet
-vet:
-	@go vet $(shell go list ${PKG}/internal/... | grep -v vendor)
+.PHONY: docs-verify
+docs-verify: docs-generate ## Fail if generated docs are stale
+	git diff --exit-code -- docs/ || \
+		{ echo "generated docs are stale: run make docs-generate" >&2; exit 1; }
 
-.PHONY: dev-env
-dev-env:  ## Starts a local Kubernetes cluster using kind, building and deploying the ingress controller.
-	@build/dev-env.sh
+.PHONY: docs-build
+docs-build: $(DOCS_VENV)/bin/mkdocs ## mkdocs build --strict
+	$(DOCS_VENV)/bin/mkdocs build --strict --site-dir $(DIST)/site
 
-.PHONY: dev-env-stop
-dev-env-stop: ## Deletes local Kubernetes cluster created by kind.
-	@kind delete cluster --name ingress-nginx-dev
+.PHONY: docs-serve
+docs-serve: $(DOCS_VENV)/bin/mkdocs ## Serve the site locally with live reload
+	$(DOCS_VENV)/bin/mkdocs serve
 
+##@ Security
 
+.PHONY: security-dependency-scan
+security-dependency-scan: $(GOVULNCHECK) ## govulncheck for all Go modules
+	$(GOVULNCHECK) ./...
+	for mod in $(GO_IMAGE_MODULES); do (cd "$$mod" && $(GOVULNCHECK) ./...); done
 
-.PHONY: live-docs
-live-docs: ## Build and launch a local copy of the documentation website in http://localhost:8000
-	@docker build ${PLATFORM_FLAG} ${PLATFORM} \
-                  		--no-cache \
-                  		 -t ingress-nginx-docs .github/actions/mkdocs
-	@docker run ${PLATFORM_FLAG} ${PLATFORM} --rm -it \
-		-p 8000:8000 \
-		-v ${PWD}:/docs \
-		--entrypoint /bin/bash   \
-		ingress-nginx-docs \
-		-c "pip install -r /docs/docs/requirements.txt && mkdocs serve --dev-addr=0.0.0.0:8000"
-
-.PHONY: misspell
-misspell:  ## Check for spelling errors.
-	@go install github.com/client9/misspell/cmd/misspell@latest
-	misspell \
-		-locale US \
-		-error \
-		cmd/* internal/* deploy/* docs/* design/* test/* README.md
-
-.PHONY: builder
-builder:
-	docker buildx create --name $(BUILDER) --bootstrap --use || :
-	docker buildx inspect $(BUILDER)
-
-.PHONY: show-version
-show-version:
-	echo -n $(TAG)
-
-BUILDER ?= ingress-nginx
-# Local default: amd64 only. The release workflow builds amd64 + arm64, e.g.:
-#   make release PLATFORMS="amd64 arm64" BUILDX_PLATFORMS=linux/amd64,linux/arm64
-# The base image (BASE_IMAGE) must be published for every requested platform.
-PLATFORMS ?= amd64
-BUILDX_PLATFORMS ?= linux/amd64
-# Extra docker buildx flags for release builds (e.g. "--sbom=true --provenance=mode=max").
-BUILDX_ARGS ?=
-
-.PHONY: release # Build a multi-arch docker image
-release: builder clean
-	echo "Building binaries..."
-	$(foreach PLATFORM,$(PLATFORMS), echo -n "$(PLATFORM)..."; ARCH=$(PLATFORM) make build;)
-
-	echo "Building and pushing ingress-nginx image...$(BUILDX_PLATFORMS)"
-
-	docker buildx build \
-		--no-cache \
-		$(MAC_DOCKER_FLAGS) \
-		--push \
-		--pull \
-		--progress plain \
-		--platform $(BUILDX_PLATFORMS) \
-		$(BUILDX_ARGS) \
-		--build-arg BASE_IMAGE="$(BASE_IMAGE)" \
-		--build-arg VERSION="$(TAG)" \
-		--build-arg COMMIT_SHA="$(COMMIT_SHA)" \
-		--build-arg BUILD_ID="$(BUILD_ID)" \
-		-t $(REGISTRY)/controller:$(TAG) rootfs
-
-	docker buildx build \
-		--no-cache \
-		$(MAC_DOCKER_FLAGS) \
-		--push \
-		--pull \
-		--progress plain \
-		--platform $(BUILDX_PLATFORMS) \
-		$(BUILDX_ARGS) \
-		--build-arg BASE_IMAGE="$(BASE_IMAGE)" \
-		--build-arg VERSION="$(TAG)" \
-		--build-arg COMMIT_SHA="$(COMMIT_SHA)" \
-		--build-arg BUILD_ID="$(BUILD_ID)" \
-		-t $(REGISTRY)/controller-chroot:$(TAG) rootfs -f rootfs/Dockerfile-chroot
-
-.PHONY: build-docs
-build-docs:
-	pip install -r docs/requirements.txt
-	mkdocs build --config-file mkdocs.yml
+GO_IMAGE_MODULES := images/kube-webhook-certgen/rootfs images/custom-error-pages/rootfs images/fastcgi-helloserver/rootfs

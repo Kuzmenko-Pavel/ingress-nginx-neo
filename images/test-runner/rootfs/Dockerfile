@@ -11,28 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 ARG BASE_IMAGE
 ARG GOLANG_VERSION
-ARG ETCD_VERSION
+ARG ETCD_IMAGE
 
 FROM golang:${GOLANG_VERSION}-alpine3.23 AS go
-FROM registry.k8s.io/etcd:${ETCD_VERSION} AS etcd
+FROM ${ETCD_IMAGE} AS etcd
 
 FROM ${BASE_IMAGE}
 
+ARG TARGETARCH
+ARG GINKGO_VERSION
+ARG HELM_VERSION
+ARG K8S_RELEASE
+ARG KUBECTL_SHA256_amd64
+ARG KUBECTL_SHA256_arm64
+ARG KUBE_APISERVER_SHA256_amd64
+ARG KUBE_APISERVER_SHA256_arm64
 ARG RESTY_CLI_VERSION
 ARG RESTY_CLI_SHA
 ARG LUAROCKS_VERSION
 ARG LUAROCKS_SHA
-ARG TARGETARCH
-ARG K8S_RELEASE
-ARG CHART_TESTING_VERSION
-ARG HELM_VERSION
-ARG YAMALE_VERSION
-ARG YAML_LINT_VERSION
-ARG GINKGO_VERSION
-ARG GOLINT_VERSION
-
+ARG BUSTED_VERSION
+ARG LUACHECK_VERSION
+ARG LJ_RELENG_COMMIT
+ARG LJ_RELENG_SHA
 
 RUN set -eux; \
 	if [ -e /etc/nsswitch.conf ]; then \
@@ -46,9 +50,8 @@ ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 
+# etcd and kube-apiserver back the envtest-based unit tests.
 COPY --from=etcd /usr/local/bin/etcd /usr/local/bin/etcd
-
-RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
 
 RUN apk update && apk upgrade && apk add --no-cache \
   bash \
@@ -59,18 +62,16 @@ RUN apk update && apk upgrade && apk add --no-cache \
   git \
   musl-dev \
   perl \
-  python3 \
-  py-crcmod \
-  py-pip \
   unzip \
   openssl \
-  cfssl@testing \
   tzdata \
   libc6-compat \
   sqlite-dev
 
-RUN go install -v github.com/onsi/ginkgo/v2/ginkgo@v${GINKGO_VERSION} \
-    && go install golang.org/x/lint/golint@${GOLINT_VERSION}
+RUN go install github.com/onsi/ginkgo/v2/ginkgo@${GINKGO_VERSION} \
+  && go install helm.sh/helm/v4/cmd/helm@${HELM_VERSION} \
+  && mv /go/bin/helm /usr/local/bin/helm \
+  && rm -rf /root/.cache /go/pkg
 
 RUN wget -qO /tmp/resty_cli.tgz \
   https://github.com/openresty/resty-cli/archive/v${RESTY_CLI_VERSION}.tar.gz \
@@ -86,56 +87,27 @@ RUN wget -qO /tmp/luarocks.tgz \
   && tar -C /tmp -xzf /tmp/luarocks.tgz \
   && cd /tmp/luarocks* \
   && ./configure \
-  && make install
-
-RUN  luarocks install busted \
-  && luarocks install luacheck
-
-RUN wget -qO /usr/local/bin/kubectl \
-  https://dl.k8s.io/release/${K8S_RELEASE}/bin/linux/${TARGETARCH}/kubectl \
-  && chmod +x /usr/local/bin/kubectl
-
-RUN wget -qO /usr/local/bin/kube-apiserver \
-  https://dl.k8s.io/release/${K8S_RELEASE}/bin/linux/${TARGETARCH}/kube-apiserver \
-  && chmod +x /usr/local/bin/kube-apiserver
-
-RUN wget -qO /tmp/ct-${CHART_TESTING_VERSION}-linux-${TARGETARCH}.tar.gz \
-  https://github.com/helm/chart-testing/releases/download/v${CHART_TESTING_VERSION}/chart-testing_${CHART_TESTING_VERSION}_linux_${TARGETARCH}.tar.gz \
-  && mkdir -p /tmp/ct-download \
-  && tar xzvf /tmp/ct-${CHART_TESTING_VERSION}-linux-${TARGETARCH}.tar.gz -C /tmp/ct-download \
-  && rm /tmp/ct-${CHART_TESTING_VERSION}-linux-${TARGETARCH}.tar.gz \
-  && cp /tmp/ct-download/ct /usr/local/bin \
-  && mkdir -p /etc/ct \
-  && cp -R /tmp/ct-download/etc/* /etc/ct \
+  && make install \
   && rm -rf /tmp/*
+
+RUN luarocks install busted ${BUSTED_VERSION} \
+  && luarocks install luacheck ${LUACHECK_VERSION}
 
 RUN wget -qO /usr/local/bin/lj-releng \
-  https://raw.githubusercontent.com/openresty/openresty-devel-utils/master/lj-releng \
+  https://raw.githubusercontent.com/openresty/openresty-devel-utils/${LJ_RELENG_COMMIT}/lj-releng \
+  && echo "${LJ_RELENG_SHA} */usr/local/bin/lj-releng" | sha256sum -c - \
   && chmod +x /usr/local/bin/lj-releng
 
+RUN for bin in kubectl kube-apiserver; do \
+    var="$(echo "${bin}" | tr 'a-z-' 'A-Z_')_SHA256_${TARGETARCH}"; \
+    eval "sha=\${${var}}"; \
+    wget -qO /usr/local/bin/${bin} https://dl.k8s.io/release/${K8S_RELEASE}/bin/linux/${TARGETARCH}/${bin} \
+    && echo "${sha} */usr/local/bin/${bin}" | sha256sum -c - \
+    && chmod +x /usr/local/bin/${bin} || exit 1; \
+  done
 
-RUN wget -qO /tmp/helm.tgz \
-  https://get.helm.sh/helm-v${HELM_VERSION}-linux-${TARGETARCH}.tar.gz \
-  && tar -C /tmp -xzf /tmp/helm.tgz \
-  && cp /tmp/linux*/helm /usr/local/bin \
-  && rm -rf /tmp/*
-
-# Install a YAML Linter
-# Pip not working. Check PR https://github.com/kubernetes/ingress-nginx/pull/10874
-# RUN pip install --user "yamllint==$YAML_LINT_VERSION"
-RUN apk update -U \
-    && apk add yamllint \
-    && yamllint --version
-
-# Install Yamale YAML schema validator
-# Commenting pip install yamale because broken cloudbuild https://github.com/kubernetes/ingress-nginx/pull/10885
-# RUN pip install --user "yamale==$YAMALE_VERSION"
-RUN wget https://github.com/23andMe/Yamale/archive/master.zip \
-    && unzip -d /tmp master.zip \
-    && cd /tmp/Yamale-master \
-    && python setup.py install \
-    && yamale -V
-
-LABEL org.opencontainers.image.source=https://github.com/kubernetes/ingress-nginx
+LABEL org.opencontainers.image.source=https://github.com/Kuzmenko-Pavel/ingress-nginx-neo
+LABEL org.opencontainers.image.description="ingress-nginx-neo e2e and Lua test runner"
+LABEL org.opencontainers.image.licenses=Apache-2.0
 
 WORKDIR $GOPATH
