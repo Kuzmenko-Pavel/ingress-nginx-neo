@@ -90,7 +90,8 @@ k6 -> node port 80/443 -> controller pod: NGINX (base image, patches, TLS),
 
 The backends are `e2e-test-echo` (`load.local`, NGINX with Lua, faster than the controller, so that
 the controller is the measured component) and `httpbun` (`errors.load.local`, whose 404 and 503
-responses the controller replaces with pages of the default backend).
+responses the controller replaces with pages of the default backend). Both hosts answer HTTP and HTTPS
+without a redirect, so `PROTOCOL` selects what is measured.
 
 ```console
 make dev-env-up
@@ -119,7 +120,7 @@ requests below 1% (0.1% for `reload` and `soak`), `p(95)` below `P95_MS` (500), 
 Parameters (make variables or environment): `LOAD_SCENARIO`, `PROTOCOL` (`http`, `https`), `RATE`,
 `DURATION`, `BODY_SIZE` (bytes of a POST body, 0 sends GET), `REUSE` (`false` opens a connection
 per request), `P95_MS`, `P99_MS`, `MAX_VUS` (concurrent requests, 2000), `CHURN_INTERVAL` (10),
-`SAMPLE_INTERVAL` (10), `WARMUP` (60), `MEM_GROWTH_MAX_PCT`.
+`SAMPLE_INTERVAL` (10), `WARMUP` (seconds; 60 for `soak`, 10 otherwise), `MEM_GROWTH_MAX_PCT`.
 
 ### Memory and CPU
 

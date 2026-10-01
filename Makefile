@@ -883,6 +883,7 @@ LOAD_SCENARIO ?= steady
 PROTOCOL ?= http
 RATE ?= 500
 DURATION ?= $(if $(filter soak,$(LOAD_SCENARIO)),30m,1m)
+WARMUP ?= $(if $(filter soak,$(LOAD_SCENARIO)),60,10)
 
 .PHONY: test-load
 ## k6 load test of the dev environment, memory and CPU of the controller (LOAD_SCENARIO: steady, limit, reload, soak, default-backend; PROTOCOL, RATE, DURATION).
@@ -896,7 +897,7 @@ test-load: $(KIND) $(KUBECTL)
 	KIND=$(KIND) KUBECTL=$(KUBECTL) KIND_CLUSTER_NAME=$(DEV_KIND_CLUSTER) \
 	NAMESPACE=$(NAMESPACE) RELEASE_NAME=$(RELEASE_NAME) \
 	ECHO_IMAGE=$(ECHO_IMAGE) HTTPBUN_IMAGE=$(HTTPBUN_IMAGE) K6_IMAGE=$(K6_IMAGE) OUT_DIR=$(DIST)/load \
-	LOAD_SCENARIO=$(LOAD_SCENARIO) PROTOCOL=$(PROTOCOL) RATE=$(RATE) DURATION=$(DURATION) \
+	LOAD_SCENARIO=$(LOAD_SCENARIO) PROTOCOL=$(PROTOCOL) RATE=$(RATE) DURATION=$(DURATION) WARMUP=$(WARMUP) \
 		tools/load-test.sh
 
 

@@ -5,6 +5,8 @@
 #
 # - load.local: e2e-test-echo (NGINX with Lua), faster than the controller,
 #   so that the controller is the measured component.
+# Both hosts serve HTTP and HTTPS without a redirect, so PROTOCOL selects what
+# is measured.
 # - errors.load.local: httpbun answers /status/<code>; the controller
 #   intercepts 404 and 503 and serves the page of the default backend
 #   (custom-error-pages).
@@ -58,6 +60,8 @@ kind: Ingress
 metadata:
   name: echo
   namespace: ingress-nginx-neo-load
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   ingressClassName: nginx
   tls:
@@ -121,6 +125,7 @@ metadata:
   namespace: ingress-nginx-neo-load
   annotations:
     nginx.ingress.kubernetes.io/custom-http-errors: "404,503"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   ingressClassName: nginx
   tls:
