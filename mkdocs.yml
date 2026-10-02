@@ -63,6 +63,9 @@ theme:
 plugins:
   - search
 
+hooks:
+  - tools/docs/release_version.py
+
 extra:
   version:
     provider: mike

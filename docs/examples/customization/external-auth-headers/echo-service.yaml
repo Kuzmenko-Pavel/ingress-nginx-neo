@@ -1,4 +1,4 @@
-# <version>: a release version, see https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases
+# RELEASE_VERSION: a release version vX.Y.Z, see https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,7 +19,7 @@ spec:
       terminationGracePeriodSeconds: 60
       containers:
       - name: echo-service
-        image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo:<version>
+        image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo:RELEASE_VERSION
         ports:
         - containerPort: 80
         resources:

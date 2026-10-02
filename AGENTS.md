@@ -40,7 +40,8 @@ make docs-serve  # documentation with live reload
 The release tag `vX.Y.Z` is the only version source. Images, chart, plugin, manifests and docs take
 their version from it; the Makefile derives tags from `VERSION` and `CHANNEL`. Never write versions
 into files (Chart.yaml stays `0.0.0-latest`/`latest`, image tags in values.yaml stay empty).
-Dependency images are content addressed (`src-<hash>`) and need no version bumps.
+Dependency images are content addressed (`src-<hash>`) and need no version bumps. Docs write the
+release as `<version>` (inside code); the build substitutes it (`docs/developer-guide/release.md`).
 
 ## Rules
 

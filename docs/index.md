@@ -27,8 +27,8 @@ Chart, image and resource names are specific to ingress-nginx-neo. See
 
 ## Quick start
 
-Install the Helm chart from the OCI registry. Replace `<version>` with a version from the
-[releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases):
+Install the release `<version>` of the Helm chart from the OCI registry (other versions are on the
+[releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases)):
 
 ```console
 helm install ingress-nginx-neo oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \

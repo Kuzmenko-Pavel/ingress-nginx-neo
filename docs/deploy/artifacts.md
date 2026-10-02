@@ -2,7 +2,8 @@
 
 Every ingress-nginx-neo release publishes container images and a Helm chart to the GitHub Container Registry
 (`ghcr.io`) and attaches static manifests, the kubectl plugin and checksum files to the GitHub release. All
-artifacts of a release share one version `vX.Y.Z`; the chart version is the same number without the `v` prefix.
+artifacts of a release share one version `vX.Y.Z`. The chart is stored with the same number without the `v` prefix
+(`X.Y.Z`, as SemVer requires); Helm accepts `vX.Y.Z` as `--version`.
 Releases are listed on the [releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases).
 
 ## Artifacts
@@ -42,9 +43,8 @@ Build and test images, published under the same prefix and also tagged with each
 | krew manifest | release asset `ingress-nginx-neo.yaml` |
 
 Release assets are downloaded from
-`https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/<file>`, where `<version>` is the
-release tag `vX.Y.Z`. See [Installation](./index.md) for the manifests and [kubectl plugin](../kubectl-plugin.md)
-for the plugin.
+`https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/<file>`. See
+[Installation](./index.md) for the manifests and [kubectl plugin](../kubectl-plugin.md) for the plugin.
 
 ## Tags and digests
 
@@ -81,11 +81,11 @@ release notes or from the running pod.
 
 ### Helm chart
 
-The chart is verified like an image, with the chart version (`X.Y.Z`) as the tag and the release tag (`vX.Y.Z`) in
-the identity:
+The chart is verified like an image. Its tag is the version without the `v` prefix, the identity has the release tag:
 
 ```console
-cosign verify ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo:<chart version> \
+VERSION=<version>
+cosign verify ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo:${VERSION#v} \
   --certificate-identity-regexp '^https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/\.github/workflows/release\.yaml@refs/tags/<version>$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```

@@ -16,7 +16,6 @@ The `ghcr.io/kuzmenko-pavel/ingress-nginx-neo/fastcgi-helloserver` image is a mi
 that listens on port `9000` and answers the path `/hello` with `Hello world!` (or `Hello <name>!` for `?name=<name>`).
 
 ```yaml
-# <version>: a release version, see https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases
 apiVersion: apps/v1
 kind: Deployment
 metadata:

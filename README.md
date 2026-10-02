@@ -32,11 +32,10 @@ Releases are listed on <https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/rele
 release publishes signed images for `linux/amd64` and `linux/arm64` and a Helm chart that pins them
 by digest.
 
-Helm (OCI):
+The commands below install the latest release. Helm (OCI), pin a release with `--version vX.Y.Z`:
 
 ```console
 helm install ingress-nginx-neo oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \
-  --version <version> \
   --namespace ingress-nginx-neo --create-namespace
 ```
 
@@ -44,13 +43,13 @@ Static manifests, one per provider (`aws`, `aws-nlb-with-tls-termination`, `bare
 `do`, `exoscale`, `kind`, `oracle`, `scw`), are release assets:
 
 ```console
-kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-cloud.yaml
+kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/latest/download/deploy-cloud.yaml
 ```
 
 kubectl plugin:
 
 ```console
-kubectl krew install --manifest-url=https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/ingress-nginx-neo.yaml
+kubectl krew install --manifest-url=https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/latest/download/ingress-nginx-neo.yaml
 kubectl ingress-nginx-neo --help
 ```
 

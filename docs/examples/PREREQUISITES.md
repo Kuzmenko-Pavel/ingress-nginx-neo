@@ -63,13 +63,11 @@ All examples that require a test HTTP Service use the standard http-svc Deployme
 which listens on port `80` and replies with the details of the request it received (pod information, method, path,
 query, headers and body).
 
-Set `VERSION` to a release version (see the [releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases))
-and deploy it as follows:
+Deploy it with the image of the release `<version>`:
 
 ```console
-$ VERSION=<version>
 $ curl -sL https://raw.githubusercontent.com/Kuzmenko-Pavel/ingress-nginx-neo/main/docs/examples/http-svc.yaml \
-    | sed "s/<version>/${VERSION}/" | kubectl apply -f -
+    | sed "s/RELEASE_VERSION/<version>/" | kubectl apply -f -
 deployment.apps/http-svc created
 service/http-svc created
 

@@ -16,6 +16,7 @@ The Makefile derives everything from `VERSION` and `CHANNEL` once per run:
 | chart version | `0.0.0-dev` | `0.0.0-latest` | `X.Y.Z` |
 | chart `appVersion` | `dev` | `latest` | `vX.Y.Z` |
 | docs version | — | `latest` | `X.Y` |
+| `<version>` in the docs pages | highest published release | highest published release | `vX.Y.Z` |
 | image digests pinned in the chart | no | no | yes |
 | cosign signature, SBOM, provenance | no | yes | yes |
 
@@ -23,6 +24,12 @@ The Makefile derives everything from `VERSION` and `CHANNEL` once per run:
 make version
 make version CHANNEL=release VERSION=vX.Y.Z
 ```
+
+Documentation pages write the release as the placeholder `<version>`, always inside code. The MkDocs hook
+`tools/docs/release_version.py` replaces it with `DOCS_RELEASE_TAG`, which the Makefile sets from the row
+above; before the first release the placeholder stays. `make docs-build` runs the unit tests of the hook.
+Example manifests under `docs/examples` use the placeholder `RELEASE_VERSION`, replaced by the `sed`
+commands of their pages.
 
 `charts/ingress-nginx-neo/Chart.yaml` carries `version: 0.0.0-latest` and `appVersion: latest`, and
 `values.yaml` leaves image tags and digests empty: image tags default to the chart `appVersion`.

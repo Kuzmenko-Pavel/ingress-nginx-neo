@@ -16,7 +16,7 @@ Snippet annotations are disabled by default: the ConfigMap key [`allow-snippet-a
 Question - How can I easily install multiple instances of the controller in the same cluster?
 
 You can install them in different namespaces, each with its own IngressClass. With Helm (see
-[Installation](./deploy/index.md) for the `<version>` to use):
+[Installation](./deploy/index.md)):
 
 ```
 helm install ingress-nginx-neo-2 oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \

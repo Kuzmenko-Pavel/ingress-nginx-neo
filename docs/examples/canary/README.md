@@ -5,8 +5,7 @@ annotations, the following is an example of how to configure a canary
 deployment with weighted canary routing.
 
 Both deployments use the echo server image `ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo`, which replies with
-the name of the pod that served the request. Set `VERSION` to a release version
-(see the [releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases)) before running the commands below:
+the name of the pod that served the request. Set `VERSION` to the release before running the commands below:
 
 ```bash
 VERSION=<version>
