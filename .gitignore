@@ -22,6 +22,7 @@ test/e2e/e2e.test
 test/junitreports/
 images/fastcgi-helloserver/rootfs/fastcgi-helloserver
 charts/*/tests/__snapshot__/
+__pycache__/
 
 # Local agent settings
 .claude/settings.local.json
