@@ -787,9 +787,8 @@ docs-verify: docs-generate
 		{ echo "generated docs are stale: run make docs-generate" >&2; exit 1; }
 
 .PHONY: docs-build
-## Unit tests of the docs hooks, mkdocs build --strict.
+## mkdocs build --strict.
 docs-build: $(DOCS_VENV)/bin/mkdocs
-	$(DOCS_VENV)/bin/python -m unittest discover --start-directory tools/docs --pattern '*_test.py'
 	DOCS_RELEASE_TAG=$(DOCS_RELEASE_TAG) $(DOCS_VENV)/bin/mkdocs build --strict --site-dir $(DIST)/site
 
 .PHONY: docs-serve

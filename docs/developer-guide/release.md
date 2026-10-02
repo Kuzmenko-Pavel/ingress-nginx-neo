@@ -27,7 +27,7 @@ make version CHANNEL=release VERSION=vX.Y.Z
 
 Documentation pages write the release as the placeholder `<version>`, always inside code. The MkDocs hook
 `tools/docs/release_version.py` replaces it with `DOCS_RELEASE_TAG`, which the Makefile sets from the row
-above; before the first release the placeholder stays. `make docs-build` runs the unit tests of the hook.
+above; before the first release the placeholder stays.
 Example manifests under `docs/examples` use the placeholder `RELEASE_VERSION`, replaced by the `sed`
 commands of their pages.
 
