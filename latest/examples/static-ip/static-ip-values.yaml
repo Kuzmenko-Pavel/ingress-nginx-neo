@@ -1,0 +1,6 @@
+# Values for the ingress-nginx-neo chart: publish the address of the
+# ingress-nginx-neo-lb Service (static-ip-svc.yaml) in the status of Ingresses.
+controller:
+  publishService:
+    enabled: true
+    pathOverride: ingress-nginx-neo/ingress-nginx-neo-lb

@@ -1,0 +1,21 @@
+# Values for the ingress-nginx-neo chart: enable the default backend (image
+# custom-error-pages, the chart default) and serve the pages from the
+# ConfigMap custom-error-pages (custom-default-backend-error_pages.configMap.yaml),
+# which must exist in the release namespace.
+controller:
+  config:
+    custom-http-errors: "404,503"
+defaultBackend:
+  enabled: true
+  extraVolumes:
+  - name: custom-error-pages
+    configMap:
+      name: custom-error-pages
+      items:
+      - key: "404"
+        path: "404.html"
+      - key: "503"
+        path: "503.html"
+  extraVolumeMounts:
+  - name: custom-error-pages
+    mountPath: /www

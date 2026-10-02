@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-auth-service
+  labels:
+    k8s-app: demo-auth-service
+  namespace: default
+data:
+  default.conf: |
+    # Requests whose `User` header contains "internal" are authenticated and
+    # receive the UserID and UserRole response headers. Other requests get 403,
+    # unless the auth URL has the query `code=200` (used by the public Ingress),
+    # in which case they are allowed without user headers.
+    server {
+      listen 8080;
+      location / {
+        if ($http_user ~ "internal") {
+          add_header UserID $request_id always;
+          add_header UserRole admin always;
+          add_header Other "not used" always;
+          return 200 "ok";
+        }
+        if ($arg_code = "200") {
+          return 200 "ok";
+        }
+        return 403 "unauthorized";
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-auth-service
+  labels:
+    k8s-app: demo-auth-service
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: demo-auth-service
+  template:
+    metadata:
+      labels:
+        k8s-app: demo-auth-service
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: auth-service
+        image: nginx:1.29.1-alpine@sha256:42a516af16b852e33b7682d5ef8acbd5d13fe08fecadc7ed98605ba5e3b26ab8
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: 10m
+            memory: 20Mi
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: config
+        configMap:
+          name: demo-auth-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-auth-service
+  labels:
+    k8s-app: demo-auth-service
+  namespace: default
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    k8s-app: demo-auth-service

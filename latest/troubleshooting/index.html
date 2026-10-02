@@ -1,0 +1,3491 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="NGINX Ingress controller for Kubernetes">
+      
+      
+      
+        <link rel="canonical" href="https://kuzmenko-pavel.github.io/ingress-nginx-neo/latest/troubleshooting/">
+      
+      
+        <link rel="prev" href="../developer-guide/backporting/">
+      
+      
+        <link rel="next" href="../faq/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Troubleshooting - ingress-nginx-neo</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#troubleshooting" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="ingress-nginx-neo" class="md-header__button md-logo" aria-label="ingress-nginx-neo" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ingress-nginx-neo
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Troubleshooting
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Kuzmenko-Pavel/ingress-nginx-neo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Kuzmenko-Pavel/ingress-nginx-neo
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../deploy/" class="md-tabs__link">
+          
+  
+  
+  Deploy
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../how-it-works/" class="md-tabs__link">
+          
+  
+  
+  User guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../kubectl-plugin/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  kubectl plugin
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../developer-guide/getting-started/" class="md-tabs__link">
+          
+  
+  
+  Developer guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Troubleshooting
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="ingress-nginx-neo" class="md-nav__button md-logo" aria-label="ingress-nginx-neo" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ingress-nginx-neo
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Kuzmenko-Pavel/ingress-nginx-neo" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Kuzmenko-Pavel/ingress-nginx-neo
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Deploy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy/baremetal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bare-metal considerations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy/rbac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Role Based Access Control (RBAC)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy/hardening-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hardening guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy/upgrade/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgrade
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy/migrate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrate from kubernetes/ingress-nginx
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy/artifacts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifacts and verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How it works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGINX Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    NGINX Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/nginx-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/basic-usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Basic usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/nginx-configuration/annotations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/nginx-configuration/annotations-risk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annotations Risks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/nginx-configuration/configmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ConfigMap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/nginx-configuration/custom-template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom NGINX template
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/nginx-configuration/log-format/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Log format
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/cli-arguments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Command line arguments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/custom-errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/default-backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Default backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/exposing-tcp-udp-services/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exposing TCP and UDP services
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/fcgi-services/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exposing FCGI services
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/ingress-path-matching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Regular expressions in paths
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/external-articles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    External Articles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/miscellaneous/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Miscellaneous
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/multiple-ingress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple Ingress controllers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/tls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TLS/HTTPS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_14" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_14" id="__nav_3_14_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Third party addons
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Third party addons
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/third-party-addons/modsecurity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ModSecurity Web Application Firewall
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user-guide/third-party-addons/opentelemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenTelemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../kubectl-plugin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    kubectl plugin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Introduction
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/PREREQUISITES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prerequisites
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/affinity/cookie/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sticky Sessions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Auth
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Auth
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/auth/basic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Basic Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/auth/client-certs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Client Certificate Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/auth/external-auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    External Basic Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/auth/oauth-external-auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    External OAUTH Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Customization
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Customization
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/customization/configuration-snippets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Snippets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/customization/custom-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/customization/custom-errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/customization/custom-headers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Headers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/customization/external-auth-headers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    External authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/customization/ssl-dh-param/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom DH parameters for perfect forward secrecy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/customization/sysctl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sysctl tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/docker-registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/grpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    gRPC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/multi-tls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi TLS certificate termination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/rewrite/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrite
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/static-ip/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Static IPs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/tls-termination/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TLS termination
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/openpolicyagent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Open Policy Agent rules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/canary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Canary Deployments
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/code-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Images
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/release/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer-guide/backporting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backporting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#ingress-controller-logs-and-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ingress-Controller Logs and Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ingress-Controller Logs and Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#check-the-ingress-resource-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check the Ingress Resource Events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-the-ingress-controller-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check the Ingress Controller Logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-the-nginx-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check the Nginx Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-if-used-services-exist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check if used Services Exist
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debug-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debug Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-to-the-kubernetes-api-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication to the Kubernetes API Server
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Authentication to the Kubernetes API Server">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#service-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service Account
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kube-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kube-Config
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-gdb-with-nginx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using GDB with Nginx
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#image-pull-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image pull errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#unable-to-listen-on-port-80443" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unable to listen on port (80/443)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Unable to listen on port (80/443)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-a-test-pod" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a test pod
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-a-test-pod-as-root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a test pod as root
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#ingress-controller-logs-and-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ingress-Controller Logs and Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ingress-Controller Logs and Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#check-the-ingress-resource-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check the Ingress Resource Events
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-the-ingress-controller-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check the Ingress Controller Logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-the-nginx-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check the Nginx Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-if-used-services-exist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check if used Services Exist
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#debug-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Debug Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#authentication-to-the-kubernetes-api-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Authentication to the Kubernetes API Server
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Authentication to the Kubernetes API Server">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#service-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service Account
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kube-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kube-Config
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-gdb-with-nginx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using GDB with Nginx
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#image-pull-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Image pull errors
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#unable-to-listen-on-port-80443" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unable to listen on port (80/443)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Unable to listen on port (80/443)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#create-a-test-pod" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a test pod
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-a-test-pod-as-root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a test pod as root
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!--
+-----------------NOTICE------------------------
+This page is referenced in code (cmd/nginx/main.go) as
+https://kuzmenko-pavel.github.io/ingress-nginx-neo/troubleshooting/
+Do not move it without providing redirects.
+-----------------------------------------------
+-->
+
+<h1 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link"> ¶</a></h1>
+<h2 id="ingress-controller-logs-and-events">Ingress-Controller Logs and Events<a class="headerlink" href="#ingress-controller-logs-and-events" title="Permanent link"> ¶</a></h2>
+<p>There are many ways to troubleshoot the ingress-controller. The following are basic troubleshooting
+methods to obtain more information.</p>
+<h3 id="check-the-ingress-resource-events">Check the Ingress Resource Events<a class="headerlink" href="#check-the-ingress-resource-events" title="Permanent link"> ¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>kubectl<span class="w"> </span>get<span class="w"> </span>ing<span class="w"> </span>-n<span class="w"> </span>&lt;namespace-of-ingress-resource&gt;
+<span class="go">NAME           HOSTS      ADDRESS     PORTS     AGE</span>
+<span class="go">cafe-ingress   cafe.com   10.0.2.15   80        25s</span>
+
+<span class="gp">$ </span>kubectl<span class="w"> </span>describe<span class="w"> </span>ing<span class="w"> </span>&lt;ingress-resource-name&gt;<span class="w"> </span>-n<span class="w"> </span>&lt;namespace-of-ingress-resource&gt;
+<span class="go">Name:             cafe-ingress</span>
+<span class="go">Namespace:        default</span>
+<span class="go">Address:          10.0.2.15</span>
+<span class="go">Default backend:  default-http-backend:80 (172.17.0.5:8080)</span>
+<span class="go">Rules:</span>
+<span class="go">  Host      Path  Backends</span>
+<span class="go">  ----      ----  --------</span>
+<span class="go">  cafe.com</span>
+<span class="go">            /tea      tea-svc:80 (&lt;none&gt;)</span>
+<span class="go">            /coffee   coffee-svc:80 (&lt;none&gt;)</span>
+<span class="go">Annotations:</span>
+<span class="go">  kubectl.kubernetes.io/last-applied-configuration:  {"apiVersion":"networking.k8s.io/v1","kind":"Ingress","metadata":{"annotations":{},"name":"cafe-ingress","namespace":"default","selfLink":"/apis/networking/v1/namespaces/default/ingresses/cafe-ingress"},"spec":{"rules":[{"host":"cafe.com","http":{"paths":[{"backend":{"serviceName":"tea-svc","servicePort":80},"path":"/tea"},{"backend":{"serviceName":"coffee-svc","servicePort":80},"path":"/coffee"}]}}]},"status":{"loadBalancer":{"ingress":[{"ip":"169.48.142.110"}]}}}</span>
+
+<span class="go">Events:</span>
+<span class="go">  Type    Reason  Age   From                      Message</span>
+<span class="go">  ----    ------  ----  ----                      -------</span>
+<span class="go">  Normal  CREATE  1m    nginx-ingress-controller  Ingress default/cafe-ingress</span>
+<span class="go">  Normal  UPDATE  58s   nginx-ingress-controller  Ingress default/cafe-ingress</span>
+</code></pre></div>
+<h3 id="check-the-ingress-controller-logs">Check the Ingress Controller Logs<a class="headerlink" href="#check-the-ingress-controller-logs" title="Permanent link"> ¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>kubectl<span class="w"> </span>get<span class="w"> </span>pods<span class="w"> </span>-n<span class="w"> </span>&lt;namespace-of-ingress-controller&gt;
+<span class="go">NAME                                            READY     STATUS    RESTARTS   AGE</span>
+<span class="go">ingress-nginx-neo-controller-67956bf89d-fv58j   1/1       Running   0          1m</span>
+
+<span class="gp">$ </span>kubectl<span class="w"> </span>logs<span class="w"> </span>-n<span class="w"> </span>&lt;namespace-of-ingress-controller&gt;<span class="w"> </span>ingress-nginx-neo-controller-67956bf89d-fv58j
+<span class="go">-------------------------------------------------------------------------------</span>
+<span class="go">NGINX Ingress controller</span>
+<span class="go">  Release:       &lt;version&gt;</span>
+<span class="go">  Build:         &lt;commit&gt;</span>
+<span class="go">  Repository:    https://github.com/Kuzmenko-Pavel/ingress-nginx-neo</span>
+<span class="go">  nginx version: nginx/&lt;nginx version&gt;</span>
+
+<span class="go">-------------------------------------------------------------------------------</span>
+<span class="go">....</span>
+</code></pre></div>
+<p>The <a href="../kubectl-plugin/">kubectl plugin</a> finds the controller pod for you: <code>kubectl ingress-nginx-neo logs -n &lt;namespace-of-ingress-controller&gt;</code>.</p>
+<h3 id="check-the-nginx-configuration">Check the Nginx Configuration<a class="headerlink" href="#check-the-nginx-configuration" title="Permanent link"> ¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>kubectl<span class="w"> </span>get<span class="w"> </span>pods<span class="w"> </span>-n<span class="w"> </span>&lt;namespace-of-ingress-controller&gt;
+<span class="go">NAME                                            READY     STATUS    RESTARTS   AGE</span>
+<span class="go">ingress-nginx-neo-controller-67956bf89d-fv58j   1/1       Running   0          1m</span>
+
+<span class="gp">$ </span>kubectl<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>-n<span class="w"> </span>&lt;namespace-of-ingress-controller&gt;<span class="w"> </span>ingress-nginx-neo-controller-67956bf89d-fv58j<span class="w"> </span>--<span class="w"> </span>cat<span class="w"> </span>/etc/nginx/nginx.conf
+<span class="go">daemon off;</span>
+<span class="go">worker_processes 2;</span>
+<span class="go">pid /run/nginx.pid;</span>
+<span class="go">worker_rlimit_nofile 523264;</span>
+<span class="go">worker_shutdown_timeout 240s;</span>
+<span class="go">events {</span>
+<span class="go">    multi_accept        on;</span>
+<span class="go">    worker_connections  16384;</span>
+<span class="go">    use                 epoll;</span>
+<span class="go">}</span>
+<span class="go">http {</span>
+<span class="go">....</span>
+</code></pre></div>
+<p>With the <a href="../kubectl-plugin/">kubectl plugin</a>: <code>kubectl ingress-nginx-neo conf -n &lt;namespace-of-ingress-controller&gt;</code>.</p>
+<h3 id="check-if-used-services-exist">Check if used Services Exist<a class="headerlink" href="#check-if-used-services-exist" title="Permanent link"> ¶</a></h3>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>kubectl<span class="w"> </span>get<span class="w"> </span>svc<span class="w"> </span>--all-namespaces
+<span class="go">NAMESPACE     NAME                   TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)         AGE</span>
+<span class="go">default       coffee-svc             ClusterIP   10.106.154.35    &lt;none&gt;        80/TCP          18m</span>
+<span class="go">default       kubernetes             ClusterIP   10.96.0.1        &lt;none&gt;        443/TCP         30m</span>
+<span class="go">default       tea-svc                ClusterIP   10.104.172.12    &lt;none&gt;        80/TCP          18m</span>
+<span class="go">kube-system   default-http-backend   NodePort    10.108.189.236   &lt;none&gt;        80:30001/TCP    30m</span>
+<span class="go">kube-system   kube-dns               ClusterIP   10.96.0.10       &lt;none&gt;        53/UDP,53/TCP   30m</span>
+<span class="go">kube-system   kubernetes-dashboard   NodePort    10.103.128.17    &lt;none&gt;        80:30000/TCP    30m</span>
+</code></pre></div>
+<h2 id="debug-logging">Debug Logging<a class="headerlink" href="#debug-logging" title="Permanent link"> ¶</a></h2>
+<p>Using the flag <code>--v=XX</code> it is possible to increase the level of logging. This is performed by editing
+the deployment.</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>kubectl<span class="w"> </span>get<span class="w"> </span>deploy<span class="w"> </span>-n<span class="w"> </span>&lt;namespace-of-ingress-controller&gt;
+<span class="go">NAME                           READY   UP-TO-DATE   AVAILABLE   AGE</span>
+<span class="go">ingress-nginx-neo-controller   1/1     1            1           35m</span>
+
+<span class="gp">$ </span>kubectl<span class="w"> </span>edit<span class="w"> </span>deploy<span class="w"> </span>-n<span class="w"> </span>&lt;namespace-of-ingress-controller&gt;<span class="w"> </span>ingress-nginx-neo-controller
+<span class="gp"># </span>Add<span class="w"> </span>--v<span class="o">=</span>X<span class="w"> </span>to<span class="w"> </span><span class="s2">"- args"</span>,<span class="w"> </span>where<span class="w"> </span>X<span class="w"> </span>is<span class="w"> </span>an<span class="w"> </span>integer
+</code></pre></div>
+<p>With Helm, set the flag through the chart value <code>controller.extraArgs</code>, for example <code>--set controller.extraArgs.v=2</code>.</p>
+<ul>
+<li><code>--v=2</code> shows details using <code>diff</code> about the changes in the configuration in nginx</li>
+<li><code>--v=3</code> shows details about the service, Ingress rule, endpoint changes and it dumps the nginx configuration in JSON format</li>
+<li><code>--v=5</code> configures NGINX in <a href="https://nginx.org/en/docs/debugging_log.html">debug mode</a></li>
+</ul>
+<h2 id="authentication-to-the-kubernetes-api-server">Authentication to the Kubernetes API Server<a class="headerlink" href="#authentication-to-the-kubernetes-api-server" title="Permanent link"> ¶</a></h2>
+<p>A number of components are involved in the authentication process and the first step is to narrow
+down the source of the problem, namely whether it is a problem with service authentication or
+with the kubeconfig file.</p>
+<p>Both authentications must work:</p>
+<div class="highlight"><pre><span></span><code>+-------------+   service          +------------+
+|             |   authentication   |            |
++  apiserver  +&lt;-------------------+  ingress   |
+|             |                    | controller |
++-------------+                    +------------+
+</code></pre></div>
+<p><strong>Service authentication</strong></p>
+<p>The Ingress controller needs information from apiserver. Therefore, authentication is required, which can be achieved in a couple of ways:</p>
+<ul>
+<li>
+<p><em>Service Account:</em> This is recommended, because nothing has to be configured. The Ingress controller will use information provided by the system to communicate with the API server. See 'Service Account' section for details.</p>
+</li>
+<li>
+<p><em>Kubeconfig file:</em> In some Kubernetes environments service accounts are not available. In this case a manual configuration is required. The Ingress controller binary can be started with the <code>--kubeconfig</code> flag. The value of the flag is a path to a file specifying how to connect to the API server. Using the <code>--kubeconfig</code> does not requires the flag <code>--apiserver-host</code>.
+   The format of the file is identical to <code>~/.kube/config</code> which is used by kubectl to connect to the API server. See 'kubeconfig' section for details.</p>
+</li>
+<li>
+<p><em>Using the flag <code>--apiserver-host</code>:</em> Using this flag <code>--apiserver-host=http://localhost:8080</code> it is possible to specify an unsecured API server or reach a remote kubernetes cluster using <a href="https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands#proxy">kubectl proxy</a>.
+   Please do not use this approach in production.</p>
+</li>
+</ul>
+<p>In the diagram below you can see the full authentication flow with all options, starting with the browser
+on the lower left hand side.</p>
+<div class="highlight"><pre><span></span><code>Kubernetes                                                  Workstation
++---------------------------------------------------+     +------------------+
+|                                                   |     |                  |
+|  +-----------+   apiserver        +------------+  |     |  +------------+  |
+|  |           |   proxy            |            |  |     |  |            |  |
+|  | apiserver |                    |  ingress   |  |     |  |  ingress   |  |
+|  |           |                    | controller |  |     |  | controller |  |
+|  |           |                    |            |  |     |  |            |  |
+|  |           |                    |            |  |     |  |            |  |
+|  |           |  service account/  |            |  |     |  |            |  |
+|  |           |  kubeconfig        |            |  |     |  |            |  |
+|  |           +&lt;-------------------+            |  |     |  |            |  |
+|  |           |                    |            |  |     |  |            |  |
+|  +------+----+      kubeconfig    +------+-----+  |     |  +------+-----+  |
+|         |&lt;--------------------------------------------------------|        |
+|                                                   |     |                  |
++---------------------------------------------------+     +------------------+
+</code></pre></div>
+<h3 id="service-account">Service Account<a class="headerlink" href="#service-account" title="Permanent link"> ¶</a></h3>
+<p>If using a service account to connect to the API server, the ingress-controller expects the file
+<code>/var/run/secrets/kubernetes.io/serviceaccount/token</code> to be present. It provides a secret
+token that is required to authenticate with the API server.</p>
+<p>Verify with the following commands:</p>
+<div class="highlight"><pre><span></span><code><span class="gp"># </span>start<span class="w"> </span>a<span class="w"> </span>container<span class="w"> </span>that<span class="w"> </span>contains<span class="w"> </span>curl
+<span class="gp">$ </span>kubectl<span class="w"> </span>run<span class="w"> </span>-it<span class="w"> </span>--rm<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--image<span class="o">=</span>curlimages/curl<span class="w"> </span>--restart<span class="o">=</span>Never<span class="w"> </span>--<span class="w"> </span>/bin/sh
+
+<span class="gp"># </span>check<span class="w"> </span><span class="k">if</span><span class="w"> </span>secret<span class="w"> </span>exists
+<span class="go">/ $ ls /var/run/secrets/kubernetes.io/serviceaccount/</span>
+<span class="go">ca.crt     namespace  token</span>
+<span class="go">/ $</span>
+
+<span class="gp"># </span>check<span class="w"> </span>base<span class="w"> </span>connectivity<span class="w"> </span>from<span class="w"> </span>cluster<span class="w"> </span>inside
+<span class="go">/ $ curl -k https://kubernetes.default.svc.cluster.local</span>
+<span class="go">{</span>
+<span class="go">  "kind": "Status",</span>
+<span class="go">  "apiVersion": "v1",</span>
+<span class="go">  "metadata": {</span>
+
+<span class="go">  },</span>
+<span class="go">  "status": "Failure",</span>
+<span class="go">  "message": "forbidden: User \"system:anonymous\" cannot get path \"/\"",</span>
+<span class="go">  "reason": "Forbidden",</span>
+<span class="go">  "details": {</span>
+
+<span class="go">  },</span>
+<span class="go">  "code": 403</span>
+<span class="go">}/ $</span>
+
+<span class="gp"># </span>connect<span class="w"> </span>using<span class="w"> </span>tokens
+<span class="go">}/ $ curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H  "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" https://kubernetes.default.svc.cluster.local</span>
+<span class="go">&amp;&amp; echo</span>
+<span class="go">{</span>
+<span class="go">  "paths": [</span>
+<span class="go">    "/api",</span>
+<span class="go">    "/api/v1",</span>
+<span class="go">    "/apis",</span>
+<span class="go">    "/apis/",</span>
+<span class="go">    ... TRUNCATED</span>
+<span class="go">    "/readyz/shutdown",</span>
+<span class="go">    "/version"</span>
+<span class="go">  ]</span>
+<span class="go">}</span>
+<span class="go">/ $</span>
+
+<span class="gp"># </span>when<span class="w"> </span>you<span class="w"> </span><span class="nb">type</span><span class="w"> </span><span class="sb">`</span><span class="nb">exit</span><span class="sb">`</span><span class="w"> </span>or<span class="w"> </span><span class="sb">`</span>^D<span class="sb">`</span><span class="w"> </span>the<span class="w"> </span><span class="nb">test</span><span class="w"> </span>pod<span class="w"> </span>will<span class="w"> </span>be<span class="w"> </span>deleted.
+</code></pre></div>
+<p>If it is not working, there are two possible reasons:</p>
+<ol>
+<li>
+<p>The contents of the tokens are invalid. Find the secret name with <code>kubectl get secrets | grep service-account</code> and
+   delete it with <code>kubectl delete secret &lt;name&gt;</code>. It will automatically be recreated.</p>
+</li>
+<li>
+<p>You have a non-standard Kubernetes installation and the file containing the token may not be present.
+   The API server will mount a volume containing this file, but only if the API server is configured to use
+   the ServiceAccount admission controller.
+   If you experience this error, verify that your API server is using the ServiceAccount admission controller.
+   If you are configuring the API server by hand, you can set this with the <code>--admission-control</code> parameter.</p>
+<blockquote>
+<p>Note that you should use other admission controllers as well. Before configuring this option, you should read about admission controllers.</p>
+</blockquote>
+</li>
+</ol>
+<p>More information:</p>
+<ul>
+<li><a href="https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/">User Guide: Service Accounts</a></li>
+<li><a href="http://kubernetes.io/docs/admin/service-accounts-admin/">Cluster Administrator Guide: Managing Service Accounts</a></li>
+</ul>
+<h2 id="kube-config">Kube-Config<a class="headerlink" href="#kube-config" title="Permanent link"> ¶</a></h2>
+<p>If you want to use a kubeconfig file for authentication, follow the <a href="../deploy/">deploy procedure</a> and
+add the flag <code>--kubeconfig=/etc/kubernetes/kubeconfig.yaml</code> to the args section of the deployment.</p>
+<h2 id="using-gdb-with-nginx">Using GDB with Nginx<a class="headerlink" href="#using-gdb-with-nginx" title="Permanent link"> ¶</a></h2>
+<p><a href="https://www.gnu.org/software/gdb/">Gdb</a> can be used to with nginx to perform a configuration
+dump. This allows us to see which configuration is being used, as well as older configurations.</p>
+<p>Note: The below is based on the nginx <a href="https://docs.nginx.com/nginx/admin-guide/monitoring/debugging/#dumping-nginx-configuration-from-a-running-process">documentation</a>.</p>
+<ol>
+<li>
+<p>SSH into the worker</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>ssh<span class="w"> </span>user@workerIP
+</code></pre></div>
+</li>
+<li>
+<p>Obtain the Docker Container Running nginx</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>docker<span class="w"> </span>ps<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>ingress-nginx-neo-controller
+<span class="go">CONTAINER ID        IMAGE                                                COMMAND                  CREATED             STATUS              PORTS               NAMES</span>
+<span class="go">d9e1d243156a        ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller   "/usr/bin/dumb-init …"   19 minutes ago      Up 19 minutes                           k8s_controller_ingress-nginx-neo-controller-67956bf89d-mqxzt_ingress-nginx-neo_079f31ec-aa37-11e8-ad39-080027a227db_0</span>
+</code></pre></div>
+</li>
+<li>
+<p>Exec into the container</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>--user<span class="o">=</span><span class="m">0</span><span class="w"> </span>--privileged<span class="w"> </span>d9e1d243156a<span class="w"> </span>bash
+</code></pre></div>
+</li>
+<li>
+<p>Make sure nginx is running in <code>--with-debug</code></p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>nginx<span class="w"> </span>-V<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>--<span class="w"> </span><span class="s1">'--with-debug'</span>
+</code></pre></div>
+</li>
+<li>
+<p>Get list of processes running on container</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>ps<span class="w"> </span>-ef
+<span class="go">UID        PID  PPID  C STIME TTY          TIME CMD</span>
+<span class="go">root         1     0  0 20:23 ?        00:00:00 /usr/bin/dumb-init /nginx-ingres</span>
+<span class="go">root         5     1  0 20:23 ?        00:00:05 /nginx-ingress-controller --defa</span>
+<span class="go">root        21     5  0 20:23 ?        00:00:00 nginx: master process /usr/sbin/</span>
+<span class="go">nobody     106    21  0 20:23 ?        00:00:00 nginx: worker process</span>
+<span class="go">nobody     107    21  0 20:23 ?        00:00:00 nginx: worker process</span>
+<span class="go">root       172     0  0 20:43 pts/0    00:00:00 bash</span>
+</code></pre></div>
+</li>
+<li>
+<p>Attach gdb to the nginx master process</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>gdb<span class="w"> </span>-p<span class="w"> </span><span class="m">21</span>
+<span class="go">....</span>
+<span class="go">Attaching to process 21</span>
+<span class="go">Reading symbols from /usr/sbin/nginx...done.</span>
+<span class="go">....</span>
+<span class="gp gp-VirtualEnv">(gdb)</span>
+</code></pre></div>
+</li>
+<li>
+<p>Copy and paste the following:</p>
+<div class="highlight"><pre><span></span><code><span class="go">set $cd = ngx_cycle-&gt;config_dump</span>
+<span class="go">set $nelts = $cd.nelts</span>
+<span class="go">set $elts = (ngx_conf_dump_t*)($cd.elts)</span>
+<span class="go">while ($nelts-- &gt; 0)</span>
+<span class="go">set $name = $elts[$nelts]-&gt;name.data</span>
+<span class="go">printf "Dumping %s to nginx_conf.txt\n", $name</span>
+<span class="go">append memory nginx_conf.txt \</span>
+<span class="gp">        $</span>elts<span class="o">[</span><span class="nv">$nelts</span><span class="o">]</span>-&gt;buffer.start<span class="w"> </span><span class="nv">$elts</span><span class="o">[</span><span class="nv">$nelts</span><span class="o">]</span>-&gt;buffer.end
+<span class="go">end</span>
+</code></pre></div>
+</li>
+<li>
+<p>Quit GDB by pressing CTRL+D</p>
+</li>
+<li>
+<p>Open nginx_conf.txt</p>
+<div class="highlight"><pre><span></span><code><span class="go">cat nginx_conf.txt</span>
+</code></pre></div>
+</li>
+</ol>
+<h2 id="image-pull-errors">Image pull errors<a class="headerlink" href="#image-pull-errors" title="Permanent link"> ¶</a></h2>
+<p>All ingress-nginx-neo images are pulled from the GitHub Container Registry, under the prefix
+<code>ghcr.io/kuzmenko-pavel/ingress-nginx-neo/</code> (see <a href="../deploy/artifacts/">Artifacts and verification</a>). If pods stay in
+<code>ImagePullBackOff</code> or <code>ErrImagePull</code>, check the events of the pod:</p>
+<div class="highlight"><pre><span></span><code><span class="go">kubectl describe pod -n &lt;namespace-of-ingress-controller&gt; &lt;pod-name&gt;</span>
+</code></pre></div>
+<p>An error such as <code>failed to do request: Head "https://ghcr.io/v2/...": EOF</code> or a timeout usually means that the
+nodes cannot reach the registry.</p>
+<ol>
+<li>
+<p>Test the connectivity to the registry from a node or from a machine in the same network. A request without
+   credentials returns <code>401 Unauthorized</code>, which shows that the registry is reachable:</p>
+<div class="highlight"><pre><span></span><code><span class="go">curl -sSI https://ghcr.io/v2/</span>
+</code></pre></div>
+</li>
+<li>
+<p>If you use a proxy or firewall with an allowlist, allow the registry host and the host that serves the image
+   layers:</p>
+<div class="highlight"><pre><span></span><code>ghcr.io
+pkg-containers.githubusercontent.com
+</code></pre></div>
+</li>
+<li>
+<p>If the nodes cannot reach <code>ghcr.io</code> at all, mirror the images into a registry they can reach and set
+   <code>global.image.registry</code> to it, as described in <a href="../deploy/artifacts/#mirroring">Mirroring</a>. In this case, allow
+   your mirror instead of <code>ghcr.io</code>.</p>
+</li>
+</ol>
+<h2 id="unable-to-listen-on-port-80443">Unable to listen on port (80/443)<a class="headerlink" href="#unable-to-listen-on-port-80443" title="Permanent link"> ¶</a></h2>
+<p>One possible reason for this error is lack of permission to bind to the port.  Ports 80, 443, and any other port &lt; 1024 are Linux privileged ports which historically could only be bound by root.  The controller uses the CAP_NET_BIND_SERVICE <a href="https://man7.org/linux/man-pages/man7/capabilities.7.html">linux capability</a> to allow binding these ports as a normal user (www-data / 101).  This involves two components:
+1. In the image, the /nginx-ingress-controller file has the cap_net_bind_service capability added (e.g. via <a href="https://man7.org/linux/man-pages/man8/setcap.8.html">setcap</a>) 
+2. The NET_BIND_SERVICE capability is added to the container in the containerSecurityContext of the deployment.</p>
+<p>If encountering this on one/some node(s) and not on others, try to purge and pull a fresh copy of the image to the affected node(s), in case there has been corruption of the underlying layers to lose the capability on the executable.</p>
+<h3 id="create-a-test-pod">Create a test pod<a class="headerlink" href="#create-a-test-pod" title="Permanent link"> ¶</a></h3>
+<p>The /nginx-ingress-controller process exits/crashes when encountering this error, making it difficult to troubleshoot what is happening inside the container.  To get around this, start an equivalent container running "sleep 3600", and exec into it for further troubleshooting.  For example:
+<div class="highlight"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pod</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ingress-nginx-neo-sleep</span>
+<span class="w">  </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">default</span>
+<span class="w">  </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nginx</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nginx</span>
+<span class="w">      </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="c1">##_CONTROLLER_IMAGE_##</span>
+<span class="w">      </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">requests</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">"512Mi"</span>
+<span class="w">          </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">"500m"</span>
+<span class="w">        </span><span class="nt">limits</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">"1Gi"</span>
+<span class="w">          </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">"1"</span>
+<span class="w">      </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"sleep"</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"3600"</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">80</span>
+<span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http</span>
+<span class="w">        </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+<span class="w">        </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https</span>
+<span class="w">        </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w">      </span><span class="nt">securityContext</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">allowPrivilegeEscalation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">        </span><span class="nt">capabilities</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">add</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NET_BIND_SERVICE</span>
+<span class="w">          </span><span class="nt">drop</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ALL</span>
+<span class="w">        </span><span class="nt">runAsUser</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">101</span>
+<span class="w">  </span><span class="nt">restartPolicy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Never</span>
+<span class="w">  </span><span class="nt">nodeSelector</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">kubernetes.io/hostname</span><span class="p">:</span><span class="w"> </span><span class="c1">##_NODE_NAME_##</span>
+<span class="w">  </span><span class="nt">tolerations</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="s">"node.kubernetes.io/unschedulable"</span>
+<span class="w">    </span><span class="nt">operator</span><span class="p">:</span><span class="w"> </span><span class="s">"Exists"</span>
+<span class="w">    </span><span class="nt">effect</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NoSchedule</span>
+</code></pre></div>
+* update the namespace if applicable/desired
+* replace <code>##_NODE_NAME_##</code> with the problematic node (or remove nodeSelector section if problem is not confined to one node)
+* replace <code>##_CONTROLLER_IMAGE_##</code> with the same image as in use by your controller Deployment or DaemonSet (for example <code>ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:&lt;version&gt;</code>)
+* confirm the securityContext section matches what is in place for the controller pods in your cluster</p>
+<p>Apply the YAML and open a shell into the pod.
+Try to manually run the controller process:
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>/nginx-ingress-controller
+</code></pre></div>
+You should get the same error as from the ingress controller pod logs.</p>
+<p>Confirm the capabilities are properly surfacing into the pod:
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>grep<span class="w"> </span>CapBnd<span class="w"> </span>/proc/1/status
+<span class="go">CapBnd: 0000000000000400</span>
+</code></pre></div>
+The above value has only net_bind_service enabled (per security context in YAML which adds that and drops all). If you get a different value, then you can decode it on another linux box (capsh not available in this container) like below, and then figure out why specified capabilities are not propagating into the pod/container.
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>capsh<span class="w"> </span>--decode<span class="o">=</span><span class="m">0000000000000400</span>
+<span class="go">0x0000000000000400=cap_net_bind_service</span>
+</code></pre></div></p>
+<h2 id="create-a-test-pod-as-root">Create a test pod as root<a class="headerlink" href="#create-a-test-pod-as-root" title="Permanent link"> ¶</a></h2>
+<p>(Note, this may be restricted by PodSecurityAdmission/Standards, OPA Gatekeeper, etc. in which case you will need to do the appropriate workaround for testing, e.g. deploy in a new namespace without the restrictions.)
+To test further you may want to install additional utilities, etc.  Modify the pod yaml by:
+* changing runAsUser from 101 to 0
+* removing the "drop..ALL" section from the capabilities.</p>
+<p>Some things to try after shelling into this container:</p>
+<p>Try running the controller as the www-data (101) user:
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>chmod<span class="w"> </span><span class="m">4755</span><span class="w"> </span>/nginx-ingress-controller
+<span class="gp">$ </span>/nginx-ingress-controller
+</code></pre></div>
+Examine the errors to see if there is still an issue listening on the port or if it passed that and moved on to other expected errors due to running out of context.</p>
+<p>Install the libcap package and check capabilities on the file:
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>apk<span class="w"> </span>add<span class="w"> </span>libcap
+<span class="gp gp-VirtualEnv">(1/1)</span> <span class="go">Installing libcap (2.50-r0)</span>
+<span class="go">Executing busybox-1.33.1-r7.trigger</span>
+<span class="go">OK: 26 MiB in 41 packages</span>
+<span class="gp">$ </span>getcap<span class="w"> </span>/nginx-ingress-controller
+<span class="go">/nginx-ingress-controller cap_net_bind_service=ep</span>
+</code></pre></div>
+(if missing, see above about purging image on the server and re-pulling)</p>
+<p>Strace the executable to see what system calls are being executed when it fails:
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>apk<span class="w"> </span>add<span class="w"> </span>strace
+<span class="gp gp-VirtualEnv">(1/1)</span> <span class="go">Installing strace (5.12-r0)</span>
+<span class="go">Executing busybox-1.33.1-r7.trigger</span>
+<span class="go">OK: 28 MiB in 42 packages</span>
+<span class="gp">$ </span>strace<span class="w"> </span>/nginx-ingress-controller
+<span class="go">execve("/nginx-ingress-controller", ["/nginx-ingress-controller"], 0x7ffeb9eb3240 /* 131 vars */) = 0</span>
+<span class="go">arch_prctl(ARCH_SET_FS, 0x29ea690)      = 0</span>
+<span class="go">...</span>
+</code></pre></div></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.instant", "navigation.sections", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "stable", "provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
