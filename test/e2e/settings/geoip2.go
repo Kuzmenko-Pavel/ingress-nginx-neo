@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
@@ -31,7 +30,8 @@ import (
 	"k8s.io/ingress-nginx/test/e2e/framework"
 )
 
-const testdataURL = "https://github.com/maxmind/MaxMind-DB/blob/5a0be1c0320490b8e4379dbd5295a18a648ff156/test-data/GeoLite2-Country-Test.mmdb?raw=true"
+// testdata is the test database carried by the e2e image, see test/e2e/settings/geoip.
+const testdata = "/GeoLite2-Country-Test.mmdb"
 
 var _ = framework.DescribeSetting("Geoip2", func() {
 	f := framework.NewDefaultFramework("geoip2")
@@ -55,9 +55,8 @@ var _ = framework.DescribeSetting("Geoip2", func() {
 		assert.Nil(ginkgo.GinkgoT(), err, "updating ingress controller deployment flags")
 
 		filename := fmt.Sprintf("/etc/ingress-controller/geoip/%s.mmdb", edition)
-		exec, err := f.ExecIngressPod(fmt.Sprintf(`sh -c "mkdir -p '%s' && wget -O '%s' '%s' 2>&1"`, filepath.Dir(filename), filename, testdataURL))
-		framework.Logf(exec)
-		assert.Nil(ginkgo.GinkgoT(), err, fmt.Sprintln("error downloading test geoip2 db", filename))
+		err = f.CopyToIngressPod(testdata, filename)
+		assert.Nil(ginkgo.GinkgoT(), err, fmt.Sprintln("error copying test geoip2 db", filename))
 
 		f.UpdateNginxConfigMapData("use-geoip2", "true")
 		f.WaitForNginxConfiguration(
@@ -132,9 +131,8 @@ var _ = framework.DescribeSetting("Geoip2", func() {
 		assert.Nil(ginkgo.GinkgoT(), err, "updating ingress controller deployment flags")
 
 		filename := fmt.Sprintf("/etc/ingress-controller/geoip/%s.mmdb", edition)
-		exec, err := f.ExecIngressPod(fmt.Sprintf(`sh -c "mkdir -p '%s' && wget -O '%s' '%s' 2>&1"`, filepath.Dir(filename), filename, testdataURL))
-		framework.Logf(exec)
-		assert.Nil(ginkgo.GinkgoT(), err, fmt.Sprintln("error downloading test geoip2 db", filename))
+		err = f.CopyToIngressPod(testdata, filename)
+		assert.Nil(ginkgo.GinkgoT(), err, fmt.Sprintln("error copying test geoip2 db", filename))
 
 		f.SetNginxConfigMapData(map[string]string{
 			"use-geoip2":                   "true",

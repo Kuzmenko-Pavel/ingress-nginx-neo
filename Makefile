@@ -657,6 +657,7 @@ docker-build-e2e: $(GINKGO) helm-stage
 	cp test/e2e/wait-for-nginx.sh $(E2E_CONTEXT)/
 	cp -R $(STAGED_CHART) $(E2E_CONTEXT)/charts/
 	cp test/e2e/settings/ocsp/*.json test/e2e/settings/ocsp/*.db $(E2E_CONTEXT)/
+	cp test/e2e/settings/geoip/GeoLite2-Country-Test.mmdb $(E2E_CONTEXT)/
 	GOOS=linux GOARCH=$(ARCH) CGO_ENABLED=0 $(GINKGO) build -trimpath -o $(CURDIR)/$(E2E_CONTEXT)/e2e.test ./test/e2e
 	docker buildx build --builder $(LOCAL_BUILDER) --load --platform $(PLATFORM) \
 		--build-arg E2E_BASE_IMAGE=$(RUNNER_IMAGE) \

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -72,7 +73,8 @@ func (f *Framework) ExecCommand(pod *corev1.Pod, command string) (string, error)
 
 	err := cmd.Run()
 	if err != nil {
-		return "", fmt.Errorf("could not execute '%s %s': %v", cmd.Path, cmd.Args, err)
+		return "", fmt.Errorf("could not execute '%s %s': %v\nstdout: %s\nstderr: %s",
+			cmd.Path, cmd.Args, err, execOut.String(), execErr.String())
 	}
 
 	if execErr.Len() > 0 {
@@ -80,6 +82,23 @@ func (f *Framework) ExecCommand(pod *corev1.Pod, command string) (string, error)
 	}
 
 	return execOut.String(), nil
+}
+
+// CopyToIngressPod copies the local file src to dst in the controller container
+// of the ingress controller pod, creating the directory of dst.
+func (f *Framework) CopyToIngressPod(src, dst string) error {
+	var execErr bytes.Buffer
+
+	//nolint:gosec // Ignore G204 error
+	cmd := exec.Command("/bin/bash", "-c", fmt.Sprintf("%v exec -i --namespace %s %s --container controller -- sh -c \"mkdir -p '%s' && cat > '%s'\" < '%s'",
+		KubectlPath, f.pod.Namespace, f.pod.Name, filepath.Dir(dst), dst, src))
+	cmd.Stderr = &execErr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("could not copy %s to %s: %v\nstderr: %s", src, dst, err, execErr.String())
+	}
+
+	return nil
 }
 
 // NamespaceContent executes a kubectl command that returns information about
