@@ -14,13 +14,11 @@ This example uses 2 different certificates to terminate SSL for 2 hostnames.
     ```
 
 2. Create the backends and the Ingress from [multi-tls.yaml](multi-tls.yaml). The `http-svc` backend uses the
-   echo server image `ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo`; replace `<version>` with a release version
-   (see the [releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases)):
+   echo server image `ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo` of the release `<version>`:
 
     ```console
-    $ VERSION=<version>
     $ curl -sL https://raw.githubusercontent.com/Kuzmenko-Pavel/ingress-nginx-neo/main/docs/examples/multi-tls/multi-tls.yaml \
-        | sed "s/<version>/${VERSION}/" | kubectl apply -f -
+        | sed "s/RELEASE_VERSION/<version>/" | kubectl apply -f -
     ```
 
 The controller generates one `server` block per host in `nginx.conf`. Certificates are served dynamically (selected by

@@ -67,6 +67,13 @@ APP_VERSION := dev
 DOCS_VERSION :=
 endif
 
+# The highest published release tag (empty before the first release); queried
+# from origin only where it is used.
+LATEST_RELEASE = $(shell git ls-remote --tags --refs origin 'v*' 2>/dev/null | sed 's|.*refs/tags/||' | \
+	grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | sort -V | tail -n1)
+# The release the documentation describes, substituted for <version> in its pages.
+DOCS_RELEASE_TAG = $(if $(filter release,$(CHANNEL)),$(VERSION),$(LATEST_RELEASE))
+
 COMMIT := $(shell git rev-parse HEAD 2>/dev/null)
 
 # Go version: toolchain line of go.mod, else its go line. Used for every Go
@@ -782,24 +789,24 @@ docs-verify: docs-generate
 .PHONY: docs-build
 ## mkdocs build --strict.
 docs-build: $(DOCS_VENV)/bin/mkdocs
-	$(DOCS_VENV)/bin/mkdocs build --strict --site-dir $(DIST)/site
+	DOCS_RELEASE_TAG=$(DOCS_RELEASE_TAG) $(DOCS_VENV)/bin/mkdocs build --strict --site-dir $(DIST)/site
 
 .PHONY: docs-serve
 ## Serve the site locally with live reload.
 docs-serve: $(DOCS_VENV)/bin/mkdocs
-	$(DOCS_VENV)/bin/mkdocs serve
+	DOCS_RELEASE_TAG=$(DOCS_RELEASE_TAG) $(DOCS_VENV)/bin/mkdocs serve
 
 .PHONY: docs-publish
 ## Publish the docs version for CHANNEL via mike.
 docs-publish: $(DOCS_VENV)/bin/mkdocs
-	$(DOCS_PATH) MIKE=$(DOCS_VENV)/bin/mike CHANNEL=$(CHANNEL) VERSION=$(VERSION) DOCS_VERSION=$(DOCS_VERSION) \
+	$(DOCS_PATH) DOCS_RELEASE_TAG=$(DOCS_RELEASE_TAG) MIKE=$(DOCS_VENV)/bin/mike CHANNEL=$(CHANNEL) VERSION=$(VERSION) DOCS_VERSION=$(DOCS_VERSION) \
 		tools/docs-publish.sh
 
 .PHONY: docs-publish-check
 ## Run docs-publish for CHANNEL=latest into the local branch docs-publish-check, without pushing.
 docs-publish-check: $(DOCS_VENV)/bin/mkdocs
 	git branch -D docs-publish-check 2>/dev/null || true
-	$(DOCS_PATH) MIKE=$(DOCS_VENV)/bin/mike CHANNEL=latest VERSION=$(VERSION) DOCS_VERSION=latest \
+	$(DOCS_PATH) DOCS_RELEASE_TAG=$(DOCS_RELEASE_TAG) MIKE=$(DOCS_VENV)/bin/mike CHANNEL=latest VERSION=$(VERSION) DOCS_VERSION=latest \
 		DOCS_BRANCH=docs-publish-check DOCS_PUSH=false tools/docs-publish.sh
 	git branch -D docs-publish-check
 
@@ -867,8 +874,7 @@ endif
 
 .PHONY: print-latest-release
 print-latest-release:
-	@git ls-remote --tags --refs origin 'v*' | sed 's#.*refs/tags/##' | \
-		grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | sort -V | tail -n1
+	@echo '$(LATEST_RELEASE)'
 
 
 DEV_KIND_CLUSTER ?= $(PROJECT)-dev

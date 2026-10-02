@@ -16,7 +16,7 @@ binary is named `kubectl-ingress_nginx_neo`.
 
 The plugin is attached to every [release](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases) as an
 archive per platform: `kubectl-ingress_nginx_neo_<os>_<arch>.tar.gz` (`.zip` for Windows) for `linux`, `darwin` and
-`windows` on `amd64` and `arm64`. In the commands below, `<version>` is the release tag `vX.Y.Z`.
+`windows` on `amd64` and `arm64`. The commands below install the release `<version>`.
 
 ### With krew
 

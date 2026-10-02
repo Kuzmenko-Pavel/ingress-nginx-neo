@@ -36,8 +36,8 @@ spec:
     spec:
       containers:
       - name: nginx-error-server
-        # <version>: a release version, see https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases
-        image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/custom-error-pages:<version>
+        # RELEASE_VERSION: a release version vX.Y.Z, see https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases
+        image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/custom-error-pages:RELEASE_VERSION
         ports:
         - containerPort: 8080
         # Setting the environment variable DEBUG we can see the headers sent

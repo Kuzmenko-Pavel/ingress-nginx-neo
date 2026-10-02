@@ -29,7 +29,7 @@ kubectl get pods --namespace ingress-nginx-neo \
 ## Versioning policy
 
 - Every release has one version `vX.Y.Z` that applies to all artifacts: images, Helm chart, kubectl plugin,
-  static manifests and documentation. The chart version is the same number without the `v` prefix.
+  static manifests and documentation. Helm accepts it as the chart version.
 - ingress-nginx-neo uses 0.x versions. A **minor** release (`0.Y.0`) may contain breaking changes; they are always
   listed in the **Breaking changes** section of its release notes. A **patch** release (`0.Y.Z`) contains only fixes.
 - Only the latest minor release is supported. Upgrade to the latest patch release of the latest minor release to
@@ -39,7 +39,7 @@ kubectl get pods --namespace ingress-nginx-neo \
 
 ## With Helm
 
-Upgrade the release to the chart version of the target release (`<version>` is `X.Y.Z`, without `v`):
+Upgrade the release to the target release, here `<version>`:
 
 ```console
 helm upgrade ingress-nginx-neo oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \
@@ -73,13 +73,13 @@ A rollback restores the chart, values and image digests of that revision.
 
 ## With static manifests
 
-Apply the manifest of the target release for the same provider you installed:
+Apply the manifest of the target release, here `<version>`, for the same provider you installed:
 
 ```console
 kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/<version>/deploy-<provider>.yaml
 ```
 
-Here `<version>` is the release tag `vX.Y.Z`. The manifest pins every image by digest, so applying it upgrades the
+The manifest pins every image by digest, so applying it upgrades the
 controller, the admission webhook jobs and all other resources together. `kubectl apply` does not delete resources
 that are missing from the new manifest; delete them yourself if the release notes mention such a change.
 

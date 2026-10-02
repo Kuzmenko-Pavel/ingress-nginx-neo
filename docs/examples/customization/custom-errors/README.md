@@ -33,13 +33,11 @@ Remove `extraVolumes` / `extraVolumeMounts` from the values to keep the built-in
 
 First, create the custom `default-backend`. It will be used by the Ingress controller later on.
 
-To do that, use the [example manifest](custom-default-backend.yaml). Replace `<version>` with a release version
-(see the [releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases)) and create it in the namespace
-of the controller:
+To do that, use the [example manifest](custom-default-backend.yaml) with the image of the release `<version>` and
+create it in the namespace of the controller:
 
 ```console
-$ VERSION=<version>
-$ sed "s/<version>/${VERSION}/" custom-default-backend.yaml | kubectl -n ingress-nginx-neo apply -f -
+$ sed "s/RELEASE_VERSION/<version>/" custom-default-backend.yaml | kubectl -n ingress-nginx-neo apply -f -
 service/nginx-errors created
 deployment.apps/nginx-errors created
 ```

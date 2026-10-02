@@ -14,17 +14,15 @@ Sample configuration includes:
   * Private, which allows access from authenticated users only
 
 Deploy the example from this directory. [echo-service.yaml](echo-service.yaml) references the echo image as
-`e2e-test-echo:<version>`; replace `<version>` with a release version
-(see the [releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases)):
+`e2e-test-echo:RELEASE_VERSION`; the commands below set it to the release `<version>`:
 
 ```console
-$ VERSION=<version>
 $ kubectl apply -f auth-service.yaml
 configmap/demo-auth-service created
 deployment.apps/demo-auth-service created
 service/demo-auth-service created
 
-$ sed "s/<version>/${VERSION}/" echo-service.yaml | kubectl apply -f -
+$ sed "s/RELEASE_VERSION/<version>/" echo-service.yaml | kubectl apply -f -
 deployment.apps/demo-echo-service created
 service/demo-echo-service created
 ingress.networking.k8s.io/public-demo-echo-service created

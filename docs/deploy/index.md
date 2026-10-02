@@ -8,9 +8,9 @@ ingress-nginx-neo can be installed in two ways:
 Both methods install the same resources into the namespace `ingress-nginx-neo` with the release name
 `ingress-nginx-neo`, so the controller Deployment and Service are named `ingress-nginx-neo-controller`.
 
-Every command below uses `<version>` as a placeholder. Pick a version from the
-[releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases): Helm takes the chart version
-without the `v` prefix (`X.Y.Z`), release asset URLs take the release tag (`vX.Y.Z`).
+The commands below install the release `<version>`. Other releases are listed on the
+[releases page](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases) and in the version menu of this site.
+A release has one version `vX.Y.Z` for every artifact; Helm accepts it as the chart version.
 
 ## Contents
 
