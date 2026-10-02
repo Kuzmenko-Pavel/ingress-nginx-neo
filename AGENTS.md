@@ -26,7 +26,8 @@ manifests and the kubectl plugin `kubectl ingress-nginx-neo`. The Go module path
 
 ## Project API
 
-The root `Makefile` is the interface for humans, agents and CI.
+The root `Makefile` is the single contract for humans, agents and CI: the same target gives the same
+result everywhere, so a check run outside make proves nothing about CI.
 
 ```console
 make help        # all targets by domain: code, test, images, helm, manifests, docs, security, release, development
@@ -51,6 +52,9 @@ release as `<version>` (inside code); the build substitutes it (`docs/developer-
   unit, Lua, chart or e2e test; a lint rule when a test cannot express the defect), then change
   the code until it passes. A change of behavior without such a test states the reason in the
   pull request.
+- Build, lint and test only through make targets (`make code-lint`, `make test-unit`,
+  `make test-e2e FOCUS=...`, `make docs-build`, ...); never call golangci-lint, go vet, ginkgo, kind,
+  helm or other tools directly. When no target fits, say so instead of working around make.
 - Commits follow Conventional Commits (`make code-lint-commits`). No AI attribution trailers or
   footers in commits and pull requests.
 - Never force-push or rewrite history. Never publish, tag or push releases or images.
