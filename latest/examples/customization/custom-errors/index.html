@@ -2876,11 +2876,9 @@ Remove <code>extraVolumes</code> / <code>extraVolumeMounts</code> from the value
 <h2 id="without-helm">Without Helm<a class="headerlink" href="#without-helm" title="Permanent link"> ¶</a></h2>
 <h3 id="customized-default-backend">Customized default backend<a class="headerlink" href="#customized-default-backend" title="Permanent link"> ¶</a></h3>
 <p>First, create the custom <code>default-backend</code>. It will be used by the Ingress controller later on.</p>
-<p>To do that, use the <a href="custom-default-backend.yaml">example manifest</a>. Replace <code>&lt;version&gt;</code> with a release version
-(see the <a href="https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases">releases page</a>) and create it in the namespace
-of the controller:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span><span class="nv">VERSION</span><span class="o">=</span>&lt;version&gt;
-<span class="gp">$ </span>sed<span class="w"> </span><span class="s2">"s/&lt;version&gt;/</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">/"</span><span class="w"> </span>custom-default-backend.yaml<span class="w"> </span><span class="p">|</span><span class="w"> </span>kubectl<span class="w"> </span>-n<span class="w"> </span>ingress-nginx-neo<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>-
+<p>To do that, use the <a href="custom-default-backend.yaml">example manifest</a> with the image of the release <code>&lt;version&gt;</code> and
+create it in the namespace of the controller:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>sed<span class="w"> </span><span class="s2">"s/RELEASE_VERSION/&lt;version&gt;/"</span><span class="w"> </span>custom-default-backend.yaml<span class="w"> </span><span class="p">|</span><span class="w"> </span>kubectl<span class="w"> </span>-n<span class="w"> </span>ingress-nginx-neo<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>-
 <span class="go">service/nginx-errors created</span>
 <span class="go">deployment.apps/nginx-errors created</span>
 </code></pre></div>

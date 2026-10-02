@@ -2654,11 +2654,9 @@
 </li>
 <li>
 <p>Create the backends and the Ingress from <a href="multi-tls.yaml">multi-tls.yaml</a>. The <code>http-svc</code> backend uses the
-   echo server image <code>ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo</code>; replace <code>&lt;version&gt;</code> with a release version
-   (see the <a href="https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases">releases page</a>):</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span><span class="nv">VERSION</span><span class="o">=</span>&lt;version&gt;
-<span class="gp">$ </span>curl<span class="w"> </span>-sL<span class="w"> </span>https://raw.githubusercontent.com/Kuzmenko-Pavel/ingress-nginx-neo/main/docs/examples/multi-tls/multi-tls.yaml<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s2">"s/&lt;version&gt;/</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">/"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>-
+   echo server image <code>ghcr.io/kuzmenko-pavel/ingress-nginx-neo/e2e-test-echo</code> of the release <code>&lt;version&gt;</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>curl<span class="w"> </span>-sL<span class="w"> </span>https://raw.githubusercontent.com/Kuzmenko-Pavel/ingress-nginx-neo/main/docs/examples/multi-tls/multi-tls.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span><span class="s2">"s/RELEASE_VERSION/&lt;version&gt;/"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>-
 </code></pre></div>
 </li>
 </ol>

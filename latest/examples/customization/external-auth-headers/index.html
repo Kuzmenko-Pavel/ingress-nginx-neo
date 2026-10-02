@@ -2788,15 +2788,13 @@ to a backend service.</p>
 <li>Private, which allows access from authenticated users only</li>
 </ul>
 <p>Deploy the example from this directory. <a href="echo-service.yaml">echo-service.yaml</a> references the echo image as
-<code>e2e-test-echo:&lt;version&gt;</code>; replace <code>&lt;version&gt;</code> with a release version
-(see the <a href="https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases">releases page</a>):</p>
-<div class="highlight"><pre><span></span><code><span class="gp">$ </span><span class="nv">VERSION</span><span class="o">=</span>&lt;version&gt;
-<span class="gp">$ </span>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>auth-service.yaml
+<code>e2e-test-echo:RELEASE_VERSION</code>; the commands below set it to the release <code>&lt;version&gt;</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>auth-service.yaml
 <span class="go">configmap/demo-auth-service created</span>
 <span class="go">deployment.apps/demo-auth-service created</span>
 <span class="go">service/demo-auth-service created</span>
 
-<span class="gp">$ </span>sed<span class="w"> </span><span class="s2">"s/&lt;version&gt;/</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span><span class="s2">/"</span><span class="w"> </span>echo-service.yaml<span class="w"> </span><span class="p">|</span><span class="w"> </span>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>-
+<span class="gp">$ </span>sed<span class="w"> </span><span class="s2">"s/RELEASE_VERSION/&lt;version&gt;/"</span><span class="w"> </span>echo-service.yaml<span class="w"> </span><span class="p">|</span><span class="w"> </span>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>-
 <span class="go">deployment.apps/demo-echo-service created</span>
 <span class="go">service/demo-echo-service created</span>
 <span class="go">ingress.networking.k8s.io/public-demo-echo-service created</span>

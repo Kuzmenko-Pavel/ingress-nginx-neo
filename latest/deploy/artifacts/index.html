@@ -2981,7 +2981,8 @@
 <h1 id="artifacts-and-verification">Artifacts and verification<a class="headerlink" href="#artifacts-and-verification" title="Permanent link"> ¶</a></h1>
 <p>Every ingress-nginx-neo release publishes container images and a Helm chart to the GitHub Container Registry
 (<code>ghcr.io</code>) and attaches static manifests, the kubectl plugin and checksum files to the GitHub release. All
-artifacts of a release share one version <code>vX.Y.Z</code>; the chart version is the same number without the <code>v</code> prefix.
+artifacts of a release share one version <code>vX.Y.Z</code>. The chart is stored with the same number without the <code>v</code> prefix
+(<code>X.Y.Z</code>, as SemVer requires); Helm accepts <code>vX.Y.Z</code> as <code>--version</code>.
 Releases are listed on the <a href="https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases">releases page</a>.</p>
 <h2 id="artifacts">Artifacts<a class="headerlink" href="#artifacts" title="Permanent link"> ¶</a></h2>
 <h3 id="images">Images<a class="headerlink" href="#images" title="Permanent link"> ¶</a></h3>
@@ -3084,9 +3085,8 @@ Releases are listed on the <a href="https://github.com/Kuzmenko-Pavel/ingress-ng
 </tbody>
 </table>
 <p>Release assets are downloaded from
-<code>https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/&lt;version&gt;/&lt;file&gt;</code>, where <code>&lt;version&gt;</code> is the
-release tag <code>vX.Y.Z</code>. See <a href="../">Installation</a> for the manifests and <a href="../../kubectl-plugin/">kubectl plugin</a>
-for the plugin.</p>
+<code>https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/&lt;version&gt;/&lt;file&gt;</code>. See
+<a href="../">Installation</a> for the manifests and <a href="../../kubectl-plugin/">kubectl plugin</a> for the plugin.</p>
 <h2 id="tags-and-digests">Tags and digests<a class="headerlink" href="#tags-and-digests" title="Permanent link"> ¶</a></h2>
 <ul>
 <li>Image tags are the release version <code>vX.Y.Z</code>. The released chart has the appVersion <code>vX.Y.Z</code> and pins the digest of
@@ -3113,9 +3113,9 @@ release tag.</p>
 image you run, use its digest reference (<code>ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller@sha256:...</code>) from the
 release notes or from the running pod.</p>
 <h3 id="helm-chart">Helm chart<a class="headerlink" href="#helm-chart" title="Permanent link"> ¶</a></h3>
-<p>The chart is verified like an image, with the chart version (<code>X.Y.Z</code>) as the tag and the release tag (<code>vX.Y.Z</code>) in
-the identity:</p>
-<div class="highlight"><pre><span></span><code><span class="go">cosign verify ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo:&lt;chart version&gt; \</span>
+<p>The chart is verified like an image. Its tag is the version without the <code>v</code> prefix, the identity has the release tag:</p>
+<div class="highlight"><pre><span></span><code><span class="go">VERSION=&lt;version&gt;</span>
+<span class="go">cosign verify ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo:${VERSION#v} \</span>
 <span class="go">  --certificate-identity-regexp '^https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/\.github/workflows/release\.yaml@refs/tags/&lt;version&gt;$' \</span>
 <span class="go">  --certificate-oidc-issuer https://token.actions.githubusercontent.com</span>
 </code></pre></div>

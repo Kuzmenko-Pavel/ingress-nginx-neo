@@ -2759,8 +2759,8 @@ configuration work unchanged:</p>
 <p>Chart, image and resource names are specific to ingress-nginx-neo. See
 <a href="deploy/migrate/">Migrate from kubernetes/ingress-nginx</a> for the details.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link"> ¶</a></h2>
-<p>Install the Helm chart from the OCI registry. Replace <code>&lt;version&gt;</code> with a version from the
-<a href="https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases">releases page</a>:</p>
+<p>Install the release <code>&lt;version&gt;</code> of the Helm chart from the OCI registry (other versions are on the
+<a href="https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases">releases page</a>):</p>
 <div class="highlight"><pre><span></span><code><span class="go">helm install ingress-nginx-neo oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \</span>
 <span class="go">  --version &lt;version&gt; \</span>
 <span class="go">  --namespace ingress-nginx-neo --create-namespace</span>

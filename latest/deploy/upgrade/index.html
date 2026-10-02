@@ -2845,7 +2845,7 @@ an installation of kubernetes/ingress-nginx to ingress-nginx-neo, see
 <h2 id="versioning-policy">Versioning policy<a class="headerlink" href="#versioning-policy" title="Permanent link"> ¶</a></h2>
 <ul>
 <li>Every release has one version <code>vX.Y.Z</code> that applies to all artifacts: images, Helm chart, kubectl plugin,
-  static manifests and documentation. The chart version is the same number without the <code>v</code> prefix.</li>
+  static manifests and documentation. Helm accepts it as the chart version.</li>
 <li>ingress-nginx-neo uses 0.x versions. A <strong>minor</strong> release (<code>0.Y.0</code>) may contain breaking changes; they are always
   listed in the <strong>Breaking changes</strong> section of its release notes. A <strong>patch</strong> release (<code>0.Y.Z</code>) contains only fixes.</li>
 <li>Only the latest minor release is supported. Upgrade to the latest patch release of the latest minor release to
@@ -2854,7 +2854,7 @@ an installation of kubernetes/ingress-nginx to ingress-nginx-neo, see
   version.</li>
 </ul>
 <h2 id="with-helm">With Helm<a class="headerlink" href="#with-helm" title="Permanent link"> ¶</a></h2>
-<p>Upgrade the release to the chart version of the target release (<code>&lt;version&gt;</code> is <code>X.Y.Z</code>, without <code>v</code>):</p>
+<p>Upgrade the release to the target release, here <code>&lt;version&gt;</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="go">helm upgrade ingress-nginx-neo oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \</span>
 <span class="go">  --version &lt;version&gt; \</span>
 <span class="go">  --namespace ingress-nginx-neo \</span>
@@ -2878,10 +2878,10 @@ not set image tags or digests yourself, unless they point to a mirror (see
 </code></pre></div>
 <p>A rollback restores the chart, values and image digests of that revision.</p>
 <h2 id="with-static-manifests">With static manifests<a class="headerlink" href="#with-static-manifests" title="Permanent link"> ¶</a></h2>
-<p>Apply the manifest of the target release for the same provider you installed:</p>
+<p>Apply the manifest of the target release, here <code>&lt;version&gt;</code>, for the same provider you installed:</p>
 <div class="highlight"><pre><span></span><code><span class="go">kubectl apply -f https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/releases/download/&lt;version&gt;/deploy-&lt;provider&gt;.yaml</span>
 </code></pre></div>
-<p>Here <code>&lt;version&gt;</code> is the release tag <code>vX.Y.Z</code>. The manifest pins every image by digest, so applying it upgrades the
+<p>The manifest pins every image by digest, so applying it upgrades the
 controller, the admission webhook jobs and all other resources together. <code>kubectl apply</code> does not delete resources
 that are missing from the new manifest; delete them yourself if the release notes mention such a change.</p>
 <p>To roll back, apply the manifest of the release you upgraded from.</p>

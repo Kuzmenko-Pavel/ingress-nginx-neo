@@ -2858,6 +2858,12 @@ No file in the repository holds a version.</p>
 <td><code>X.Y</code></td>
 </tr>
 <tr>
+<td><code>&lt;version&gt;</code> in the docs pages</td>
+<td>highest published release</td>
+<td>highest published release</td>
+<td><code>vX.Y.Z</code></td>
+</tr>
+<tr>
 <td>image digests pinned in the chart</td>
 <td>no</td>
 <td>no</td>
@@ -2874,6 +2880,11 @@ No file in the repository holds a version.</p>
 <div class="highlight"><pre><span></span><code><span class="go">make version</span>
 <span class="go">make version CHANNEL=release VERSION=vX.Y.Z</span>
 </code></pre></div>
+<p>Documentation pages write the release as the placeholder <code>&lt;version&gt;</code>, always inside code. The MkDocs hook
+<code>tools/docs/release_version.py</code> replaces it with <code>DOCS_RELEASE_TAG</code>, which the Makefile sets from the row
+above; before the first release the placeholder stays.
+Example manifests under <code>docs/examples</code> use the placeholder <code>RELEASE_VERSION</code>, replaced by the <code>sed</code>
+commands of their pages.</p>
 <p><code>charts/ingress-nginx-neo/Chart.yaml</code> carries <code>version: 0.0.0-latest</code> and <code>appVersion: latest</code>, and
 <code>values.yaml</code> leaves image tags and digests empty: image tags default to the chart <code>appVersion</code>.
 Every use of the chart by the Makefile goes through a copy in <code>dist/chart/</code> that gets the version of

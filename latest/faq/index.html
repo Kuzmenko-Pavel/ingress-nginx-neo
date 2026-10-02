@@ -2880,7 +2880,7 @@
 <h2 id="multiple-controller-in-one-cluster">Multiple controller in one cluster<a class="headerlink" href="#multiple-controller-in-one-cluster" title="Permanent link"> ¶</a></h2>
 <p>Question - How can I easily install multiple instances of the controller in the same cluster?</p>
 <p>You can install them in different namespaces, each with its own IngressClass. With Helm (see
-<a href="../deploy/">Installation</a> for the <code>&lt;version&gt;</code> to use):</p>
+<a href="../deploy/">Installation</a>):</p>
 <div class="highlight"><pre><span></span><code>helm install ingress-nginx-neo-2 oci://ghcr.io/kuzmenko-pavel/ingress-nginx-neo/charts/ingress-nginx-neo \
   --version &lt;version&gt; \
   --namespace ingress-nginx-neo-2 --create-namespace \
