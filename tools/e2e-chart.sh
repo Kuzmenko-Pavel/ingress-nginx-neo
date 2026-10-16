@@ -233,6 +233,24 @@ fi
 expect "${other}" resilience.test 301 "https://example.test/resilience.test"
 echo "  ${victim} scaled to 0, an Ingress of ${other} was created and is served"
 
+# A second release with the default IngressClass explains what to set.
+echo "checking a taken IngressClass"
+namespace_of[taken-1]="${NAMESPACE}-taken-1"
+namespace_of[taken-2]="${NAMESPACE}-taken-2"
+releases+=(taken-1)
+"$HELM" install taken-1 "${chart}" --namespace "${namespace_of[taken-1]}" --create-namespace \
+  "${common_args[@]}" --set controller.service.type=ClusterIP --hide-notes >/dev/null
+if out="$("$HELM" install taken-2 "${chart}" --namespace "${namespace_of[taken-2]}" --create-namespace \
+  "${common_args[@]}" --set controller.service.type=ClusterIP --hide-notes 2>&1)"; then
+  echo "  a second release with the IngressClass nginx was installed" >&2
+  exit 1
+fi
+if [[ "${out}" != *'IngressClass "nginx" already belongs to release "taken-1"'*'controller.ingressClassResource.name'* ]]; then
+  printf '  unexpected error of the second release:\n%s\n' "${out}" >&2
+  exit 1
+fi
+echo "  the second release with the IngressClass nginx stops with a hint"
+
 echo "uninstalling"
 for release in "${releases[@]}"; do
   "$HELM" uninstall "${release}" --namespace "${namespace_of[${release}]}" >"${work}/${release}-uninstall.log" 2>&1 &

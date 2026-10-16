@@ -80,6 +80,11 @@ controller:
 
     Ingresses without a class are therefore ignored by default. Enable `--watch-ingress-without-class` on one controller only.
 
+When a second release of the chart is installed without its own values, its IngressClass `nginx`
+already belongs to the first release. The installation stops with a message which release owns the
+class and which values to set. The check reads the IngressClass from the cluster, so it does not run
+when the chart is rendered without a cluster (`helm template`, Argo CD by default).
+
 ## Admission webhooks with several controllers
 
 Every release of the chart creates a ValidatingWebhookConfiguration with `failurePolicy: Fail`. By
