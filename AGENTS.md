@@ -52,10 +52,10 @@ release as `<version>` (inside code); the build substitutes it (`docs/developer-
   `nginx.ingress.kubernetes.io`, IngressClass `nginx`, controller value `k8s.io/ingress-nginx`,
   ConfigMap keys, metrics, command line arguments. Several controllers with their own classes in
   one cluster are supported and tested (chart e2e).
-- Test first: before a change of behavior or a bug fix, write a test that fails without it (Go
-  unit, Lua, chart or e2e test; a lint rule when a test cannot express the defect), then change
-  the code until it passes. A change of behavior without such a test states the reason in the
-  pull request.
+- Test first: before a change of behavior or a bug fix, write a test that fails without it, at the
+  level from `docs/developer-guide/testing.md#which-test` (Go unit, Lua, chart or e2e test; a lint
+  rule when a test cannot express the defect), then change the code until it passes. A change of
+  behavior without such a test states the reason in the pull request.
 - Build, lint and test only through make targets (`make code-lint`, `make test-unit`,
   `make test-e2e FOCUS=...`, `make docs-build`, ...); never call golangci-lint, go vet, ginkgo, kind,
   helm or other tools directly. When no target fits, say so instead of working around make.

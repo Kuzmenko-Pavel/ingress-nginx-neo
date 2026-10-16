@@ -20,6 +20,35 @@ or e2e test, or a lint rule when a test cannot express the defect. The code is t
 the test passes, so the test proves both the defect and the fix. A change of behavior without such
 a test states the reason in the pull request.
 
+## Which test
+
+A test is written at the lowest level that catches the defect. e2e is needed only for behavior that
+shows only on a running NGINX in a cluster. A test of a lower level runs in milliseconds instead of
+tens of seconds, points to the cause of a failure more precisely and does not fail because of the
+cluster. e2e checks what happens only on the path of a request through NGINX and Lua to a backend.
+
+| What changes | Required test | e2e is needed as well when | Why |
+|--------------|---------------|----------------------------|-----|
+| parsing of an annotation or a ConfigMap key (`internal/ingress/annotations/*`, `internal/ingress/controller/config`) | Go unit: parsing, default value, errors, risk level | the annotation changes the handling of requests. One spec per behavior, not per value | the parser is a pure function, every branch is checked in milliseconds. e2e only confirms that the behavior reaches the traffic |
+| the template `rootfs/etc/nginx/template/nginx.tmpl` | Go unit on the rendered result (`internal/ingress/controller/template`) | the behavior of a request or a response changes | which line ends up in nginx.conf is decided by rendering, not by the cluster |
+| Lua (`rootfs/etc/nginx/lua`) | busted test `*_test.lua` | the synchronization of the configuration or the balancing on a running NGINX changes | busted checks the Lua logic, e2e is needed only for the integration with NGINX |
+| store, synchronization, admission (`internal/ingress/controller/store`, `internal/admission`) | Go unit, envtest where a real API server is needed (as in the store tests) | an end-to-end path changes, for example admission rejects an Ingress | envtest gives a real kube-apiserver without NGINX and a cluster |
+| chart templates and values | helm-unittest (`charts/ingress-nginx-neo/tests`) | a new installation mode appears. It gets a values file in `charts/ingress-nginx-neo/ci/`, and chart e2e checks it | templates are checked by rendering, chart e2e checks that the configuration installs and works |
+| a controller flag | Go unit on the parsing of the flag (`pkg/flags`) | the flag changes the handling of requests | |
+| kubectl plugin (`cmd/plugin`) | Go unit | no | the plugin does not handle traffic |
+| a bug fix | a test that reproduces the bug at the lowest level where it shows | the bug shows only on traffic | the test fails without the fix and so proves both the bug and the fix |
+
+For a change that is not in the table, the level follows from the column "Why".
+
+### Example: a new annotation
+
+1. The parser in `internal/ingress/annotations/<name>/` and a unit test of parsing, the default value and errors.
+2. The risk level of the annotation (`Risk` in the annotation description).
+3. The use in the template and a unit test of the rendering.
+4. One e2e spec with an HTTP request, when the annotation changes the handling of requests.
+5. `make docs-generate`, it updates `annotations-risk.md`.
+6. `make check` and `make test-e2e FOCUS=<name>`.
+
 ## Unit tests
 
 Go and Lua unit tests run in the `e2e-test-runner` image (`tools/run-in-container.sh`), with the
@@ -101,6 +130,33 @@ in `test/e2e/framework/images.go`.
 
 The specs are Ginkgo specs in `test/e2e`; `FOCUS` matches their descriptions, for example the
 `Describe` texts of [test/e2e/defaultbackend](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/test/e2e/defaultbackend).
+
+### Writing an e2e spec
+
+1. **Check the behavior with a request.** The spec sends a request (`f.HTTPTestClient()`) and checks
+   the response: status, headers, body. A check that a line is in nginx.conf is fine as an
+   intermediate wait, but not as the only check. Otherwise it is a unit test of the rendering, only
+   a thousand times slower. The model is `test/e2e/annotations/approot.go`. It creates an Ingress
+   with `app-root: /foo`, sends a request to `/` and expects `302` with
+   `Location: http://approot.bar.com/foo`.
+2. **Wait for a condition, not for time.** `f.WaitForNginxServer`, `f.WaitForNginxConfiguration`,
+   `f.WaitForReload` and the other `Wait*` of `test/e2e/framework` instead of `framework.Sleep` and
+   `time.Sleep`. A sleep is either too long, and the spec is slow, or too short, and the spec is
+   flaky on a slow runner. It also hides races. When a sleep is really needed (a check that nothing
+   happens within N seconds), a comment next to it states the reason.
+3. **Self-contained.** The spec creates its own resources and does not depend on other specs or
+   their order. The suite runs the specs in parallel and in random order (`--randomize-all`).
+4. **A separate installation only when needed.** `framework.IngressNginxDescribeSerial` runs the specs
+   one at a time. A namespace overlay (`test/e2e-image/namespace-overlays/<name>/values.yaml`, used
+   when the name of the framework equals `<name>`) changes the chart values of the controller of the
+   spec. They are needed only when the spec changes global state: controller flags, cluster-scoped
+   resources. A comment at the describe states the reason. Serial specs run one at a time and make
+   the whole run longer.
+5. **Time budget.** A spec longer than 60 seconds states the reason in the pull request. Every
+   second of a spec is multiplied by the number of variants and Kubernetes versions in CI.
+6. **A flaky spec does not hide behind a retry.** The suite makes up to two attempts
+   (`--flake-attempts=2`). A spec that passes on the second attempt is a defect. It gets an issue
+   and is fixed.
 
 ## Chart e2e
 
