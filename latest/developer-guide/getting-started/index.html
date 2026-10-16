@@ -2403,6 +2403,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="System requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional tools
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2599,6 +2616,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../local-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running CI locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../release/" class="md-nav__link">
         
   
@@ -2743,6 +2788,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="System requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional tools
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2895,6 +2957,11 @@ kubeconform, cosign, crane, govulncheck, actionlint, ginkgo) is pinned in <code>
 hash of their pins, so changing a pin installs a new set.</p>
 <p>Optional local overrides of Makefile variables go into a gitignored <code>.env</code> file at the repository
 root (for example <code>REGISTRY=ghcr.io/&lt;you&gt;/ingress-nginx-neo</code>).</p>
+<h3 id="optional-tools">Optional tools<a class="headerlink" href="#optional-tools" title="Permanent link"> ¶</a></h3>
+<p>act runs GitHub Actions workflows locally in Docker. Use it when you change
+<code>.github/workflows/*</code>, to see before a push which jobs a pull request runs and how the matrix
+expands. act does not replace CI and does not run the checks themselves, the make targets do. See
+<a href="../local-ci/">Running CI workflows locally</a>.</p>
 <h2 id="first-steps">First steps<a class="headerlink" href="#first-steps" title="Permanent link"> ¶</a></h2>
 <div class="highlight"><pre><span></span><code><span class="go">git clone https://github.com/Kuzmenko-Pavel/ingress-nginx-neo.git</span>
 <span class="go">cd ingress-nginx-neo</span>
@@ -2906,6 +2973,11 @@ root (for example <code>REGISTRY=ghcr.io/&lt;you&gt;/ingress-nginx-neo</code>).<
 <code>helm-lint</code> and <code>helm-test</code>. Go and Lua unit tests run inside the <code>e2e-test-runner</code> image, which
 the Makefile pulls (or builds when its sources changed); see <a href="../images/">Images</a>.</p>
 <h2 id="adding-a-make-target">Adding a make target<a class="headerlink" href="#adding-a-make-target" title="Permanent link"> ¶</a></h2>
+<p>The root <code>Makefile</code> holds the shared variables (coordinates, versions and channel, tools, images) and
+the shared targets (<code>help</code>, <code>version</code>, <code>tools</code>, <code>clean</code>, <code>check</code>, internal <code>print-*</code>, <code>ci-result</code>,
+<code>publish-guard</code>). Domain targets live in <code>make/&lt;domain&gt;.mk</code> (<code>code</code>, <code>test</code>, <code>images</code>, <code>helm</code>,
+<code>manifests</code>, <code>docs</code>, <code>release</code>, <code>dev</code>, <code>security</code>), included in this order; a new target goes into
+the file of its domain.</p>
 <p>A target appears in <code>make help</code> when the line directly above it is <code>## &lt;description&gt;</code>; a
 description that ends in <code>| &lt;group&gt;</code> starts a new group, and the following targets belong to it
 until the next group. Targets without such a line are internal. Recipes longer than a few lines
@@ -2977,6 +3049,10 @@ see <a href="../testing/#load-tests">Testing</a>.</p>
 <tr>
 <td><code>test/</code></td>
 <td>e2e suite and scripts, unit test entry points</td>
+</tr>
+<tr>
+<td><code>make/</code></td>
+<td>Makefile targets by domain, included by the root <code>Makefile</code></td>
 </tr>
 <tr>
 <td><code>tools/</code></td>

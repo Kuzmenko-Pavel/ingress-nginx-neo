@@ -16,7 +16,7 @@
         <link rel="prev" href="../testing/">
       
       
-        <link rel="next" href="../release/">
+        <link rel="next" href="../local-ci/">
       
       
         
@@ -2529,6 +2529,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#when-jobs-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When jobs run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#caches-and-artifacts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2565,6 +2576,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running CI locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2736,6 +2775,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#when-jobs-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When jobs run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#caches-and-artifacts" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2792,6 +2842,12 @@
 <p>CI runs on GitHub Actions with standard runners (<code>ubuntu-latest</code>, <code>ubuntu-24.04-arm</code>). Every step
 calls a <code>make</code> target, so each check can be reproduced locally with the same command and the same
 pinned tools. Workflows authenticate with <code>GITHUB_TOKEN</code> only and sign with cosign keyless signing.</p>
+<p>CI gives make only the environment (the runner, tokens, OIDC for signing, push access). It also
+decides when and in which order targets run. What to do and with which values is defined by the
+Makefile. Every value CI passes to make has a default or a derivation rule in the Makefile. The only
+intent the publishing jobs state explicitly is <code>CHANNEL</code> (see <a href="../release/">Release</a>).</p>
+<p>A workflow change can be checked before a push with act, see
+<a href="../local-ci/">Running CI workflows locally</a>.</p>
 <h2 id="workflows">Workflows<a class="headerlink" href="#workflows" title="Permanent link"> ¶</a></h2>
 <table>
 <thead>
@@ -2877,7 +2933,7 @@ pinned tools. Workflows authenticate with <code>GITHUB_TOKEN</code> only and sig
 <tr>
 <td>Docs</td>
 <td><code>make docs-build docs-publish-check</code></td>
-<td>docs or CI changes; always outside pull requests</td>
+<td>groups <code>docs</code>, <code>build-system</code>, <code>workflow</code>; always outside pull requests</td>
 </tr>
 <tr>
 <td>Dependency scan</td>
@@ -2887,12 +2943,12 @@ pinned tools. Workflows authenticate with <code>GITHUB_TOKEN</code> only and sig
 <tr>
 <td>Build images</td>
 <td><code>make docker-load docker-build docker-build-e2e docker-save</code></td>
-<td>code, chart, image or CI changes; always outside pull requests</td>
+<td>any group except <code>docs</code> and <code>certgen</code>; always outside pull requests</td>
 </tr>
 <tr>
 <td>E2E</td>
 <td><code>make docker-load test-e2e SKIP_BUILD=1 K8S_VERSION=… E2E_VARIANT=…</code></td>
-<td>every Kubernetes version × <code>default</code>, <code>chroot</code></td>
+<td>every Kubernetes version × every variant</td>
 </tr>
 <tr>
 <td>Chart e2e</td>
@@ -2902,7 +2958,7 @@ pinned tools. Workflows authenticate with <code>GITHUB_TOKEN</code> only and sig
 <tr>
 <td>kube-webhook-certgen e2e</td>
 <td><code>make test-e2e-certgen</code></td>
-<td>certgen changes; always outside pull requests</td>
+<td>groups <code>certgen</code>, <code>e2e</code>, <code>build-system</code>, <code>workflow</code>; always outside pull requests</td>
 </tr>
 <tr>
 <td><strong>CI result</strong></td>
@@ -2911,7 +2967,7 @@ pinned tools. Workflows authenticate with <code>GITHUB_TOKEN</code> only and sig
 </tr>
 <tr>
 <td>Publish latest</td>
-<td><code>make publish-guard docker-publish docker-promote docker-sign helm-package helm-publish CHANNEL=latest</code>, <code>make code-build-plugin CHANNEL=latest</code></td>
+<td><code>make docker-publish docker-promote docker-sign helm-package helm-publish CHANNEL=latest</code>, <code>make code-build-plugin CHANNEL=latest</code></td>
 <td>pushes to <code>main</code> and manual runs on <code>main</code>, after CI result passed</td>
 </tr>
 <tr>
@@ -2921,17 +2977,78 @@ pinned tools. Workflows authenticate with <code>GITHUB_TOKEN</code> only and sig
 </tr>
 </tbody>
 </table>
-<p>The Kubernetes matrix comes from <code>make -s print-k8s-versions</code>, the dependency image platforms from
-<code>make -s print-deps-platforms</code>.</p>
+<p>The Kubernetes matrix comes from <code>make -s print-k8s-versions</code>, the e2e variants from
+<code>make -s print-e2e-variants</code>, the dependency image platforms from <code>make -s print-deps-platforms</code>.</p>
 <p><strong>CI result</strong> is the only required status check of <code>main</code> and <code>release-*</code>: it fails when any job
 failed or was cancelled; skipped jobs count as passed. A release is published only from a commit
 whose CI result passed.</p>
 <p>Images built in one job reach the others as workflow artifacts (<code>docker-save</code>, <code>docker-load</code>). On
 pull requests the dependency images are pulled when published and built locally otherwise; on
 <code>main</code> they are published before the checks, so the first push to an empty repository works.</p>
-<p>The <code>latest</code> channel is published only from the tip of <code>main</code> (<code>publish-guard</code>); a newer push
-cancels an older publication. Jobs that write to <code>gh-pages</code> share one concurrency group and never
-cancel each other.</p>
+<p>The <code>latest</code> channel is published only from the tip of <code>main</code> (<code>publish-guard</code>, a prerequisite of
+every publishing target); a newer push cancels an older publication. Jobs that write to <code>gh-pages</code>
+share one concurrency group and never cancel each other.</p>
+<h2 id="when-jobs-run">When jobs run<a class="headerlink" href="#when-jobs-run" title="Permanent link"> ¶</a></h2>
+<p>On pull requests the <code>Changes</code> job (<code>dorny/paths-filter</code>) sorts the changed files into groups. The
+cheap jobs (Lint, Unit tests, Generated files, Helm chart, Dependency scan, CI result) always run.
+Image builds and e2e (E2E and Chart e2e follow Build images) run only when the change can affect
+them. Pushes and manual runs have no filters and run everything.</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Paths</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>go</code></td>
+<td><code>**/*.go</code>, <code>**/go.mod</code>, <code>**/go.sum</code></td>
+</tr>
+<tr>
+<td><code>lua</code></td>
+<td><code>rootfs/etc/nginx/lua/**</code></td>
+</tr>
+<tr>
+<td><code>template</code></td>
+<td><code>rootfs/**</code></td>
+</tr>
+<tr>
+<td><code>chart</code></td>
+<td><code>charts/**</code>, <code>make/helm.mk</code>, <code>make/manifests.mk</code>, <code>tools/manifest-templates/**</code>, <code>tools/generate-manifests.sh</code></td>
+</tr>
+<tr>
+<td><code>images-deps</code></td>
+<td><code>images/</code> of the dependency images (<code>nginx</code>, <code>test-runner</code>, <code>e2e-test-echo</code>, <code>httpbun</code>, <code>fastcgi-helloserver</code>, <code>cfssl</code>)</td>
+</tr>
+<tr>
+<td><code>images-delivered</code></td>
+<td><code>rootfs/**</code>, <code>images/kube-webhook-certgen/**</code>, <code>images/custom-error-pages/**</code></td>
+</tr>
+<tr>
+<td><code>certgen</code></td>
+<td><code>images/kube-webhook-certgen/**</code>, <code>tools/e2e-certgen.sh</code></td>
+</tr>
+<tr>
+<td><code>docs</code></td>
+<td><code>docs/**</code>, <code>mkdocs.yml</code>, <code>charts/**</code>, <code>make/docs.mk</code>, <code>tools/docs/**</code>, <code>tools/docs-publish.sh</code></td>
+</tr>
+<tr>
+<td><code>e2e</code></td>
+<td><code>test/**</code>, <code>make/test.mk</code>, <code>make/images.mk</code>, <code>tools/content-tag.sh</code>, <code>tools/image-exists.sh</code>, <code>tools/e2e-chart.sh</code></td>
+</tr>
+<tr>
+<td><code>build-system</code></td>
+<td><code>Makefile</code>, <code>make/code.mk</code>, <code>tools/go.mod</code>, <code>tools/go.sum</code>, <code>tools/versions.env</code>, <code>tools/install.sh</code>, <code>tools/actionlint/**</code></td>
+</tr>
+<tr>
+<td><code>workflow</code></td>
+<td><code>.github/**</code>, any workflow change runs the whole CI</td>
+</tr>
+</tbody>
+</table>
+<p>Paths outside the groups (for example <code>tools/release/**</code>, <code>make/release.mk</code>, <code>AGENTS.md</code>) run only
+the cheap jobs. Unit tests and lint check them; they do not affect the build or e2e.</p>
 <h2 id="caches-and-artifacts">Caches and artifacts<a class="headerlink" href="#caches-and-artifacts" title="Permanent link"> ¶</a></h2>
 <ul>
 <li><code>.cache/tools</code> is cached under a key of the hashes of <code>tools/**/go.mod</code>, <code>tools/**/go.sum</code>,

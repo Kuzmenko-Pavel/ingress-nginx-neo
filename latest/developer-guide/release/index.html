@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://kuzmenko-pavel.github.io/ingress-nginx-neo/latest/developer-guide/release/">
       
       
-        <link rel="prev" href="../ci/">
+        <link rel="prev" href="../local-ci/">
       
       
         <link rel="next" href="../backporting/">
@@ -2472,6 +2472,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../local-ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running CI locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -2561,6 +2589,17 @@
     <span class="md-ellipsis">
       
         Release workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#publishing-without-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing without CI
       
     </span>
   </a>
@@ -2758,6 +2797,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#publishing-without-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing without CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#trusted-release-managers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2816,14 +2866,17 @@
 artifact of the release takes its version from it: images <code>vX.Y.Z</code>, chart <code>X.Y.Z</code> with
 <code>appVersion</code> <code>vX.Y.Z</code>, kubectl plugin, static manifests and the documentation version <code>X.Y</code>.
 No file in the repository holds a version.</p>
-<p>The Makefile derives everything from <code>VERSION</code> and <code>CHANNEL</code> once per run:</p>
+<p>The Makefile derives everything from <code>VERSION</code> and <code>CHANNEL</code> once per run. The channel follows the
+git state, the same for a human and CI. A release tag on <code>HEAD</code> is <code>release</code>, the tip of
+<code>origin/main</code> is <code>latest</code>, anything else is <code>dev</code>. <code>CHANNEL=...</code> overrides it; <code>make version</code> prints
+the channel and the reason.</p>
 <table>
 <thead>
 <tr>
 <th></th>
-<th><code>CHANNEL=dev</code> (local)</th>
-<th><code>CHANNEL=latest</code> (CI on <code>main</code>)</th>
-<th><code>CHANNEL=release</code> (CI on a tag)</th>
+<th><code>CHANNEL=dev</code> (own branch)</th>
+<th><code>CHANNEL=latest</code> (tip of <code>main</code>)</th>
+<th><code>CHANNEL=release</code> (release tag)</th>
 </tr>
 </thead>
 <tbody>
@@ -2831,7 +2884,7 @@ No file in the repository holds a version.</p>
 <td><code>VERSION</code></td>
 <td><code>git describe</code> of the nearest release tag, else <code>v0.0.0-dev</code></td>
 <td>same</td>
-<td>the tag of the run (<code>RELEASE_TAG</code>, <code>GITHUB_REF_NAME</code>)</td>
+<td>the tag on <code>HEAD</code> (<code>RELEASE_TAG</code>)</td>
 </tr>
 <tr>
 <td>image tag</td>
@@ -2880,6 +2933,9 @@ No file in the repository holds a version.</p>
 <div class="highlight"><pre><span></span><code><span class="go">make version</span>
 <span class="go">make version CHANNEL=release VERSION=vX.Y.Z</span>
 </code></pre></div>
+<p>A build on an up-to-date <code>main</code> gets the channel <code>latest</code>. Its images <code>:latest</code> in the local image
+store shadow the registry images of the same name on that machine. When this is in the way, use
+<code>CHANNEL=dev</code>.</p>
 <p>Documentation pages write the release as the placeholder <code>&lt;version&gt;</code>, always inside code. The MkDocs hook
 <code>tools/docs/release_version.py</code> replaces it with <code>DOCS_RELEASE_TAG</code>, which the Makefile sets from the row
 above; before the first release the placeholder stays.
@@ -2894,24 +2950,22 @@ the channel and, for a release, the digests of the published images; the package
 <strong>Breaking changes</strong> in the release notes; a patch release contains fixes only. The latest minor is
 supported. Published versions are immutable.</p>
 <h2 id="creating-a-release">Creating a release<a class="headerlink" href="#creating-a-release" title="Permanent link"> ¶</a></h2>
-<p>Releases are cut from <code>main</code> (or from a <code>release-X.Y</code> branch for a hotfix), in a clone whose
-<code>origin</code> is <code>Kuzmenko-Pavel/ingress-nginx-neo</code>, with an OpenPGP signing key listed in
-<code>trusted_release_managers.yml</code>.</p>
+<p>Releases are cut from <code>main</code> (or from a <code>release-X.Y</code> branch for a hotfix), with an OpenPGP signing
+key listed in <code>trusted_release_managers.yml</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="go">git switch main &amp;&amp; git pull</span>
-<span class="go">make release-tag                         # proposes the next version</span>
-<span class="go">make release-tag RELEASE_VERSION=vX.Y.Z  # explicit version</span>
+<span class="go">make release-tag</span>
 <span class="go">git push origin vX.Y.Z</span>
 </code></pre></div>
 <p><code>make release-tag</code> (<code>tools/release/changelog.sh</code>):</p>
 <ol>
-<li>checks that the tree is clean, the branch is <code>main</code> or <code>release-X.Y</code>, <code>HEAD</code> is the tip of its
-   <code>origin</code> branch, OpenPGP signing is configured and <code>origin</code> is the project repository;</li>
-<li>takes the commits since the nearest release tag (the first release needs <code>NOTES_FROM=&lt;rev&gt;</code>,
-   the changelog then starts after that revision);</li>
+<li>checks that the tree is clean, otherwise uncommitted changes would not be in the tag;</li>
+<li>takes the commits since the nearest release tag, or the whole history for the first release;</li>
 <li>proposes the version from them: a breaking change gives the next minor (next major from 1.0),
-   a <code>feat</code> the next minor, anything else the next patch; <code>RELEASE_VERSION</code> must be greater than
-   every release of its line and must not exist;</li>
-<li>writes the changelog into the tag message and opens it in the editor:</li>
+   a <code>feat</code> the next minor, anything else the next patch; on a <code>release-X.Y</code> branch the next patch
+   of that line. In a terminal it asks <code>Version (previous release vX.Y.Z) [vX.Y.Z]:</code>, Enter takes
+   the proposed one. Outside a terminal it takes <code>RELEASE_VERSION=vX.Y.Z</code> or the proposed one. A
+   version that is not <code>vX.Y.Z</code> stops the command before the editor;</li>
+<li>writes the changelog into the tag message and opens it in the editor, where it can be edited:</li>
 </ol>
 <div class="highlight"><pre><span></span><code>ingress-nginx-neo vX.Y.Z
 
@@ -2930,21 +2984,25 @@ supported. Published versions are immutable.</p>
 <ol>
 <li>creates the signed annotated tag <code>git tag -s -a</code> and prints the push command. It never pushes.</li>
 </ol>
+<p>The branch, the signature, the CI result and the version order are checked by CI after the tag is
+pushed (the <strong>verify</strong> step below), so the command does not repeat them locally.</p>
 <h2 id="release-workflow">Release workflow<a class="headerlink" href="#release-workflow" title="Permanent link"> ¶</a></h2>
 <p>Pushing the tag starts <code>release.yaml</code>:</p>
 <ol>
-<li><strong>verify</strong> — <code>make release-verify RELEASE_TAG=&lt;tag&gt;</code>: the tag is <code>vX.Y.Z</code>, annotated and signed
-   with OpenPGP by a key of <code>trusted_release_managers.yml</code> read from <code>origin/main</code> (compared by
-   fingerprint in an empty temporary keyring); the tagged commit is on <code>origin/main</code> or
-   <code>origin/release-X.Y</code>; its <strong>CI result</strong> check passed; its GitHub Release is not published.</li>
+<li><strong>verify</strong> — <code>make release-verify</code> (the tag is taken from <code>HEAD</code>): the tag is <code>vX.Y.Z</code>; the
+   version is greater than every release of its line <code>vX.Y.*</code>, and than every release when <code>origin</code>
+   has no <code>release-X.Y</code> branch (a release from <code>main</code>); the tag is annotated and signed with OpenPGP
+   by a key of <code>trusted_release_managers.yml</code> read from <code>origin/main</code> (compared by fingerprint in an
+   empty temporary keyring); the tagged commit is on <code>origin/main</code> or <code>origin/release-X.Y</code>; its
+   <strong>CI result</strong> check passed; its GitHub Release is not published.</li>
 <li><strong>deps</strong> — publishes missing dependency images (normally none: <code>main</code> published them).</li>
-<li><strong>publish</strong> (environment <code>release</code>, approved by a reviewer) — <code>publish-guard</code>; rebuilds the
-   delivered images from the tagged source, pushes them with SBOM and provenance, tags the
-   dependency images with the version (<code>docker-promote</code>), signs every digest; builds and signs the
-   kubectl plugin; packages the chart with pinned digests and pushes and signs it; renders the
-   static manifests; renders the release notes (<code>dist/release-notes.md</code>: the tag message, the
-   artifacts with digests, install and verification commands); creates or updates the <strong>draft</strong>
-   GitHub Release with all assets and checks they are attached.</li>
+<li><strong>publish</strong> (environment <code>release</code>, approved by a reviewer) — rebuilds the delivered images
+   from the tagged source, pushes them with SBOM and provenance, tags the dependency images with the
+   version (<code>docker-promote</code>), signs every digest; builds and signs the kubectl plugin; packages the
+   chart with pinned digests and pushes and signs it; renders the static manifests; renders the
+   release notes (<code>dist/release-notes.md</code>: the tag message, the artifacts with digests, install and
+   verification commands); creates or updates the <strong>draft</strong> GitHub Release with all assets and
+   checks they are attached.</li>
 <li><strong>docs</strong> — publishes the documentation version <code>X.Y</code>; when the tag is the highest release, the
    alias <code>stable</code> and the site root move to it.</li>
 <li><strong>finalize</strong> — publishes the draft release; it is marked latest only when the tag is the highest
@@ -2955,6 +3013,50 @@ draft (or missing), the workflow may run again; delivered images already publish
 tagged commit are kept, the chart and the assets are replaced, the draft is updated. Once
 published, <code>release-verify</code> rejects the tag.</p>
 <p>The tested commit is the tagged commit: the e2e suite does not run again on the tag.</p>
+<p>Every publishing target (<code>docker-publish</code>, <code>docker-promote</code>, <code>docker-sign</code>, <code>helm-publish</code>,
+<code>code-sign-plugin</code>, <code>docs-publish</code>, <code>release-notes</code>, <code>release-publish</code>, <code>release-finalize</code>) runs
+<code>publish-guard</code> first. It checks that the tree is committed; <code>latest</code> is published only from the tip
+of <code>origin/main</code> (after <code>git fetch</code>), <code>release</code> only from the commit of the tag; on <code>dev</code> publishing
+stops with a hint. CI passes <code>CHANNEL</code> explicitly, so when a release tag is put on the tip of <code>main</code>
+while the CI run of <code>main</code> is still going, the <code>latest</code> job still publishes <code>latest</code>.</p>
+<h2 id="publishing-without-ci">Publishing without CI<a class="headerlink" href="#publishing-without-ci" title="Permanent link"> ¶</a></h2>
+<p>CI publishes as a rule. When CI is unavailable, a person with write access runs the same make
+targets in the same order. The Makefile derives the channel and the tag from the checkout, so no
+variables are needed.</p>
+<ol>
+<li>Access: <code>gh auth login</code>; <code>docker login ghcr.io</code> with a token with the scope <code>write:packages</code>;
+   <code>export GITHUB_TOKEN="$(gh auth token)"</code> (the NGINX image build downloads sources from GitHub).</li>
+<li>Multi-platform builds (in CI <code>setup-buildx</code> and <code>setup-qemu</code> do this):</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="go">docker buildx create --use --name neo</span>
+<span class="go">docker run --privileged --rm tonistiigi/binfmt --install arm64</span>
+</code></pre></div>
+<ol>
+<li>Dependency images, when the registry lacks them (<code>make -s print-deps-missing</code> prints <code>true</code>):</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="go">make docker-publish-deps PLATFORM=linux/amd64</span>
+<span class="go">make docker-publish-deps PLATFORM=linux/arm64</span>
+<span class="go">make docker-publish-deps-manifest</span>
+</code></pre></div>
+<ol>
+<li><strong>latest</strong>, on an up-to-date <code>main</code>:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="go">git switch main &amp;&amp; git pull</span>
+<span class="go">make docker-publish docker-promote docker-sign helm-package helm-publish</span>
+<span class="go">make docs-publish</span>
+</code></pre></div>
+<ol>
+<li><strong>release</strong>, on a checkout of the tag:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="go">git checkout vX.Y.Z</span>
+<span class="go">make docker-publish docker-promote docker-sign code-build-plugin code-sign-plugin \</span>
+<span class="go">  helm-package helm-publish manifests-generate release-notes release-publish</span>
+<span class="go">make docs-publish</span>
+<span class="go">make release-finalize</span>
+</code></pre></div>
+<p>The cosign signatures then carry your identity (browser login), not the identity of the workflow.
+The verification command of the release notes (<code>--certificate-identity-regexp</code> on <code>release.yaml</code>)
+does not accept them, so publishing by hand is an emergency path.</p>
 <h2 id="trusted-release-managers">Trusted release managers<a class="headerlink" href="#trusted-release-managers" title="Permanent link"> ¶</a></h2>
 <p><code>trusted_release_managers.yml</code> maps the email of a release manager to their ASCII-armored public
 OpenPGP key:</p>
