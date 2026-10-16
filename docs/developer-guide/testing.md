@@ -25,9 +25,43 @@ a test states the reason in the pull request.
 Go and Lua unit tests run in the `e2e-test-runner` image (`tools/run-in-container.sh`), with the
 repository mounted at `/src`, Go caches in `.cache/container` and a writable
 `/etc/ingress-controller`. The image provides the Go toolchain of `go.mod`, the envtest binaries
-(etcd, kube-apiserver) used by the store tests, and the Lua test tools (resty, busted, luacheck).
+(etcd, kube-apiserver) used by the store tests, and the Lua test tools (resty, busted, luacheck,
+luacov).
 
 Lua tests live in `rootfs/etc/nginx/lua/test`; test files are named `<name>_test.lua`.
+
+`TEST_ARGS` passes extra arguments to `go test`:
+
+```console
+make test-unit TEST_ARGS='-run TestStore -v'
+```
+
+## Test reports and coverage
+
+`make test-unit`, `make test-unit-lua` and `make helm-test` write reports to `dist/test-reports/`
+(`TEST_REPORTS`, a directory inside the repository, because the tests run in a container with the
+repository at `/src`):
+
+| File | Target | Content |
+|------|--------|---------|
+| `unit-go.xml`, `unit-go-<module>.xml` | `make test-unit` | JUnit of the Go tests of the root module and of every module in `images/*/rootfs` |
+| `coverage-go.out`, `coverage-go-<module>.out` | `make test-unit` | coverage in the Go `coverprofile` format |
+| `unit-lua.xml` | `make test-unit-lua` | JUnit of the Lua tests |
+| `coverage-lua.lcov` | `make test-unit-lua` | coverage of the Lua code in `rootfs/etc/nginx/lua` in the LCOV format |
+| `unit-helm.xml` | `make helm-test` | JUnit of the chart tests |
+
+gotestsum (pinned in `tools/go.mod`, built in the container) runs the Go tests. It prints one line
+per package, the full output of failed tests and the number of tests at the end. `make test-unit`
+prints the total coverage of every module. The uncovered lines are shown by
+
+```console
+go tool cover -html=dist/test-reports/coverage-go.out
+```
+
+luacov counts the Lua coverage (`busted --coverage`), luacov-reporter-lcov writes the LCOV report.
+
+In CI the jobs Unit tests and Helm chart keep `dist/test-reports/` as artifacts (see
+[CI](ci.md#caches-and-artifacts)).
 
 ## Controller e2e
 

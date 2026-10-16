@@ -118,6 +118,9 @@ the cheap jobs. Unit tests and lint check them; they do not affect the build or 
   `tools/versions.env` and `go.mod`.
 - Image builds that publish use the GitHub Actions build cache with one scope per image and platform
   (`DOCKER_CACHE=gha`).
+- Unit tests and Helm chart keep `dist/test-reports/` (JUnit and coverage, see
+  [Testing](testing.md#test-reports-and-coverage)) as the artifacts `test-reports-unit` and
+  `test-reports-helm`, also when the tests failed.
 - Artifacts are kept for at most 7 days.
 
 ## Conventional Commits

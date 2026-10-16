@@ -172,7 +172,11 @@ func (fakeTemplate) Write(conf *ngx_config.TemplateConfig) ([]byte, error) {
 
 func TestCheckIngress(t *testing.T) {
 	defer func() {
-		err := filepath.Walk(os.TempDir(), func(path string, info os.FileInfo, _ error) error {
+		err := filepath.Walk(os.TempDir(), func(path string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil {
+				// a file of a concurrent test process (go test -cover) was removed meanwhile
+				return nil
+			}
 			if info.IsDir() && os.TempDir() != path {
 				return filepath.SkipDir
 			}

@@ -2,13 +2,16 @@
 #
 # Unit and e2e tests. Included by the root Makefile.
 
+# Read by test/test.sh and test/test-lua.sh in the runner container.
+export TEST_REPORTS TEST_ARGS
+
 .PHONY: test-unit
-## Go unit tests: root module (excluding test/e2e, images, docs/examples) + images/{kube-webhook-certgen,custom-error-pages,fastcgi-helloserver}/rootfs. | Test
+## Go unit tests: root module (excluding test/e2e, images, docs/examples) + images/{kube-webhook-certgen,custom-error-pages,fastcgi-helloserver}/rootfs; JUnit and coverage in dist/test-reports. | Test
 test-unit: deps-runner
 	tools/run-in-container.sh $(RUNNER_IMAGE) test/test.sh
 
 .PHONY: test-unit-lua
-## Lua unit tests inside e2e-test-runner.
+## Lua unit tests inside e2e-test-runner; JUnit and coverage in dist/test-reports.
 test-unit-lua: deps-runner
 	tools/run-in-container.sh $(RUNNER_IMAGE) test/test-lua.sh
 
