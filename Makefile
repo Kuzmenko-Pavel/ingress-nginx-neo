@@ -322,6 +322,11 @@ check: code-lint test-unit test-unit-lua docs-verify helm-docs-verify helm-lint 
 print-k8s-versions:
 	@printf '%s\n' $(K8S_VERSIONS) | jq -R '{version: ., name: (. | split("@")[0])}' | jq -cs .
 
+# The matrix of pull requests: the newest version, the local default.
+.PHONY: print-k8s-versions-pr
+print-k8s-versions-pr:
+	@printf '%s\n' $(lastword $(K8S_VERSIONS)) | jq -R '{version: ., name: (. | split("@")[0])}' | jq -cs .
+
 # "true" when a dependency image src-* is not published for every platform.
 .PHONY: print-deps-missing
 print-deps-missing:

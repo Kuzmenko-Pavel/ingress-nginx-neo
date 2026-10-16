@@ -36,14 +36,15 @@ A workflow change can be checked before a push with act, see
 | Docs | `make docs-build docs-publish-check` | groups `docs`, `build-system`, `workflow`; always outside pull requests |
 | Dependency scan | `make security-dependency-scan` | always |
 | Build images | `make docker-load docker-build docker-build-e2e docker-save` | any group except `docs` and `certgen`; always outside pull requests |
-| E2E | `make docker-load test-e2e SKIP_BUILD=1 K8S_VERSION=… E2E_VARIANT=…` | every Kubernetes version × every variant |
-| Chart e2e | `make docker-load test-e2e-chart SKIP_BUILD=1 K8S_VERSION=…` | every Kubernetes version |
+| E2E | `make docker-load test-e2e SKIP_BUILD=1 K8S_VERSION=… E2E_VARIANT=…` | every variant × [Kubernetes versions](#kubernetes-versions) |
+| Chart e2e | `make docker-load test-e2e-chart SKIP_BUILD=1 K8S_VERSION=…` | [Kubernetes versions](#kubernetes-versions) |
 | kube-webhook-certgen e2e | `make test-e2e-certgen` | groups `certgen`, `e2e`, `build-system`, `workflow`; always outside pull requests |
 | **CI result** | `make ci-result` | always (not when the run is cancelled) |
 | Publish latest | `make docker-publish docker-promote docker-sign helm-package helm-publish CHANNEL=latest`, `make code-build-plugin CHANNEL=latest` | pushes to `main` and manual runs on `main`, after CI result passed |
 | Publish docs (latest) | `make docs-publish CHANNEL=latest` | after Publish latest |
 
-The Kubernetes matrix comes from `make -s print-k8s-versions`, the e2e variants from
+The Kubernetes matrix comes from `make -s print-k8s-versions` (on pull requests from
+`make -s print-k8s-versions-pr`), the e2e variants from
 `make -s print-e2e-variants`, the dependency image platforms from `make -s print-deps-platforms`.
 
 **CI result** is the only required status check of `main` and `release-*`: it fails when any job
@@ -57,6 +58,32 @@ pull requests the dependency images are pulled when published and built locally 
 The `latest` channel is published only from the tip of `main` (`publish-guard`, a prerequisite of
 every publishing target); a newer push cancels an older publication. Jobs that write to `gh-pages`
 share one concurrency group and never cancel each other.
+
+## Kubernetes versions
+
+On pull requests E2E and Chart e2e run on the newest Kubernetes version, the same as `make test-e2e`
+locally. Pushes to `main` and `release-*` and manual runs check every version of `K8S_VERSIONS`.
+The variants `default` and `chroot` are different controller images, so both always run.
+
+The versions differ in the APIs the controller uses (Ingress, IngressClass, EndpointSlice, Lease,
+admission), and inside the supported window these APIs are stable. A breakage on one version only
+is rare, and the run on `main` catches it. A release is tagged only on a commit of `main` or
+`release-X.Y` with a passed CI result, so no release ships without a check of every version.
+
+When a change depends on the Kubernetes version, request the full matrix on the pull request:
+- the label `full-e2e` on the pull request. The next push, opening or reopening runs every version
+  until the label is removed
+- a manual run on the branch of the pull request, right away and without a new push:
+
+  ```console
+  gh workflow run ci.yaml --ref <branch>
+  ```
+
+  Its CI result belongs to the last commit of the branch and shows in the pull request
+
+Adding the label does not start a run by itself. A new run of a pull request cancels the running
+one, and the `labeled` event comes for any label, so every label would restart CI. Add `full-e2e`
+only when the change depends on the version. It triples the runner time of e2e.
 
 ## When jobs run
 

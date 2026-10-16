@@ -111,10 +111,20 @@ jobs:
             workflow:
               - '.github/**'
 
+      # Pull requests run e2e on the newest Kubernetes version, pushes, manual
+      # runs and pull requests labeled full-e2e on every version.
       - name: Test matrices
         id: matrix
+        env:
+          FULL: >-
+            ${{ github.event_name != 'pull_request'
+                || contains(github.event.pull_request.labels.*.name, 'full-e2e') }}
         run: |
-          echo "k8s-versions=$(make -s print-k8s-versions)" >> "$GITHUB_OUTPUT"
+          if [ "$FULL" = true ]; then
+            echo "k8s-versions=$(make -s print-k8s-versions)" >> "$GITHUB_OUTPUT"
+          else
+            echo "k8s-versions=$(make -s print-k8s-versions-pr)" >> "$GITHUB_OUTPUT"
+          fi
           echo "e2e-variants=$(make -s print-e2e-variants)" >> "$GITHUB_OUTPUT"
 
   deps:

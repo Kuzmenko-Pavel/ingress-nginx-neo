@@ -166,9 +166,12 @@ machine and compare the files of both runs.
 ## Kubernetes versions
 
 `K8S_VERSIONS` in the Makefile lists the tested Kubernetes versions: the EKS standard support
-window, each as a `kindest/node` tag with the digest built by the pinned kind version. CI runs the
-e2e jobs for every entry. To change the window, edit `K8S_VERSIONS` (take the digests from the
-release notes of the kind version in `tools/go.mod`) and the supported versions on the
+window, each as a `kindest/node` tag with the digest built by the pinned kind version.
+`make test-e2e` locally and e2e in CI on pull requests use the newest entry. Pushes to `main` and
+`release-*`, manual runs and pull requests labeled `full-e2e` check every entry, see
+[CI](ci.md#kubernetes-versions). `K8S_VERSION` selects another version locally (see the example
+above). To change the window, edit `K8S_VERSIONS` (take the digests from the release notes of the
+kind version in `tools/go.mod`) and the supported versions on the
 [installation page](../deploy/index.md).
 
 ## Architectures
