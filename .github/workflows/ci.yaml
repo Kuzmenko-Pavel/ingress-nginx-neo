@@ -86,6 +86,7 @@ jobs:
             ci:
               - '.github/**'
               - 'Makefile'
+              - 'make/**'
               - 'tools/**'
               - 'test/**'
 

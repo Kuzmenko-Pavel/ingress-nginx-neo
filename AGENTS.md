@@ -20,14 +20,16 @@ manifests and the kubectl plugin `kubectl ingress-nginx-neo`. The Go module path
 | `charts/ingress-nginx-neo` | Helm chart (`tests/` helm-unittest, `ci/` values for lint and e2e) |
 | `images/` | NGINX base (`images/nginx`), test runner, test helpers, certgen, custom-error-pages |
 | `test/` | e2e suite (`test/e2e`, Ginkgo), e2e image, unit test entry points |
+| `make/` | Makefile targets by domain (`code.mk`, `test.mk`, `images.mk`, `helm.mk`, ...), included by the root `Makefile` |
 | `tools/` | pinned tools (`go.mod`, `versions.env`) and the scripts behind the Makefile |
 | `docs/` | MkDocs site |
 | `.github/workflows` | CI, release, security; every step is a make target |
 
 ## Project API
 
-The root `Makefile` is the single contract for humans, agents and CI: the same target gives the same
-result everywhere, so a check run outside make proves nothing about CI.
+The root `Makefile` (with the domain files `make/*.mk`) is the single contract for humans, agents
+and CI: the same target gives the same result everywhere, so a check run outside make proves nothing
+about CI.
 
 ```console
 make help        # all targets by domain: code, test, images, helm, manifests, docs, security, release, development
