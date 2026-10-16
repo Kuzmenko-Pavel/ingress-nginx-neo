@@ -2,7 +2,7 @@ module k8s.io/ingress-nginx/tools/actionlint
 
 go 1.26.1
 
-toolchain go1.26.8
+toolchain go1.26.9
 
 tool github.com/rhysd/actionlint/cmd/actionlint
 
