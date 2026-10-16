@@ -778,6 +778,12 @@ controller:
     key: "/usr/local/certificates/key"
     namespaceSelector: {}
     objectSelector: {}
+    # -- Call the webhook only for Ingresses of this release's IngressClass (`ingressClassResource.name` and
+    # `aliases`, the `ingressClass` annotation, Ingresses without a class with `watchIngressWithoutClass`).
+    # With several controllers in a cluster, a controller that is down then does not block the Ingresses of
+    # the others. Ingresses of an IngressClass created outside this chart are not validated.
+    # Ref: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchconditions
+    matchIngressClass: false
     # -- Labels to be added to admission webhooks
     labels: {}
     service:

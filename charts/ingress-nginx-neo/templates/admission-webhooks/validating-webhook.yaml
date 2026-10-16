@@ -51,4 +51,20 @@ webhooks:
     {{- if .Values.controller.admissionWebhooks.objectSelector }}
     objectSelector: {{ toYaml .Values.controller.admissionWebhooks.objectSelector | nindent 6 }}
     {{- end }}
+    {{- if .Values.controller.admissionWebhooks.matchIngressClass }}
+    {{- /* The class of an Ingress is decided as by the controller: ingressClassName,
+    else the kubernetes.io/ingress.class annotation, else watchIngressWithoutClass. */}}
+    {{- $classNames := prepend .Values.controller.ingressClassResource.aliases .Values.controller.ingressClassResource.name }}
+    {{- if .Values.controller.ingressClassByName }}
+    {{- $classNames = append $classNames .Values.controller.ingressClass | uniq }}
+    {{- end }}
+    matchConditions:
+      - name: ingress-class
+        expression: >-
+          has(object.spec.ingressClassName)
+          ? object.spec.ingressClassName in {{ $classNames | toJson }}
+          : (has(object.metadata.annotations) && 'kubernetes.io/ingress.class' in object.metadata.annotations)
+          ? object.metadata.annotations['kubernetes.io/ingress.class'] == {{ .Values.controller.ingressClass | toJson }}
+          : {{ .Values.controller.watchIngressWithoutClass }}
+    {{- end }}
 {{- end }}

@@ -30,3 +30,53 @@ tests:
       - equal:
           path: webhooks[0].clientConfig.service.port
           value: 9443
+
+  - it: should call the webhook for every Ingress if `controller.admissionWebhooks.matchIngressClass` is false
+    asserts:
+      - notExists:
+          path: webhooks[0].matchConditions
+
+  - it: should call the webhook only for Ingresses of the release's class if `controller.admissionWebhooks.matchIngressClass` is true
+    set:
+      controller.admissionWebhooks.matchIngressClass: true
+    asserts:
+      - equal:
+          path: webhooks[0].matchConditions
+          value:
+            - name: ingress-class
+              expression: >-
+                has(object.spec.ingressClassName)
+                ? object.spec.ingressClassName in ["nginx"]
+                : (has(object.metadata.annotations) && 'kubernetes.io/ingress.class' in object.metadata.annotations)
+                ? object.metadata.annotations['kubernetes.io/ingress.class'] == "nginx"
+                : false
+
+  - it: should match the aliases, the annotation class and Ingresses without a class as the controller does
+    set:
+      controller.admissionWebhooks.matchIngressClass: true
+      controller.ingressClassResource.name: internal
+      controller.ingressClassResource.aliases:
+        - internal-a
+        - internal-b
+      controller.ingressClass: internal-legacy
+      controller.watchIngressWithoutClass: true
+    asserts:
+      - matchRegex:
+          path: webhooks[0].matchConditions[0].expression
+          pattern: 'object\.spec\.ingressClassName in \["internal","internal-a","internal-b"\]'
+      - matchRegex:
+          path: webhooks[0].matchConditions[0].expression
+          pattern: "\\['kubernetes.io/ingress.class'\\] == \"internal-legacy\""
+      - matchRegex:
+          path: webhooks[0].matchConditions[0].expression
+          pattern: ': true$'
+
+  - it: should match the IngressClass named after `controller.ingressClass` if `controller.ingressClassByName` is true
+    set:
+      controller.admissionWebhooks.matchIngressClass: true
+      controller.ingressClassByName: true
+      controller.ingressClass: internal-legacy
+    asserts:
+      - matchRegex:
+          path: webhooks[0].matchConditions[0].expression
+          pattern: 'object\.spec\.ingressClassName in \["nginx","internal-legacy"\]'

@@ -57,6 +57,9 @@ common_args=(
   --set "controller.readinessProbe.initialDelaySeconds=1"
   --set "controller.readinessProbe.periodSeconds=1"
   --set "controller.terminationGracePeriodSeconds=0"
+  # Several controllers in one cluster, as docs/user-guide/multiple-ingress.md
+  # recommends.
+  --set "controller.admissionWebhooks.matchIngressClass=true"
 )
 
 # Release i is ci-i in namespace ${NAMESPACE}-i with the IngressClass ci-i, as
