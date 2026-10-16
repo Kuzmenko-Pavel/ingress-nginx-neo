@@ -30,3 +30,5 @@ for module in images/kube-webhook-certgen/rootfs images/custom-error-pages/rootf
 done
 
 test/channel_test.sh
+tools/release/changelog_test.sh
+tools/release/verify-tag_test.sh

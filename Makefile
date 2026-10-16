@@ -842,10 +842,9 @@ DELIVERED_IMAGES := controller controller-chroot kube-webhook-certgen custom-err
 RELEASE_NOTES := $(DIST)/release-notes.md
 
 .PHONY: release-tag
-## Create the signed annotated release tag with a generated changelog (interactive). | Release
+## Create the signed annotated release tag: asks the version, opens the changelog in the editor. | Release
 release-tag:
-	RELEASE_TAG_PATTERN='$(RELEASE_TAG_PATTERN)' RELEASE_VERSION='$(RELEASE_VERSION)' NOTES_FROM='$(NOTES_FROM)' \
-	REPO_SLUG=$(GITHUB_REPO) PROJECT=$(PROJECT) \
+	RELEASE_TAG_PATTERN='$(RELEASE_TAG_PATTERN)' RELEASE_VERSION='$(RELEASE_VERSION)' PROJECT=$(PROJECT) \
 		tools/release/changelog.sh
 
 .PHONY: release-verify

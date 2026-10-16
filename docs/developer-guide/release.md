@@ -50,27 +50,25 @@ supported. Published versions are immutable.
 
 ## Creating a release
 
-Releases are cut from `main` (or from a `release-X.Y` branch for a hotfix), in a clone whose
-`origin` is `Kuzmenko-Pavel/ingress-nginx-neo`, with an OpenPGP signing key listed in
-`trusted_release_managers.yml`.
+Releases are cut from `main` (or from a `release-X.Y` branch for a hotfix), with an OpenPGP signing
+key listed in `trusted_release_managers.yml`.
 
 ```console
 git switch main && git pull
-make release-tag                         # proposes the next version
-make release-tag RELEASE_VERSION=vX.Y.Z  # explicit version
+make release-tag
 git push origin vX.Y.Z
 ```
 
 `make release-tag` (`tools/release/changelog.sh`):
 
-1. checks that the tree is clean, the branch is `main` or `release-X.Y`, `HEAD` is the tip of its
-   `origin` branch, OpenPGP signing is configured and `origin` is the project repository;
-2. takes the commits since the nearest release tag (the first release needs `NOTES_FROM=<rev>`,
-   the changelog then starts after that revision);
+1. checks that the tree is clean, otherwise uncommitted changes would not be in the tag;
+2. takes the commits since the nearest release tag, or the whole history for the first release;
 3. proposes the version from them: a breaking change gives the next minor (next major from 1.0),
-   a `feat` the next minor, anything else the next patch; `RELEASE_VERSION` must be greater than
-   every release of its line and must not exist;
-4. writes the changelog into the tag message and opens it in the editor:
+   a `feat` the next minor, anything else the next patch; on a `release-X.Y` branch the next patch
+   of that line. In a terminal it asks `Version (previous release vX.Y.Z) [vX.Y.Z]:`, Enter takes
+   the proposed one. Outside a terminal it takes `RELEASE_VERSION=vX.Y.Z` or the proposed one. A
+   version that is not `vX.Y.Z` stops the command before the editor;
+4. writes the changelog into the tag message and opens it in the editor, where it can be edited:
 
    ```text
    ingress-nginx-neo vX.Y.Z
@@ -90,15 +88,19 @@ git push origin vX.Y.Z
 
 5. creates the signed annotated tag `git tag -s -a` and prints the push command. It never pushes.
 
+The branch, the signature, the CI result and the version order are checked by CI after the tag is
+pushed (the **verify** step below), so the command does not repeat them locally.
+
 ## Release workflow
 
 Pushing the tag starts `release.yaml`:
 
-1. **verify** — `make release-verify` (the tag is taken from `HEAD`): the tag is `vX.Y.Z`,
-   annotated and signed with OpenPGP by a key of `trusted_release_managers.yml` read from
-   `origin/main` (compared by fingerprint in an empty temporary keyring); the tagged commit is on
-   `origin/main` or `origin/release-X.Y`; its **CI result** check passed; its GitHub Release is not
-   published.
+1. **verify** — `make release-verify` (the tag is taken from `HEAD`): the tag is `vX.Y.Z`; the
+   version is greater than every release of its line `vX.Y.*`, and than every release when `origin`
+   has no `release-X.Y` branch (a release from `main`); the tag is annotated and signed with OpenPGP
+   by a key of `trusted_release_managers.yml` read from `origin/main` (compared by fingerprint in an
+   empty temporary keyring); the tagged commit is on `origin/main` or `origin/release-X.Y`; its
+   **CI result** check passed; its GitHub Release is not published.
 2. **deps** — publishes missing dependency images (normally none: `main` published them).
 3. **publish** (environment `release`, approved by a reviewer) — rebuilds the delivered images
    from the tagged source, pushes them with SBOM and provenance, tags the dependency images with the
