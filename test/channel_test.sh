@@ -56,4 +56,14 @@ git tag --delete v9.9.9 >/dev/null
 git tag v9.9.9 HEAD~1
 expect "release tag below HEAD: latest" latest print-CHANNEL print-RELEASE_TAG
 
+# print-main-tip fetches main from origin. Commits are created with
+# commit-tree, so HEAD and the work tree (the real repository) stay as they are.
+env -u GIT_DIR -u GIT_WORK_TREE git init --quiet --bare "${scratch}/origin.git"
+git remote add origin "${scratch}/origin.git"
+git push --quiet origin HEAD:refs/heads/main
+expect "HEAD is the tip of main on origin" true print-main-tip
+newer="$(git -c user.name=test -c user.email=test@example.com commit-tree 'HEAD^{tree}' -p HEAD -m three)"
+git push --quiet origin "${newer}:refs/heads/main"
+expect "main on origin moved past HEAD" false print-main-tip
+
 [[ "${failures}" -eq 0 ]] || { echo "${failures} channel test(s) failed" >&2; exit 1; }

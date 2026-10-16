@@ -211,5 +211,7 @@ is the highest release. A release never changes the `latest` channel.
 ## The latest channel
 
 Every push to `main` that passes CI publishes the images `:latest`, the chart `0.0.0-latest`, the
-documentation version `latest` and the kubectl plugin as a workflow artifact. Until the first
-release the documentation root points to `latest`.
+documentation version `latest` and the kubectl plugin as a workflow artifact. When `main` already
+has a newer commit at the time of publication, the run skips the publication and the run of that
+commit publishes `latest` (see [CI](ci.md)). Until the first release the documentation root points
+to `latest`.
