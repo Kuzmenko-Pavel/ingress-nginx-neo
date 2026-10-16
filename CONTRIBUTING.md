@@ -6,11 +6,13 @@ Contributions are welcome as pull requests into `main` of
 ## Workflow
 
 1. Create a branch from `main`.
-2. Make the change. Run the checks:
+2. First write a test that fails without the change, at the level from
+   [Which test](https://kuzmenko-pavel.github.io/ingress-nginx-neo/latest/developer-guide/testing/#which-test).
+   Then make the change. Run the checks:
 
    ```console
    make check       # lint, unit tests, generated files, chart lint and tests
-   make test-e2e    # when the controller, the NGINX template or Lua code changed
+   make test-e2e    # when the change needs an e2e spec (see Which test)
    ```
 
    `make help` lists all targets; the [developer guide](https://kuzmenko-pavel.github.io/ingress-nginx-neo/latest/developer-guide/getting-started/)

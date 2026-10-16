@@ -87,9 +87,10 @@ see [Testing](testing.md#load-tests).
 
 ## Typical change
 
-1. Create a branch and make the change.
-2. Run `make check`; for changes of the controller, the NGINX template or Lua code also run
-   `make test-e2e` (see [Testing](testing.md)).
+1. Create a branch and write a test that fails without the change, at the level from
+   [Which test](testing.md#which-test).
+2. Make the change. Run `make check`. When the change needs an e2e spec, also run
+   `make test-e2e FOCUS=...` (see [Testing](testing.md)).
 3. Regenerate generated files when their sources changed: `make docs-generate` (annotation risks,
    command line arguments) and `make helm-docs-generate` (chart README). Generated files are never
    edited by hand.
