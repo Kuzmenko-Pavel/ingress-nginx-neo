@@ -9,3 +9,18 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: should allow the patch job to read and update only the ValidatingWebhookConfiguration of the release
+    asserts:
+      - equal:
+          path: rules
+          value:
+            - apiGroups:
+                - admissionregistration.k8s.io
+              resources:
+                - validatingwebhookconfigurations
+              resourceNames:
+                - RELEASE-NAME-ingress-nginx-neo-admission
+              verbs:
+                - get
+                - update

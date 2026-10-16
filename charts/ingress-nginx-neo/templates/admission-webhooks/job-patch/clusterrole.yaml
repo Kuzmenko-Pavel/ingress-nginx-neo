@@ -17,6 +17,8 @@ rules:
       - admissionregistration.k8s.io
     resources:
       - validatingwebhookconfigurations
+    resourceNames:
+      - {{ include "ingress-nginx.admissionWebhooks.fullname" . }}
     verbs:
       - get
       - update
