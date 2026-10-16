@@ -35,6 +35,8 @@ ARG LUAROCKS_VERSION
 ARG LUAROCKS_SHA
 ARG BUSTED_VERSION
 ARG LUACHECK_VERSION
+ARG LUACOV_VERSION
+ARG LUACOV_REPORTER_LCOV_VERSION
 ARG LJ_RELENG_COMMIT
 ARG LJ_RELENG_SHA
 
@@ -91,7 +93,9 @@ RUN wget -qO /tmp/luarocks.tgz \
   && rm -rf /tmp/*
 
 RUN luarocks install busted ${BUSTED_VERSION} \
-  && luarocks install luacheck ${LUACHECK_VERSION}
+  && luarocks install luacheck ${LUACHECK_VERSION} \
+  && luarocks install luacov ${LUACOV_VERSION} \
+  && luarocks install luacov-reporter-lcov ${LUACOV_REPORTER_LCOV_VERSION}
 
 RUN wget -qO /usr/local/bin/lj-releng \
   https://raw.githubusercontent.com/openresty/openresty-devel-utils/${LJ_RELENG_COMMIT}/lj-releng \

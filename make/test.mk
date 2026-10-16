@@ -11,7 +11,7 @@ test-unit: deps-runner
 	tools/run-in-container.sh $(RUNNER_IMAGE) test/test.sh
 
 .PHONY: test-unit-lua
-## Lua unit tests inside e2e-test-runner.
+## Lua unit tests inside e2e-test-runner; JUnit and coverage in dist/test-reports.
 test-unit-lua: deps-runner
 	tools/run-in-container.sh $(RUNNER_IMAGE) test/test-lua.sh
 
