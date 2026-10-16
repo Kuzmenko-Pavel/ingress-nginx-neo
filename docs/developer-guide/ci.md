@@ -56,8 +56,11 @@ pull requests the dependency images are pulled when published and built locally 
 `main` they are published before the checks, so the first push to an empty repository works.
 
 The `latest` channel is published only from the tip of `main` (`publish-guard`, a prerequisite of
-every publishing target); a newer push cancels an older publication. Jobs that write to `gh-pages`
-share one concurrency group and never cancel each other.
+every publishing target). Before publishing, Publish latest and Publish docs (latest) ask
+`make -s print-main-tip`. When `main` already has a newer commit, the job skips the publication with
+a notice and stays green, the run of that commit publishes `latest`. A newer publication cancels an
+older one that is still running. Jobs that write to `gh-pages` share one concurrency group and never
+cancel each other.
 
 ## Kubernetes versions
 

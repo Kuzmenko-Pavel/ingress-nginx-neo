@@ -556,15 +556,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # After a newer merge into main, its own run publishes latest.
+      - name: Check the tip of main
+        id: tip
+        run: |
+          tip="$(make -s print-main-tip)"
+          echo "tip=$tip" >> "$GITHUB_OUTPUT"
+          [ "$tip" = true ] || echo "::notice::A newer commit of main publishes latest, skipped"
+
       - name: Publish images and chart
+        if: steps.tip.outputs.tip == 'true'
         run: >-
           make docker-publish docker-promote docker-sign helm-package helm-publish
           CHANNEL=latest DOCKER_CACHE=gha
 
       - name: Build the kubectl plugin
+        if: steps.tip.outputs.tip == 'true'
         run: make code-build-plugin CHANNEL=latest
 
       - name: Upload the kubectl plugin
+        if: steps.tip.outputs.tip == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: kubectl-plugin
@@ -592,5 +603,13 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Check the tip of main
+        id: tip
+        run: |
+          tip="$(make -s print-main-tip)"
+          echo "tip=$tip" >> "$GITHUB_OUTPUT"
+          [ "$tip" = true ] || echo "::notice::A newer commit of main publishes the latest docs, skipped"
+
       - name: Publish the latest docs version
+        if: steps.tip.outputs.tip == 'true'
         run: make docs-publish CHANNEL=latest

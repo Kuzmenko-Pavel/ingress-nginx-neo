@@ -366,6 +366,12 @@ print-deps-platforms:
 print-%:
 	@echo '$($*)'
 
+# "true" when HEAD is the tip of main on origin; CI publishes latest only then.
+.PHONY: print-main-tip
+print-main-tip:
+	@git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
+	@if [ "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" ]; then echo true; else echo false; fi
+
 # A prerequisite of every publishing target, checked once per make run: the
 # tree is committed, latest publishes the tip of main only, release publishes
 # the tagged commit only.
@@ -377,8 +383,7 @@ endif
 	@test -z "$$(git status --porcelain)" || \
 		{ echo "There are uncommitted changes. Commit them before publishing" >&2; exit 1; }
 ifeq ($(CHANNEL),latest)
-	git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
-	test "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" || \
+	@tip="$$($(MAKE) --no-print-directory -s print-main-tip)" && test "$$tip" = true || \
 		{ echo "HEAD is not the tip of origin/main: a newer commit publishes latest" >&2; exit 1; }
 else ifeq ($(CHANNEL),release)
 	git rev-parse --verify --quiet 'refs/tags/$(VERSION)' >/dev/null || \
