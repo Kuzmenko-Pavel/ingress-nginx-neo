@@ -252,6 +252,7 @@ metadata:
 | controller.admissionWebhooks.failurePolicy | string | `"Fail"` | Admission Webhook failure policy to use |
 | controller.admissionWebhooks.key | string | `"/usr/local/certificates/key"` |  |
 | controller.admissionWebhooks.labels | object | `{}` | Labels to be added to admission webhooks |
+| controller.admissionWebhooks.matchIngressClass | bool | `false` | Call the webhook only for Ingresses of this release's IngressClass (`ingressClassResource.name` and `aliases`, the `ingressClass` annotation, Ingresses without a class with `watchIngressWithoutClass`). With several controllers in a cluster, a controller that is down then does not block the Ingresses of the others. Ingresses of an IngressClass created outside this chart are not validated. Ref: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchconditions |
 | controller.admissionWebhooks.name | string | `"admission"` |  |
 | controller.admissionWebhooks.namespaceSelector | object | `{}` |  |
 | controller.admissionWebhooks.objectSelector | object | `{}` |  |

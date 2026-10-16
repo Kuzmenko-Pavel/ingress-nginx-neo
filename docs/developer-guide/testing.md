@@ -71,11 +71,24 @@ The specs are Ginkgo specs in `test/e2e`; `FOCUS` matches their descriptions, fo
 ## Chart e2e
 
 `make test-e2e-chart` packages the chart, creates a kind cluster with cert-manager (pinned manifest
-from `tools/versions.env`) and, for every `charts/ingress-nginx-neo/ci/*-values.yaml`, installs the
-package with the locally built images in a namespace of its own, waits until the release is ready,
-uninstalls it and deletes the namespace without waiting (`tools/e2e-chart.sh`). The controller runs
-with `terminationGracePeriodSeconds: 0`: the test checks installations, not the draining of
-connections. The output shows the duration of every installation.
+from `tools/versions.env`) and installs every `charts/ingress-nginx-neo/ci/*-values.yaml` at the
+same time, with the locally built images, each as a release `ci-<N>` in a namespace of its own
+(`tools/e2e-chart.sh`). Several controllers thus run in one cluster, as described in
+[Multiple Ingress controllers](../user-guide/multiple-ingress.md). Every release gets its own
+IngressClass `ci-<N>` and `controller.admissionWebhooks.matchIngressClass`. A values file that sets
+`controller.ingressClassResource` itself keeps its class and serves the Ingresses without a class.
+
+The test then checks:
+- every controller answers an Ingress of its class with a redirect 301, which NGINX sends itself
+  without a backend, and answers 404 to the Ingress of the neighbouring release
+- with the controller of one release scaled to 0, an Ingress of another release is created and
+  served
+- a second release with the IngressClass `nginx` stops with a hint which values to set
+
+A readiness probe every second, `worker-processes=1` and `terminationGracePeriodSeconds: 0` are
+settings of the test, not of the chart. The output shows the time until every release is ready. A
+new values file in `ci/` joins the same parallel installation, so it has to coexist with the others:
+no NodePorts that are taken and no cluster-scoped objects with fixed names.
 
 ## kube-webhook-certgen e2e
 

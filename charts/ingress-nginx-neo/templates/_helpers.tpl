@@ -261,3 +261,25 @@ Extra modules.
     - name: modules
       mountPath: /modules_mount
 {{- end -}}
+
+{{/*
+Stop the installation when an IngressClass of this release belongs to another
+release or was created outside Helm: Helm itself fails with "invalid ownership
+metadata" without saying what to set. lookup returns nothing without a cluster
+(helm template, helm-unittest, GitOps rendering), so the check is skipped there.
+Usage: include "ingress-nginx.ingressClass.checkOwner" (dict "name" <class> "context" $)
+*/}}
+{{- define "ingress-nginx.ingressClass.checkOwner" -}}
+{{- $class := lookup "networking.k8s.io/v1" "IngressClass" "" .name -}}
+{{- if $class -}}
+{{- $annotations := $class.metadata.annotations | default dict -}}
+{{- $release := index $annotations "meta.helm.sh/release-name" | default "" -}}
+{{- $namespace := index $annotations "meta.helm.sh/release-namespace" | default "" -}}
+{{- $hint := "Set controller.ingressClassResource.name, controller.ingressClass and controller.ingressClassResource.controllerValue for this release (docs: https://kuzmenko-pavel.github.io/ingress-nginx-neo/latest/user-guide/multiple-ingress/)" -}}
+{{- if not $release -}}
+{{- fail (printf "IngressClass %q already exists and is not managed by Helm. %s" .name $hint) -}}
+{{- else if or (ne $release .context.Release.Name) (ne $namespace .context.Release.Namespace) -}}
+{{- fail (printf "IngressClass %q already belongs to release %q in namespace %q. %s" .name $release $namespace $hint) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}

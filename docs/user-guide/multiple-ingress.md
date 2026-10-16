@@ -80,6 +80,32 @@ controller:
 
     Ingresses without a class are therefore ignored by default. Enable `--watch-ingress-without-class` on one controller only.
 
+When a second release of the chart is installed without its own values, its IngressClass `nginx`
+already belongs to the first release. The installation stops with a message which release owns the
+class and which values to set. The check reads the IngressClass from the cluster, so it does not run
+when the chart is rendered without a cluster (`helm template`, Argo CD by default).
+
+## Admission webhooks with several controllers
+
+Every release of the chart creates a ValidatingWebhookConfiguration with `failurePolicy: Fail`. By
+default Kubernetes calls the webhook of every release for every Ingress in the cluster, and the
+controller skips an Ingress of another class. When any of the controllers is unavailable (restart,
+upgrade, crash), its webhook does not answer, and Kubernetes rejects the creation and update of all
+Ingresses in the cluster, including those of other classes.
+
+With `controller.admissionWebhooks.matchIngressClass: true` the webhook is called only for
+Ingresses of the classes of its release. The class is decided as by the controller above:
+`controller.ingressClassResource.name` and `aliases`, the name `controller.ingressClass` with
+`controller.ingressClassByName`, the `kubernetes.io/ingress.class` annotation, an Ingress without a
+class with `controller.watchIngressWithoutClass`. A controller that is down then blocks only the
+Ingresses of its own class. Enable this value in every release when a cluster runs several
+controllers.
+
+The condition knows only the classes the chart creates. Ingresses of a class created outside the
+chart with the same `controllerValue` (for example with `controller.ingressClassResource.enabled:
+false`) are served by the controller but not validated by the webhook. In this case keep
+`matchIngressClass` disabled.
+
 ## Ingress class annotation
 
 The controller also accepts the `kubernetes.io/ingress.class` annotation for Ingress controllers that do not support
