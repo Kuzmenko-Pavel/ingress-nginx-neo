@@ -48,8 +48,10 @@ release as `<version>` (inside code); the build substitutes it (`docs/developer-
 
 ## Rules
 
-- Keep the user-facing API: annotation prefix `nginx.ingress.kubernetes.io`, IngressClass `nginx`,
-  controller value `k8s.io/ingress-nginx`, ConfigMap keys, metrics, command line arguments.
+- Keep the upstream-compatible defaults of the user-facing API: annotation prefix
+  `nginx.ingress.kubernetes.io`, IngressClass `nginx`, controller value `k8s.io/ingress-nginx`,
+  ConfigMap keys, metrics, command line arguments. Several controllers with their own classes in
+  one cluster are supported and tested (chart e2e).
 - Test first: before a change of behavior or a bug fix, write a test that fails without it (Go
   unit, Lua, chart or e2e test; a lint rule when a test cannot express the defect), then change
   the code until it passes. A change of behavior without such a test states the reason in the
