@@ -30,12 +30,12 @@ intent the publishing jobs state explicitly is `CHANNEL` (see [Release](release.
 | Unit tests | `make docker-load test-unit test-unit-lua` | always |
 | Generated files | `make docs-verify helm-docs-verify` | always |
 | Helm chart | `make helm-lint helm-test` | always |
-| Docs | `make docs-build docs-publish-check` | docs or CI changes; always outside pull requests |
+| Docs | `make docs-build docs-publish-check` | groups `docs`, `build-system`, `workflow`; always outside pull requests |
 | Dependency scan | `make security-dependency-scan` | always |
-| Build images | `make docker-load docker-build docker-build-e2e docker-save` | code, chart, image or CI changes; always outside pull requests |
+| Build images | `make docker-load docker-build docker-build-e2e docker-save` | any group except `docs` and `certgen`; always outside pull requests |
 | E2E | `make docker-load test-e2e SKIP_BUILD=1 K8S_VERSION=… E2E_VARIANT=…` | every Kubernetes version × every variant |
 | Chart e2e | `make docker-load test-e2e-chart SKIP_BUILD=1 K8S_VERSION=…` | every Kubernetes version |
-| kube-webhook-certgen e2e | `make test-e2e-certgen` | certgen changes; always outside pull requests |
+| kube-webhook-certgen e2e | `make test-e2e-certgen` | groups `certgen`, `e2e`, `build-system`, `workflow`; always outside pull requests |
 | **CI result** | `make ci-result` | always (not when the run is cancelled) |
 | Publish latest | `make docker-publish docker-promote docker-sign helm-package helm-publish CHANNEL=latest`, `make code-build-plugin CHANNEL=latest` | pushes to `main` and manual runs on `main`, after CI result passed |
 | Publish docs (latest) | `make docs-publish CHANNEL=latest` | after Publish latest |
@@ -54,6 +54,30 @@ pull requests the dependency images are pulled when published and built locally 
 The `latest` channel is published only from the tip of `main` (`publish-guard`, a prerequisite of
 every publishing target); a newer push cancels an older publication. Jobs that write to `gh-pages`
 share one concurrency group and never cancel each other.
+
+## When jobs run
+
+On pull requests the `Changes` job (`dorny/paths-filter`) sorts the changed files into groups. The
+cheap jobs (Lint, Unit tests, Generated files, Helm chart, Dependency scan, CI result) always run.
+Image builds and e2e (E2E and Chart e2e follow Build images) run only when the change can affect
+them. Pushes and manual runs have no filters and run everything.
+
+| Group | Paths |
+|-------|-------|
+| `go` | `**/*.go`, `**/go.mod`, `**/go.sum` |
+| `lua` | `rootfs/etc/nginx/lua/**` |
+| `template` | `rootfs/**` |
+| `chart` | `charts/**`, `make/helm.mk`, `make/manifests.mk`, `tools/manifest-templates/**`, `tools/generate-manifests.sh` |
+| `images-deps` | `images/` of the dependency images (`nginx`, `test-runner`, `e2e-test-echo`, `httpbun`, `fastcgi-helloserver`, `cfssl`) |
+| `images-delivered` | `rootfs/**`, `images/kube-webhook-certgen/**`, `images/custom-error-pages/**` |
+| `certgen` | `images/kube-webhook-certgen/**`, `tools/e2e-certgen.sh` |
+| `docs` | `docs/**`, `mkdocs.yml`, `charts/**`, `make/docs.mk`, `tools/docs/**`, `tools/docs-publish.sh` |
+| `e2e` | `test/**`, `make/test.mk`, `make/images.mk`, `tools/content-tag.sh`, `tools/image-exists.sh`, `tools/e2e-chart.sh` |
+| `build-system` | `Makefile`, `make/code.mk`, `tools/go.mod`, `tools/go.sum`, `tools/versions.env`, `tools/install.sh`, `tools/actionlint/**` |
+| `workflow` | `.github/**`, any workflow change runs the whole CI |
+
+Paths outside the groups (for example `tools/release/**`, `make/release.mk`, `AGENTS.md`) run only
+the cheap jobs. Unit tests and lint check them; they do not affect the build or e2e.
 
 ## Caches and artifacts
 
