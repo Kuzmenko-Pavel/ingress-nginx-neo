@@ -1,4 +1,5 @@
 {{- if .Values.controller.ingressClassResource.enabled -}}
+{{- include "ingress-nginx.ingressClass.checkOwner" (dict "name" .Values.controller.ingressClassResource.name "context" $) }}
 apiVersion: networking.k8s.io/v1
 kind: IngressClass
 metadata:

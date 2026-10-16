@@ -14,12 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Lua unit tests. Runs inside the e2e-test-runner image (see `make test-unit-lua`)
+# and writes JUnit and LCOV coverage to TEST_REPORTS.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-BUSTED_ARGS="-v --pattern=_test"
+mkdir -p "${TEST_REPORTS:?}"
+reports="$(cd "${TEST_REPORTS}" && pwd)"
+
+cat >/tmp/luacov.lua <<CONFIG
+return {
+  statsfile = "/tmp/luacov.stats.out",
+  reportfile = "${reports}/coverage-lua.lcov",
+  include = { "rootfs/etc/nginx/lua/" },
+  exclude = { "rootfs/etc/nginx/lua/test/" },
+}
+CONFIG
+rm -f /tmp/luacov.stats.out
+
+BUSTED_ARGS="-v --pattern=_test --output=./rootfs/etc/nginx/lua/test/output.lua
+  -Xoutput ${reports}/unit-lua.xml --coverage --coverage-config-file=/tmp/luacov.lua"
 
 SHDICT_ARGS=(
     "-I" "./rootfs/etc/nginx/lua"
@@ -40,3 +56,6 @@ if [ $# -eq 0 ]; then
 else
     resty "${SHDICT_ARGS[@]}" $@ ${BUSTED_ARGS}
 fi
+
+luacov -c /tmp/luacov.lua -r lcov
+echo "Lua coverage: ${TEST_REPORTS}/coverage-lua.lcov"

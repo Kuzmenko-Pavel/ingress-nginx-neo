@@ -15,18 +15,36 @@
 
 # Go unit tests. Runs inside the e2e-test-runner image (see `make test-unit`):
 # some tests need a writable /etc/ingress-controller and the envtest binaries
-# (etcd, kube-apiserver) in /usr/local/bin.
+# (etcd, kube-apiserver) in /usr/local/bin. Writes JUnit and coverage of every
+# Go module to TEST_REPORTS.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-mkdir -p /tmp/nginx
+mkdir -p /tmp/nginx "${TEST_REPORTS:?}"
+reports="$(cd "${TEST_REPORTS}" && pwd)"
 
-go test $(go list ./... | grep -vE '/test/e2e|/images/|/docs/examples')
+# gotestsum of tools/go.mod, built for the container platform.
+go -C tools build -o /tmp/gotestsum gotest.tools/gotestsum
+
+# go_test <name> <packages...>: JUnit in unit-<name>.xml, coverage in
+# coverage-<name>.out. TEST_ARGS holds extra arguments of go test.
+go_test() {
+  local name="$1"
+  shift
+  # TEST_ARGS is unquoted on purpose: it holds several arguments.
+  /tmp/gotestsum --format pkgname --junitfile "${reports}/unit-${name}.xml" -- \
+    -covermode=atomic -coverprofile="${reports}/coverage-${name}.out" ${TEST_ARGS:-} "$@"
+  echo "coverage of ${name}: $(go tool cover -func="${reports}/coverage-${name}.out" | awk 'END { print $NF }')" \
+    "(${TEST_REPORTS}/coverage-${name}.out)"
+}
+
+go_test go $(go list ./... | grep -vE '/test/e2e|/images/|/docs/examples')
 
 for module in images/kube-webhook-certgen/rootfs images/custom-error-pages/rootfs images/fastcgi-helloserver/rootfs; do
-  (cd "${module}" && go test ./...)
+  name="$(basename "$(dirname "${module}")")"
+  (cd "${module}" && go_test "go-${name}" ./...)
 done
 
 test/channel_test.sh

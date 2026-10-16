@@ -27,9 +27,10 @@ helm-lint: helm-stage $(HELM) $(KUBECONFORM)
 	done
 
 .PHONY: helm-test
-## helm-unittest.
+## helm-unittest; JUnit in dist/test-reports.
 helm-test: $(HELM_UNITTEST)
-	$(HELM_UNITTEST) --file 'tests/**/*_test.yaml' $(CHART_DIR)
+	mkdir -p $(TEST_REPORTS)
+	$(HELM_UNITTEST) --file 'tests/**/*_test.yaml' --output-type JUnit --output-file $(TEST_REPORTS)/unit-helm.xml $(CHART_DIR)
 
 .PHONY: helm-template
 ## Render the staged chart into dist/rendered/.

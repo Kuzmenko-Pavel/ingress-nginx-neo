@@ -54,9 +54,43 @@ For a change that is not in the table, the level follows from the column "Why".
 Go and Lua unit tests run in the `e2e-test-runner` image (`tools/run-in-container.sh`), with the
 repository mounted at `/src`, Go caches in `.cache/container` and a writable
 `/etc/ingress-controller`. The image provides the Go toolchain of `go.mod`, the envtest binaries
-(etcd, kube-apiserver) used by the store tests, and the Lua test tools (resty, busted, luacheck).
+(etcd, kube-apiserver) used by the store tests, and the Lua test tools (resty, busted, luacheck,
+luacov).
 
 Lua tests live in `rootfs/etc/nginx/lua/test`; test files are named `<name>_test.lua`.
+
+`TEST_ARGS` passes extra arguments to `go test`:
+
+```console
+make test-unit TEST_ARGS='-run TestStore -v'
+```
+
+## Test reports and coverage
+
+`make test-unit`, `make test-unit-lua` and `make helm-test` write reports to `dist/test-reports/`
+(`TEST_REPORTS`, a directory inside the repository, because the tests run in a container with the
+repository at `/src`):
+
+| File | Target | Content |
+|------|--------|---------|
+| `unit-go.xml`, `unit-go-<module>.xml` | `make test-unit` | JUnit of the Go tests of the root module and of every module in `images/*/rootfs` |
+| `coverage-go.out`, `coverage-go-<module>.out` | `make test-unit` | coverage in the Go `coverprofile` format |
+| `unit-lua.xml` | `make test-unit-lua` | JUnit of the Lua tests |
+| `coverage-lua.lcov` | `make test-unit-lua` | coverage of the Lua code in `rootfs/etc/nginx/lua` in the LCOV format |
+| `unit-helm.xml` | `make helm-test` | JUnit of the chart tests |
+
+gotestsum (pinned in `tools/go.mod`, built in the container) runs the Go tests. It prints one line
+per package, the full output of failed tests and the number of tests at the end. `make test-unit`
+prints the total coverage of every module. The uncovered lines are shown by
+
+```console
+go tool cover -html=dist/test-reports/coverage-go.out
+```
+
+luacov counts the Lua coverage (`busted --coverage`), luacov-reporter-lcov writes the LCOV report.
+
+In CI the jobs Unit tests and Helm chart keep `dist/test-reports/` as artifacts (see
+[CI](ci.md#caches-and-artifacts)).
 
 ## Controller e2e
 
@@ -127,11 +161,24 @@ The specs are Ginkgo specs in `test/e2e`; `FOCUS` matches their descriptions, fo
 ## Chart e2e
 
 `make test-e2e-chart` packages the chart, creates a kind cluster with cert-manager (pinned manifest
-from `tools/versions.env`) and, for every `charts/ingress-nginx-neo/ci/*-values.yaml`, installs the
-package with the locally built images in a namespace of its own, waits until the release is ready,
-uninstalls it and deletes the namespace without waiting (`tools/e2e-chart.sh`). The controller runs
-with `terminationGracePeriodSeconds: 0`: the test checks installations, not the draining of
-connections. The output shows the duration of every installation.
+from `tools/versions.env`) and installs every `charts/ingress-nginx-neo/ci/*-values.yaml` at the
+same time, with the locally built images, each as a release `ci-<N>` in a namespace of its own
+(`tools/e2e-chart.sh`). Several controllers thus run in one cluster, as described in
+[Multiple Ingress controllers](../user-guide/multiple-ingress.md). Every release gets its own
+IngressClass `ci-<N>` and `controller.admissionWebhooks.matchIngressClass`. A values file that sets
+`controller.ingressClassResource` itself keeps its class and serves the Ingresses without a class.
+
+The test then checks:
+- every controller answers an Ingress of its class with a redirect 301, which NGINX sends itself
+  without a backend, and answers 404 to the Ingress of the neighbouring release
+- with the controller of one release scaled to 0, an Ingress of another release is created and
+  served
+- a second release with the IngressClass `nginx` stops with a hint which values to set
+
+A readiness probe every second, `worker-processes=1` and `terminationGracePeriodSeconds: 0` are
+settings of the test, not of the chart. The output shows the time until every release is ready. A
+new values file in `ci/` joins the same parallel installation, so it has to coexist with the others:
+no NodePorts that are taken and no cluster-scoped objects with fixed names.
 
 ## kube-webhook-certgen e2e
 

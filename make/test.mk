@@ -2,13 +2,16 @@
 #
 # Unit and e2e tests. Included by the root Makefile.
 
+# Read by test/test.sh and test/test-lua.sh in the runner container.
+export TEST_REPORTS TEST_ARGS
+
 .PHONY: test-unit
-## Go unit tests: root module (excluding test/e2e, images, docs/examples) + images/{kube-webhook-certgen,custom-error-pages,fastcgi-helloserver}/rootfs. | Test
+## Go unit tests: root module (excluding test/e2e, images, docs/examples) + images/{kube-webhook-certgen,custom-error-pages,fastcgi-helloserver}/rootfs; JUnit and coverage in dist/test-reports. | Test
 test-unit: deps-runner
 	tools/run-in-container.sh $(RUNNER_IMAGE) test/test.sh
 
 .PHONY: test-unit-lua
-## Lua unit tests inside e2e-test-runner.
+## Lua unit tests inside e2e-test-runner; JUnit and coverage in dist/test-reports.
 test-unit-lua: deps-runner
 	tools/run-in-container.sh $(RUNNER_IMAGE) test/test-lua.sh
 
@@ -42,14 +45,14 @@ endif
 		test/e2e/run-kind-e2e.sh
 
 .PHONY: test-e2e-chart
-## Install the chart on kind for every ci/*-values.yaml (SKIP_BUILD=1 supported).
+## Install every ci/*-values.yaml on one kind cluster in parallel, check traffic and isolation (SKIP_BUILD=1 supported).
 test-e2e-chart: helm-package $(KIND) $(KUBECTL) $(HELM) $(CERT_MANAGER_MANIFEST)
 ifeq ($(SKIP_BUILD),)
 	$(MAKE) --no-print-directory docker-build IMAGES="controller kube-webhook-certgen custom-error-pages"
 endif
 	$(HELM_ENV) KIND=$(KIND) KUBECTL=$(KUBECTL) HELM=$(HELM) KIND_CLUSTER_NAME=$(PROJECT)-chart \
 	K8S_VERSION=$(K8S_VERSION) CERT_MANAGER_MANIFEST=$(CERT_MANAGER_MANIFEST) \
-	RELEASE_NAME=$(RELEASE_NAME) NAMESPACE=$(NAMESPACE) \
+	NAMESPACE=$(NAMESPACE) \
 	LOAD_IMAGES='$(CONTROLLER_IMAGE):$(IMAGE_TAG) $(CERTGEN_IMAGE):$(IMAGE_TAG) $(ERROR_PAGES_IMAGE):$(IMAGE_TAG)' \
 	IMAGE_REGISTRY=$(REGISTRY_HOST) IMAGE_PREFIX=$(REGISTRY_PATH) IMAGE_TAG=$(IMAGE_TAG) \
 		tools/e2e-chart.sh $(CHART_PACKAGE) $(STAGED_CHART)/ci
