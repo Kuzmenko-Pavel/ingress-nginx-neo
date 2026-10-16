@@ -33,13 +33,32 @@ CACHE := .cache
 # ---------------------------------------------------------------------------
 
 RELEASE_TAG_PATTERN := v[0-9]*.[0-9]*.[0-9]*
-CHANNEL ?= dev
+COMMIT := $(shell git rev-parse HEAD 2>/dev/null)
+
+# The publishing channel follows the git state, the same for a human and CI:
+# a release tag on HEAD is that release, the tip of origin/main is latest,
+# anything else is a local dev build. CHANNEL=... overrides it.
+HEAD_RELEASE_TAG := $(shell git describe --tags --exact-match --match '$(RELEASE_TAG_PATTERN)' HEAD 2>/dev/null)
+ORIGIN_MAIN := $(shell git rev-parse --verify --quiet refs/remotes/origin/main 2>/dev/null)
+ifneq ($(origin CHANNEL),undefined)
+CHANNEL_REASON := $(origin CHANNEL)
+else ifneq ($(HEAD_RELEASE_TAG),)
+CHANNEL := release
+CHANNEL_REASON := tag $(HEAD_RELEASE_TAG) on HEAD
+else ifneq ($(and $(COMMIT),$(filter $(COMMIT),$(ORIGIN_MAIN))),)
+CHANNEL := latest
+CHANNEL_REASON := HEAD is the tip of origin/main
+else
+CHANNEL := dev
+CHANNEL_REASON := HEAD is neither a release tag nor the tip of origin/main
+endif
 ifeq ($(filter $(CHANNEL),dev latest release),)
 $(error CHANNEL must be one of dev, latest, release (got "$(CHANNEL)"))
 endif
+RELEASE_TAG ?= $(HEAD_RELEASE_TAG)
 
 ifeq ($(CHANNEL),release)
-RELEASE_TAG ?= $(or $(GITHUB_REF_NAME),$(if $(filter command line environment,$(origin VERSION)),$(VERSION)))
+RELEASE_TAG := $(or $(RELEASE_TAG),$(if $(filter command line environment,$(origin VERSION)),$(VERSION)))
 ifeq ($(filter command line environment,$(origin VERSION)),)
 VERSION := $(RELEASE_TAG)
 endif
@@ -73,8 +92,6 @@ LATEST_RELEASE = $(shell git ls-remote --tags --refs origin 'v*' 2>/dev/null | s
 	grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | sort -V | tail -n1)
 # The release the documentation describes, substituted for <version> in its pages.
 DOCS_RELEASE_TAG = $(if $(filter release,$(CHANNEL)),$(VERSION),$(LATEST_RELEASE))
-
-COMMIT := $(shell git rev-parse HEAD 2>/dev/null)
 
 # Go version: toolchain line of go.mod, else its go line. Used for every Go
 # build, native or in a container.
@@ -223,6 +240,7 @@ DIGESTS_FILE := $(DIST)/digests.env
 # Tests
 # ---------------------------------------------------------------------------
 
+E2E_VARIANTS := default chroot
 E2E_VARIANT ?= default
 FOCUS ?=
 E2E_NODES ?= 7
@@ -255,12 +273,12 @@ help:
 			printf "  %s%-" width "s%s %s%s%s\n", yellow, substr($$1, 1, index($$1, ":") - 1), reset, green, text, reset; \
 		} \
 		{ last = $$0 }' $(MAKEFILE_LIST)
-	@echo
+	@printf '\nOptional variables: K8S_VERSION, E2E_VARIANT (%s), FOCUS; make version shows the channel and versions.\n\n' '$(E2E_VARIANTS)'
 
 .PHONY: version
-## Print VERSION, CHANNEL and derived IMAGE_TAG/CHART_VERSION/APP_VERSION/DOCS_VERSION.
+## Print VERSION, CHANNEL (and why) and derived IMAGE_TAG/CHART_VERSION/APP_VERSION/DOCS_VERSION.
 version:
-	@printf '%-14s %s\n' VERSION '$(VERSION)' CHANNEL '$(CHANNEL)' IMAGE_TAG '$(IMAGE_TAG)' \
+	@printf '%-14s %s\n' VERSION '$(VERSION)' CHANNEL '$(CHANNEL) ($(CHANNEL_REASON))' IMAGE_TAG '$(IMAGE_TAG)' \
 		CHART_VERSION '$(CHART_VERSION)' APP_VERSION '$(APP_VERSION)' DOCS_VERSION '$(DOCS_VERSION)' \
 		GO_VERSION '$(GO_VERSION)' COMMIT '$(COMMIT)'
 
@@ -313,6 +331,10 @@ print-deps-missing:
 	done; \
 	echo "$$missing"
 
+.PHONY: print-e2e-variants
+print-e2e-variants:
+	@printf '%s\n' $(E2E_VARIANTS) | jq -R . | jq -cs .
+
 .PHONY: print-scan-images
 print-scan-images:
 	@printf '%s\n' $(SCAN_IMAGES) | jq -R . | jq -cs .
@@ -320,6 +342,11 @@ print-scan-images:
 # The "CI result" check: RESULTS is the JSON of the needs context of the job.
 .PHONY: ci-result
 ci-result:
+	@if [ -z "$${RESULTS:-}" ]; then \
+		echo "Error: RESULTS is not set" >&2; \
+		echo "Please add: export RESULTS='<JSON of the needs context: {\"job\": {\"result\": \"success\"}, ...}>'" >&2; \
+		exit 1; \
+	fi
 	@jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$$RESULTS"
 	@if jq -e 'to_entries | any(.value.result == "failure" or .value.result == "cancelled")' <<< "$$RESULTS" > /dev/null; then \
 		echo "at least one job failed or was cancelled" >&2; exit 1; \
@@ -373,8 +400,8 @@ code-build-plugin:
 
 .PHONY: code-sign-plugin
 ## cosign sign-blob the plugin checksums (CHANNEL=release).
-code-sign-plugin: $(COSIGN)
-	$(if $(filter release,$(CHANNEL)),,$(error code-sign-plugin needs CHANNEL=release))
+code-sign-plugin: publish-guard $(COSIGN)
+	$(if $(filter release,$(CHANNEL)),,$(error code-sign-plugin signs a release: checkout a vX.Y.Z tag))
 	$(COSIGN) sign-blob --yes --bundle $(PLUGIN_DIR)/checksums.sha256.sigstore.json $(PLUGIN_DIR)/checksums.sha256
 
 
@@ -402,7 +429,7 @@ E2E_LOAD_IMAGES = $(REGISTRY)/$(E2E_CONTROLLER):$(IMAGE_TAG) $(CERTGEN_IMAGE):$(
 .PHONY: test-e2e
 ## Controller e2e on kind (E2E_VARIANT=default or chroot, K8S_VERSION, FOCUS, E2E_NODES; SKIP_BUILD=1 uses already loaded images).
 test-e2e: $(KIND) $(KUBECTL)
-	$(if $(filter-out default chroot,$(E2E_VARIANT)),$(error E2E_VARIANT must be default or chroot))
+	$(if $(filter-out $(E2E_VARIANTS),$(E2E_VARIANT)),$(error E2E_VARIANT must be one of $(E2E_VARIANTS)))
 	$(MAKE) --no-print-directory docker-build-deps
 ifeq ($(SKIP_BUILD),)
 	$(MAKE) --no-print-directory docker-build IMAGES="$(E2E_CONTROLLER) kube-webhook-certgen custom-error-pages"
@@ -521,8 +548,7 @@ endef
 
 .PHONY: docker-publish
 ## Build and push delivered images for PLATFORMS with IMAGE_TAG (CHANNEL=latest or release), write dist/digests.env.
-docker-publish: $(CRANE)
-	$(if $(filter dev,$(CHANNEL)),$(error docker-publish needs CHANNEL=latest or CHANNEL=release))
+docker-publish: publish-guard $(CRANE)
 	$(foreach p,$(subst $(comma), ,$(PLATFORMS)),$(MAKE) --no-print-directory code-build ARCH=$(notdir $(p))$(newline))
 	mkdir -p $(DIST)
 	base="$(REGISTRY)/nginx@$$($(CRANE) digest $(NGINX_IMAGE))"; \
@@ -616,8 +642,7 @@ deps-manifest-%:
 
 .PHONY: docker-promote
 ## Point latest (CHANNEL=latest) / vX.Y.Z (CHANNEL=release) of every dependency image to its src-* digest.
-docker-promote: $(CRANE)
-	$(if $(filter dev,$(CHANNEL)),$(error docker-promote needs CHANNEL=latest or CHANNEL=release))
+docker-promote: publish-guard $(CRANE)
 	mkdir -p $(DIST)
 	for dep in $(DEPS_ALL); do \
 		$(MAKE) --no-print-directory deps-promote-$$dep; \
@@ -641,7 +666,7 @@ deps-promote-%:
 
 .PHONY: docker-sign
 ## cosign keyless sign every digest in dist/digests.env (delivered images, promoted dependency images).
-docker-sign: $(COSIGN)
+docker-sign: publish-guard $(COSIGN)
 	test -s $(DIGESTS_FILE) || { echo "$(DIGESTS_FILE) is missing: run docker-publish/docker-promote first" >&2; exit 1; }
 	cut -d= -f2- $(DIGESTS_FILE) | sort -u | xargs -r -n1 $(COSIGN) sign --yes --recursive
 
@@ -756,11 +781,11 @@ endif
 
 .PHONY: helm-publish
 ## Push dist/*.tgz to CHART_REGISTRY and sign it.
-helm-publish: $(HELM) $(COSIGN)
+helm-publish: publish-guard $(HELM) $(COSIGN)
 	test -s $(CHART_PACKAGE) || { echo "$(CHART_PACKAGE) is missing: run make helm-package first" >&2; exit 1; }
 	$(HELM_ENV) HELM_REGISTRY_CONFIG=$(HELM_REGISTRY_CONFIG) $(HELM) push $(CHART_PACKAGE) $(CHART_REGISTRY) 2>&1 | tee $(DIST)/helm-push.log
 	digest="$$(sed -n 's/^Digest: //p' $(DIST)/helm-push.log)"; \
-	test -n "$$digest"; \
+	test -n "$$digest" || { echo "helm push printed no digest; see $(DIST)/helm-push.log" >&2; exit 1; }; \
 	echo "chart=$(REGISTRY)/charts/$(CHART_NAME)@$$digest" > $(DIST)/chart-digest.env; \
 	$(COSIGN) sign --yes "$(REGISTRY)/charts/$(CHART_NAME)@$$digest"
 
@@ -799,7 +824,7 @@ docs-serve: $(DOCS_VENV)/bin/mkdocs
 
 .PHONY: docs-publish
 ## Publish the docs version for CHANNEL via mike.
-docs-publish: $(DOCS_VENV)/bin/mkdocs
+docs-publish: publish-guard $(DOCS_VENV)/bin/mkdocs
 	$(DOCS_PATH) DOCS_RELEASE_TAG=$(DOCS_RELEASE_TAG) MIKE=$(DOCS_VENV)/bin/mike CHANNEL=$(CHANNEL) VERSION=$(VERSION) DOCS_VERSION=$(DOCS_VERSION) \
 		tools/docs-publish.sh
 
@@ -826,13 +851,14 @@ release-tag:
 .PHONY: release-verify
 ## Verify RELEASE_TAG: format, annotated, trusted signature, branch, CI result, not released.
 release-verify: $(YQ)
-	test -n '$(RELEASE_TAG)' || { echo "set RELEASE_TAG=vX.Y.Z" >&2; exit 1; }
+	test -n '$(RELEASE_TAG)' || { echo "set RELEASE_TAG=vX.Y.Z or checkout a release tag" >&2; exit 1; }
+	@$(gh-auth-check)
 	YQ=$(YQ) GITHUB_REPO=$(GITHUB_REPO) tools/release/verify-tag.sh '$(RELEASE_TAG)'
 
 .PHONY: release-notes
 ## Render dist/release-notes.md.
-release-notes:
-	$(if $(filter release,$(CHANNEL)),,$(error release-notes needs CHANNEL=release))
+release-notes: publish-guard
+	$(if $(filter release,$(CHANNEL)),,$(error release-notes renders a release: checkout a vX.Y.Z tag))
 	DIGESTS_FILE=$(DIGESTS_FILE) CHART_DIGEST_FILE=$(DIST)/chart-digest.env PLUGIN_DIR=$(PLUGIN_DIR) \
 	MANIFESTS_DIR=$(DIST)/manifests CHART_REGISTRY=$(CHART_REGISTRY) CHART_NAME=$(CHART_NAME) \
 	RELEASE_NAME=$(RELEASE_NAME) NAMESPACE=$(NAMESPACE) REPO_URL=$(REPO_URL) \
@@ -845,21 +871,36 @@ RELEASE_ASSETS = $(wildcard $(DIST)/manifests/deploy-*.yaml $(DIST)/manifests/de
 
 .PHONY: release-publish
 ## Create or update the draft GitHub Release with all assets.
-release-publish:
-	$(if $(filter release,$(CHANNEL)),,$(error release-publish needs CHANNEL=release))
+release-publish: publish-guard
+	$(if $(filter release,$(CHANNEL)),,$(error release-publish publishes a release: checkout a vX.Y.Z tag))
+	@$(gh-auth-check)
 	GITHUB_REPO=$(GITHUB_REPO) tools/release/publish.sh publish $(VERSION) $(RELEASE_NOTES) $(RELEASE_ASSETS)
 
 .PHONY: release-finalize
 ## Publish the draft GitHub Release.
-release-finalize:
-	$(if $(filter release,$(CHANNEL)),,$(error release-finalize needs CHANNEL=release))
+release-finalize: publish-guard
+	$(if $(filter release,$(CHANNEL)),,$(error release-finalize publishes a release: checkout a vX.Y.Z tag))
+	@$(gh-auth-check)
 	GITHUB_REPO=$(GITHUB_REPO) tools/release/publish.sh finalize $(VERSION)
 
-# Check the invariants of the publishing channel once, before any publishing
-# target of the same job: latest publishes the tip of main only, release
-# publishes the tagged commit only.
+define gh-auth-check
+if ! gh auth token >/dev/null 2>&1; then \
+	echo "Error: gh is not authenticated" >&2; \
+	echo "Please run: gh auth login   (or export GH_TOKEN=...)" >&2; \
+	exit 1; \
+fi
+endef
+
+# A prerequisite of every publishing target, checked once per make run: the
+# tree is committed, latest publishes the tip of main only, release publishes
+# the tagged commit only.
 .PHONY: publish-guard
 publish-guard:
+ifeq ($(CHANNEL),dev)
+	@echo "publishing runs from the tip of main (latest) or from a release tag; HEAD is neither (checkout main or a vX.Y.Z tag; preview the docs with make docs-serve)" >&2; exit 1
+endif
+	@test -z "$$(git status --porcelain)" || \
+		{ echo "There are uncommitted changes. Commit them before publishing" >&2; exit 1; }
 ifeq ($(CHANNEL),latest)
 	git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
 	test "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/main)" || \
@@ -869,8 +910,6 @@ else ifeq ($(CHANNEL),release)
 		{ echo "tag $(VERSION) does not exist" >&2; exit 1; }
 	test "$$(git rev-parse HEAD)" = "$$(git rev-parse '$(VERSION)^{commit}')" || \
 		{ echo "HEAD is not the commit of $(VERSION)" >&2; exit 1; }
-else
-	@echo "publishing needs CHANNEL=latest or CHANNEL=release" >&2; exit 1
 endif
 
 .PHONY: print-latest-release
@@ -931,7 +970,7 @@ SCAN_IMAGES := $(DELIVERED_IMAGES) nginx
 .PHONY: security-container-scan
 ## Trivy scan of the latest published release images (or VERSION=) into dist/sarif/.
 security-container-scan:
-	version='$(if $(filter command line,$(origin VERSION)),$(VERSION))'; \
+	version='$(if $(filter command line environment,$(origin VERSION)),$(VERSION))'; \
 	version="$${version:-$$($(MAKE) -s print-latest-release)}"; \
 	test -n "$$version" || { echo "no release to scan" >&2; exit 1; }; \
 	mkdir -p $(DIST)/sarif; \

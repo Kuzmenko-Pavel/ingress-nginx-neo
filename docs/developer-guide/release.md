@@ -7,11 +7,14 @@ artifact of the release takes its version from it: images `vX.Y.Z`, chart `X.Y.Z
 `appVersion` `vX.Y.Z`, kubectl plugin, static manifests and the documentation version `X.Y`.
 No file in the repository holds a version.
 
-The Makefile derives everything from `VERSION` and `CHANNEL` once per run:
+The Makefile derives everything from `VERSION` and `CHANNEL` once per run. The channel follows the
+git state, the same for a human and CI. A release tag on `HEAD` is `release`, the tip of
+`origin/main` is `latest`, anything else is `dev`. `CHANNEL=...` overrides it; `make version` prints
+the channel and the reason.
 
-| | `CHANNEL=dev` (local) | `CHANNEL=latest` (CI on `main`) | `CHANNEL=release` (CI on a tag) |
+| | `CHANNEL=dev` (own branch) | `CHANNEL=latest` (tip of `main`) | `CHANNEL=release` (release tag) |
 |---|---|---|---|
-| `VERSION` | `git describe` of the nearest release tag, else `v0.0.0-dev` | same | the tag of the run (`RELEASE_TAG`, `GITHUB_REF_NAME`) |
+| `VERSION` | `git describe` of the nearest release tag, else `v0.0.0-dev` | same | the tag on `HEAD` (`RELEASE_TAG`) |
 | image tag | `dev` | `latest` | `vX.Y.Z` |
 | chart version | `0.0.0-dev` | `0.0.0-latest` | `X.Y.Z` |
 | chart `appVersion` | `dev` | `latest` | `vX.Y.Z` |
@@ -24,6 +27,10 @@ The Makefile derives everything from `VERSION` and `CHANNEL` once per run:
 make version
 make version CHANNEL=release VERSION=vX.Y.Z
 ```
+
+A build on an up-to-date `main` gets the channel `latest`. Its images `:latest` in the local image
+store shadow the registry images of the same name on that machine. When this is in the way, use
+`CHANNEL=dev`.
 
 Documentation pages write the release as the placeholder `<version>`, always inside code. The MkDocs hook
 `tools/docs/release_version.py` replaces it with `DOCS_RELEASE_TAG`, which the Makefile sets from the row
@@ -87,18 +94,19 @@ git push origin vX.Y.Z
 
 Pushing the tag starts `release.yaml`:
 
-1. **verify** — `make release-verify RELEASE_TAG=<tag>`: the tag is `vX.Y.Z`, annotated and signed
-   with OpenPGP by a key of `trusted_release_managers.yml` read from `origin/main` (compared by
-   fingerprint in an empty temporary keyring); the tagged commit is on `origin/main` or
-   `origin/release-X.Y`; its **CI result** check passed; its GitHub Release is not published.
+1. **verify** — `make release-verify` (the tag is taken from `HEAD`): the tag is `vX.Y.Z`,
+   annotated and signed with OpenPGP by a key of `trusted_release_managers.yml` read from
+   `origin/main` (compared by fingerprint in an empty temporary keyring); the tagged commit is on
+   `origin/main` or `origin/release-X.Y`; its **CI result** check passed; its GitHub Release is not
+   published.
 2. **deps** — publishes missing dependency images (normally none: `main` published them).
-3. **publish** (environment `release`, approved by a reviewer) — `publish-guard`; rebuilds the
-   delivered images from the tagged source, pushes them with SBOM and provenance, tags the
-   dependency images with the version (`docker-promote`), signs every digest; builds and signs the
-   kubectl plugin; packages the chart with pinned digests and pushes and signs it; renders the
-   static manifests; renders the release notes (`dist/release-notes.md`: the tag message, the
-   artifacts with digests, install and verification commands); creates or updates the **draft**
-   GitHub Release with all assets and checks they are attached.
+3. **publish** (environment `release`, approved by a reviewer) — rebuilds the delivered images
+   from the tagged source, pushes them with SBOM and provenance, tags the dependency images with the
+   version (`docker-promote`), signs every digest; builds and signs the kubectl plugin; packages the
+   chart with pinned digests and pushes and signs it; renders the static manifests; renders the
+   release notes (`dist/release-notes.md`: the tag message, the artifacts with digests, install and
+   verification commands); creates or updates the **draft** GitHub Release with all assets and
+   checks they are attached.
 4. **docs** — publishes the documentation version `X.Y`; when the tag is the highest release, the
    alias `stable` and the site root move to it.
 5. **finalize** — publishes the draft release; it is marked latest only when the tag is the highest
@@ -110,6 +118,58 @@ tagged commit are kept, the chart and the assets are replaced, the draft is upda
 published, `release-verify` rejects the tag.
 
 The tested commit is the tagged commit: the e2e suite does not run again on the tag.
+
+Every publishing target (`docker-publish`, `docker-promote`, `docker-sign`, `helm-publish`,
+`code-sign-plugin`, `docs-publish`, `release-notes`, `release-publish`, `release-finalize`) runs
+`publish-guard` first. It checks that the tree is committed; `latest` is published only from the tip
+of `origin/main` (after `git fetch`), `release` only from the commit of the tag; on `dev` publishing
+stops with a hint. CI passes `CHANNEL` explicitly, so when a release tag is put on the tip of `main`
+while the CI run of `main` is still going, the `latest` job still publishes `latest`.
+
+## Publishing without CI
+
+CI publishes as a rule. When CI is unavailable, a person with write access runs the same make
+targets in the same order. The Makefile derives the channel and the tag from the checkout, so no
+variables are needed.
+
+1. Access: `gh auth login`; `docker login ghcr.io` with a token with the scope `write:packages`;
+   `export GITHUB_TOKEN="$(gh auth token)"` (the NGINX image build downloads sources from GitHub).
+2. Multi-platform builds (in CI `setup-buildx` and `setup-qemu` do this):
+
+   ```console
+   docker buildx create --use --name neo
+   docker run --privileged --rm tonistiigi/binfmt --install arm64
+   ```
+
+3. Dependency images, when the registry lacks them (`make -s print-deps-missing` prints `true`):
+
+   ```console
+   make docker-publish-deps PLATFORM=linux/amd64
+   make docker-publish-deps PLATFORM=linux/arm64
+   make docker-publish-deps-manifest
+   ```
+
+4. **latest**, on an up-to-date `main`:
+
+   ```console
+   git switch main && git pull
+   make docker-publish docker-promote docker-sign helm-package helm-publish
+   make docs-publish
+   ```
+
+5. **release**, on a checkout of the tag:
+
+   ```console
+   git checkout vX.Y.Z
+   make docker-publish docker-promote docker-sign code-build-plugin code-sign-plugin \
+     helm-package helm-publish manifests-generate release-notes release-publish
+   make docs-publish
+   make release-finalize
+   ```
+
+The cosign signatures then carry your identity (browser login), not the identity of the workflow.
+The verification command of the release notes (`--certificate-identity-regexp` on `release.yaml`)
+does not accept them, so publishing by hand is an emergency path.
 
 ## Trusted release managers
 
