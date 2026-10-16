@@ -9,6 +9,9 @@ decides when and in which order targets run. What to do and with which values is
 Makefile. Every value CI passes to make has a default or a derivation rule in the Makefile. The only
 intent the publishing jobs state explicitly is `CHANNEL` (see [Release](release.md)).
 
+A workflow change can be checked before a push with act, see
+[Running CI workflows locally](local-ci.md).
+
 ## Workflows
 
 | Workflow | Trigger | Make targets |
