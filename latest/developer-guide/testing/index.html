@@ -2490,10 +2490,49 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#which-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which test
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Which test">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-a-new-annotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: a new annotation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#unit-tests" class="md-nav__link">
     <span class="md-ellipsis">
       
         Unit tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-reports-and-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test reports and coverage
       
     </span>
   </a>
@@ -2508,6 +2547,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Controller e2e">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#writing-an-e2e-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing an e2e spec
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2814,10 +2870,49 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#which-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which test
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Which test">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-a-new-annotation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: a new annotation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#unit-tests" class="md-nav__link">
     <span class="md-ellipsis">
       
         Unit tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-reports-and-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test reports and coverage
       
     </span>
   </a>
@@ -2832,6 +2927,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Controller e2e">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#writing-an-e2e-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Writing an e2e spec
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2996,12 +3108,139 @@
 or e2e test, or a lint rule when a test cannot express the defect. The code is then changed until
 the test passes, so the test proves both the defect and the fix. A change of behavior without such
 a test states the reason in the pull request.</p>
+<h2 id="which-test">Which test<a class="headerlink" href="#which-test" title="Permanent link"> ¶</a></h2>
+<p>A test is written at the lowest level that catches the defect. e2e is needed only for behavior that
+shows only on a running NGINX in a cluster. A test of a lower level runs in milliseconds instead of
+tens of seconds, points to the cause of a failure more precisely and does not fail because of the
+cluster. e2e checks what happens only on the path of a request through NGINX and Lua to a backend.</p>
+<table>
+<thead>
+<tr>
+<th>What changes</th>
+<th>Required test</th>
+<th>e2e is needed as well when</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>parsing of an annotation or a ConfigMap key (<code>internal/ingress/annotations/*</code>, <code>internal/ingress/controller/config</code>)</td>
+<td>Go unit: parsing, default value, errors, risk level</td>
+<td>the annotation changes the handling of requests. One spec per behavior, not per value</td>
+<td>the parser is a pure function, every branch is checked in milliseconds. e2e only confirms that the behavior reaches the traffic</td>
+</tr>
+<tr>
+<td>the template <code>rootfs/etc/nginx/template/nginx.tmpl</code></td>
+<td>Go unit on the rendered result (<code>internal/ingress/controller/template</code>)</td>
+<td>the behavior of a request or a response changes</td>
+<td>which line ends up in nginx.conf is decided by rendering, not by the cluster</td>
+</tr>
+<tr>
+<td>Lua (<code>rootfs/etc/nginx/lua</code>)</td>
+<td>busted test <code>*_test.lua</code></td>
+<td>the synchronization of the configuration or the balancing on a running NGINX changes</td>
+<td>busted checks the Lua logic, e2e is needed only for the integration with NGINX</td>
+</tr>
+<tr>
+<td>store, synchronization, admission (<code>internal/ingress/controller/store</code>, <code>internal/admission</code>)</td>
+<td>Go unit, envtest where a real API server is needed (as in the store tests)</td>
+<td>an end-to-end path changes, for example admission rejects an Ingress</td>
+<td>envtest gives a real kube-apiserver without NGINX and a cluster</td>
+</tr>
+<tr>
+<td>chart templates and values</td>
+<td>helm-unittest (<code>charts/ingress-nginx-neo/tests</code>)</td>
+<td>a new installation mode appears. It gets a values file in <code>charts/ingress-nginx-neo/ci/</code>, and chart e2e checks it</td>
+<td>templates are checked by rendering, chart e2e checks that the configuration installs and works</td>
+</tr>
+<tr>
+<td>a controller flag</td>
+<td>Go unit on the parsing of the flag (<code>pkg/flags</code>)</td>
+<td>the flag changes the handling of requests</td>
+<td></td>
+</tr>
+<tr>
+<td>kubectl plugin (<code>cmd/plugin</code>)</td>
+<td>Go unit</td>
+<td>no</td>
+<td>the plugin does not handle traffic</td>
+</tr>
+<tr>
+<td>a bug fix</td>
+<td>a test that reproduces the bug at the lowest level where it shows</td>
+<td>the bug shows only on traffic</td>
+<td>the test fails without the fix and so proves both the bug and the fix</td>
+</tr>
+</tbody>
+</table>
+<p>For a change that is not in the table, the level follows from the column "Why".</p>
+<h3 id="example-a-new-annotation">Example: a new annotation<a class="headerlink" href="#example-a-new-annotation" title="Permanent link"> ¶</a></h3>
+<ol>
+<li>The parser in <code>internal/ingress/annotations/&lt;name&gt;/</code> and a unit test of parsing, the default value and errors.</li>
+<li>The risk level of the annotation (<code>Risk</code> in the annotation description).</li>
+<li>The use in the template and a unit test of the rendering.</li>
+<li>One e2e spec with an HTTP request, when the annotation changes the handling of requests.</li>
+<li><code>make docs-generate</code>, it updates <code>annotations-risk.md</code>.</li>
+<li><code>make check</code> and <code>make test-e2e FOCUS=&lt;name&gt;</code>.</li>
+</ol>
 <h2 id="unit-tests">Unit tests<a class="headerlink" href="#unit-tests" title="Permanent link"> ¶</a></h2>
 <p>Go and Lua unit tests run in the <code>e2e-test-runner</code> image (<code>tools/run-in-container.sh</code>), with the
 repository mounted at <code>/src</code>, Go caches in <code>.cache/container</code> and a writable
 <code>/etc/ingress-controller</code>. The image provides the Go toolchain of <code>go.mod</code>, the envtest binaries
-(etcd, kube-apiserver) used by the store tests, and the Lua test tools (resty, busted, luacheck).</p>
+(etcd, kube-apiserver) used by the store tests, and the Lua test tools (resty, busted, luacheck,
+luacov).</p>
 <p>Lua tests live in <code>rootfs/etc/nginx/lua/test</code>; test files are named <code>&lt;name&gt;_test.lua</code>.</p>
+<p><code>TEST_ARGS</code> passes extra arguments to <code>go test</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="go">make test-unit TEST_ARGS='-run TestStore -v'</span>
+</code></pre></div>
+<h2 id="test-reports-and-coverage">Test reports and coverage<a class="headerlink" href="#test-reports-and-coverage" title="Permanent link"> ¶</a></h2>
+<p><code>make test-unit</code>, <code>make test-unit-lua</code> and <code>make helm-test</code> write reports to <code>dist/test-reports/</code>
+(<code>TEST_REPORTS</code>, a directory inside the repository, because the tests run in a container with the
+repository at <code>/src</code>):</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Target</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>unit-go.xml</code>, <code>unit-go-&lt;module&gt;.xml</code></td>
+<td><code>make test-unit</code></td>
+<td>JUnit of the Go tests of the root module and of every module in <code>images/*/rootfs</code></td>
+</tr>
+<tr>
+<td><code>coverage-go.out</code>, <code>coverage-go-&lt;module&gt;.out</code></td>
+<td><code>make test-unit</code></td>
+<td>coverage in the Go <code>coverprofile</code> format</td>
+</tr>
+<tr>
+<td><code>unit-lua.xml</code></td>
+<td><code>make test-unit-lua</code></td>
+<td>JUnit of the Lua tests</td>
+</tr>
+<tr>
+<td><code>coverage-lua.lcov</code></td>
+<td><code>make test-unit-lua</code></td>
+<td>coverage of the Lua code in <code>rootfs/etc/nginx/lua</code> in the LCOV format</td>
+</tr>
+<tr>
+<td><code>unit-helm.xml</code></td>
+<td><code>make helm-test</code></td>
+<td>JUnit of the chart tests</td>
+</tr>
+</tbody>
+</table>
+<p>gotestsum (pinned in <code>tools/go.mod</code>, built in the container) runs the Go tests. It prints one line
+per package, the full output of failed tests and the number of tests at the end. <code>make test-unit</code>
+prints the total coverage of every module. The uncovered lines are shown by</p>
+<div class="highlight"><pre><span></span><code><span class="go">go tool cover -html=dist/test-reports/coverage-go.out</span>
+</code></pre></div>
+<p>luacov counts the Lua coverage (<code>busted --coverage</code>), luacov-reporter-lcov writes the LCOV report.</p>
+<p>In CI the jobs Unit tests and Helm chart keep <code>dist/test-reports/</code> as artifacts (see
+<a href="../ci/#caches-and-artifacts">CI</a>).</p>
 <h2 id="controller-e2e">Controller e2e<a class="headerlink" href="#controller-e2e" title="Permanent link"> ¶</a></h2>
 <div class="highlight"><pre><span></span><code><span class="go">make test-e2e                                     # all specs, default variant, newest Kubernetes</span>
 <span class="go">make test-e2e E2E_VARIANT=chroot                  # the controller-chroot image</span>
@@ -3068,13 +3307,51 @@ in <code>test/e2e/framework/images.go</code>.</p>
 </table>
 <p>The specs are Ginkgo specs in <code>test/e2e</code>; <code>FOCUS</code> matches their descriptions, for example the
 <code>Describe</code> texts of <a href="https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/test/e2e/defaultbackend">test/e2e/defaultbackend</a>.</p>
+<h3 id="writing-an-e2e-spec">Writing an e2e spec<a class="headerlink" href="#writing-an-e2e-spec" title="Permanent link"> ¶</a></h3>
+<ol>
+<li><strong>Check the behavior with a request.</strong> The spec sends a request (<code>f.HTTPTestClient()</code>) and checks
+   the response: status, headers, body. A check that a line is in nginx.conf is fine as an
+   intermediate wait, but not as the only check. Otherwise it is a unit test of the rendering, only
+   a thousand times slower. The model is <code>test/e2e/annotations/approot.go</code>. It creates an Ingress
+   with <code>app-root: /foo</code>, sends a request to <code>/</code> and expects <code>302</code> with
+   <code>Location: http://approot.bar.com/foo</code>.</li>
+<li><strong>Wait for a condition, not for time.</strong> <code>f.WaitForNginxServer</code>, <code>f.WaitForNginxConfiguration</code>,
+   <code>f.WaitForReload</code> and the other <code>Wait*</code> of <code>test/e2e/framework</code> instead of <code>framework.Sleep</code> and
+   <code>time.Sleep</code>. A sleep is either too long, and the spec is slow, or too short, and the spec is
+   flaky on a slow runner. It also hides races. When a sleep is really needed (a check that nothing
+   happens within N seconds), a comment next to it states the reason.</li>
+<li><strong>Self-contained.</strong> The spec creates its own resources and does not depend on other specs or
+   their order. The suite runs the specs in parallel and in random order (<code>--randomize-all</code>).</li>
+<li><strong>A separate installation only when needed.</strong> <code>framework.IngressNginxDescribeSerial</code> runs the specs
+   one at a time. A namespace overlay (<code>test/e2e-image/namespace-overlays/&lt;name&gt;/values.yaml</code>, used
+   when the name of the framework equals <code>&lt;name&gt;</code>) changes the chart values of the controller of the
+   spec. They are needed only when the spec changes global state: controller flags, cluster-scoped
+   resources. A comment at the describe states the reason. Serial specs run one at a time and make
+   the whole run longer.</li>
+<li><strong>Time budget.</strong> A spec longer than 60 seconds states the reason in the pull request. Every
+   second of a spec is multiplied by the number of variants and Kubernetes versions in CI.</li>
+<li><strong>A flaky spec does not hide behind a retry.</strong> The suite makes up to two attempts
+   (<code>--flake-attempts=2</code>). A spec that passes on the second attempt is a defect. It gets an issue
+   and is fixed.</li>
+</ol>
 <h2 id="chart-e2e">Chart e2e<a class="headerlink" href="#chart-e2e" title="Permanent link"> ¶</a></h2>
 <p><code>make test-e2e-chart</code> packages the chart, creates a kind cluster with cert-manager (pinned manifest
-from <code>tools/versions.env</code>) and, for every <code>charts/ingress-nginx-neo/ci/*-values.yaml</code>, installs the
-package with the locally built images in a namespace of its own, waits until the release is ready,
-uninstalls it and deletes the namespace without waiting (<code>tools/e2e-chart.sh</code>). The controller runs
-with <code>terminationGracePeriodSeconds: 0</code>: the test checks installations, not the draining of
-connections. The output shows the duration of every installation.</p>
+from <code>tools/versions.env</code>) and installs every <code>charts/ingress-nginx-neo/ci/*-values.yaml</code> at the
+same time, with the locally built images, each as a release <code>ci-&lt;N&gt;</code> in a namespace of its own
+(<code>tools/e2e-chart.sh</code>). Several controllers thus run in one cluster, as described in
+<a href="../../user-guide/multiple-ingress/">Multiple Ingress controllers</a>. Every release gets its own
+IngressClass <code>ci-&lt;N&gt;</code> and <code>controller.admissionWebhooks.matchIngressClass</code>. A values file that sets
+<code>controller.ingressClassResource</code> itself keeps its class and serves the Ingresses without a class.</p>
+<p>The test then checks:
+- every controller answers an Ingress of its class with a redirect 301, which NGINX sends itself
+  without a backend, and answers 404 to the Ingress of the neighbouring release
+- with the controller of one release scaled to 0, an Ingress of another release is created and
+  served
+- a second release with the IngressClass <code>nginx</code> stops with a hint which values to set</p>
+<p>A readiness probe every second, <code>worker-processes=1</code> and <code>terminationGracePeriodSeconds: 0</code> are
+settings of the test, not of the chart. The output shows the time until every release is ready. A
+new values file in <code>ci/</code> joins the same parallel installation, so it has to coexist with the others:
+no NodePorts that are taken and no cluster-scoped objects with fixed names.</p>
 <h2 id="kube-webhook-certgen-e2e">kube-webhook-certgen e2e<a class="headerlink" href="#kube-webhook-certgen-e2e" title="Permanent link"> ¶</a></h2>
 <p><code>make test-e2e-certgen</code> creates a kind cluster and runs
 <code>images/kube-webhook-certgen/hack/e2e.sh</code>, which creates a certificate Secret and patches
@@ -3176,9 +3453,12 @@ production installation; they compare builds: run the same scenario on two commi
 machine and compare the files of both runs.</p>
 <h2 id="kubernetes-versions">Kubernetes versions<a class="headerlink" href="#kubernetes-versions" title="Permanent link"> ¶</a></h2>
 <p><code>K8S_VERSIONS</code> in the Makefile lists the tested Kubernetes versions: the EKS standard support
-window, each as a <code>kindest/node</code> tag with the digest built by the pinned kind version. CI runs the
-e2e jobs for every entry. To change the window, edit <code>K8S_VERSIONS</code> (take the digests from the
-release notes of the kind version in <code>tools/go.mod</code>) and the supported versions on the
+window, each as a <code>kindest/node</code> tag with the digest built by the pinned kind version.
+<code>make test-e2e</code> locally and e2e in CI on pull requests use the newest entry. Pushes to <code>main</code> and
+<code>release-*</code>, manual runs and pull requests labeled <code>full-e2e</code> check every entry, see
+<a href="../ci/#kubernetes-versions">CI</a>. <code>K8S_VERSION</code> selects another version locally (see the example
+above). To change the window, edit <code>K8S_VERSIONS</code> (take the digests from the release notes of the
+kind version in <code>tools/go.mod</code>) and the supported versions on the
 <a href="../../deploy/">installation page</a>.</p>
 <h2 id="architectures">Architectures<a class="headerlink" href="#architectures" title="Permanent link"> ¶</a></h2>
 <p>The suite runs on <code>linux/amd64</code> and <code>linux/arm64</code> hosts: every image it uses is published for both,

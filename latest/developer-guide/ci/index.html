@@ -2529,6 +2529,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#kubernetes-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kubernetes versions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#when-jobs-run" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2775,6 +2786,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#kubernetes-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kubernetes versions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#when-jobs-run" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2948,12 +2970,12 @@ intent the publishing jobs state explicitly is <code>CHANNEL</code> (see <a href
 <tr>
 <td>E2E</td>
 <td><code>make docker-load test-e2e SKIP_BUILD=1 K8S_VERSION=… E2E_VARIANT=…</code></td>
-<td>every Kubernetes version × every variant</td>
+<td>every variant × <a href="#kubernetes-versions">Kubernetes versions</a></td>
 </tr>
 <tr>
 <td>Chart e2e</td>
 <td><code>make docker-load test-e2e-chart SKIP_BUILD=1 K8S_VERSION=…</code></td>
-<td>every Kubernetes version</td>
+<td><a href="#kubernetes-versions">Kubernetes versions</a></td>
 </tr>
 <tr>
 <td>kube-webhook-certgen e2e</td>
@@ -2977,7 +2999,8 @@ intent the publishing jobs state explicitly is <code>CHANNEL</code> (see <a href
 </tr>
 </tbody>
 </table>
-<p>The Kubernetes matrix comes from <code>make -s print-k8s-versions</code>, the e2e variants from
+<p>The Kubernetes matrix comes from <code>make -s print-k8s-versions</code> (on pull requests from
+<code>make -s print-k8s-versions-pr</code>), the e2e variants from
 <code>make -s print-e2e-variants</code>, the dependency image platforms from <code>make -s print-deps-platforms</code>.</p>
 <p><strong>CI result</strong> is the only required status check of <code>main</code> and <code>release-*</code>: it fails when any job
 failed or was cancelled; skipped jobs count as passed. A release is published only from a commit
@@ -2986,8 +3009,29 @@ whose CI result passed.</p>
 pull requests the dependency images are pulled when published and built locally otherwise; on
 <code>main</code> they are published before the checks, so the first push to an empty repository works.</p>
 <p>The <code>latest</code> channel is published only from the tip of <code>main</code> (<code>publish-guard</code>, a prerequisite of
-every publishing target); a newer push cancels an older publication. Jobs that write to <code>gh-pages</code>
-share one concurrency group and never cancel each other.</p>
+every publishing target). Before publishing, Publish latest and Publish docs (latest) ask
+<code>make -s print-main-tip</code>. When <code>main</code> already has a newer commit, the job skips the publication with
+a notice and stays green, the run of that commit publishes <code>latest</code>. A newer publication cancels an
+older one that is still running. Jobs that write to <code>gh-pages</code> share one concurrency group and never
+cancel each other.</p>
+<h2 id="kubernetes-versions">Kubernetes versions<a class="headerlink" href="#kubernetes-versions" title="Permanent link"> ¶</a></h2>
+<p>On pull requests E2E and Chart e2e run on the newest Kubernetes version, the same as <code>make test-e2e</code>
+locally. Pushes to <code>main</code> and <code>release-*</code> and manual runs check every version of <code>K8S_VERSIONS</code>.
+The variants <code>default</code> and <code>chroot</code> are different controller images, so both always run.</p>
+<p>The versions differ in the APIs the controller uses (Ingress, IngressClass, EndpointSlice, Lease,
+admission), and inside the supported window these APIs are stable. A breakage on one version only
+is rare, and the run on <code>main</code> catches it. A release is tagged only on a commit of <code>main</code> or
+<code>release-X.Y</code> with a passed CI result, so no release ships without a check of every version.</p>
+<p>When a change depends on the Kubernetes version, request the full matrix on the pull request:
+- the label <code>full-e2e</code> on the pull request. The next push, opening or reopening runs every version
+  until the label is removed
+- a manual run on the branch of the pull request, right away and without a new push:</p>
+<div class="highlight"><pre><span></span><code><span class="go">gh workflow run ci.yaml --ref &lt;branch&gt;</span>
+</code></pre></div>
+<p>Its CI result belongs to the last commit of the branch and shows in the pull request</p>
+<p>Adding the label does not start a run by itself. A new run of a pull request cancels the running
+one, and the <code>labeled</code> event comes for any label, so every label would restart CI. Add <code>full-e2e</code>
+only when the change depends on the version. It triples the runner time of e2e.</p>
 <h2 id="when-jobs-run">When jobs run<a class="headerlink" href="#when-jobs-run" title="Permanent link"> ¶</a></h2>
 <p>On pull requests the <code>Changes</code> job (<code>dorny/paths-filter</code>) sorts the changed files into groups. The
 cheap jobs (Lint, Unit tests, Generated files, Helm chart, Dependency scan, CI result) always run.
@@ -3055,6 +3099,9 @@ the cheap jobs. Unit tests and lint check them; they do not affect the build or 
   <code>tools/versions.env</code> and <code>go.mod</code>.</li>
 <li>Image builds that publish use the GitHub Actions build cache with one scope per image and platform
   (<code>DOCKER_CACHE=gha</code>).</li>
+<li>Unit tests and Helm chart keep <code>dist/test-reports/</code> (JUnit and coverage, see
+  <a href="../testing/#test-reports-and-coverage">Testing</a>) as the artifacts <code>test-reports-unit</code> and
+  <code>test-reports-helm</code>, also when the tests failed.</li>
 <li>Artifacts are kept for at most 7 days.</li>
 </ul>
 <h2 id="conventional-commits">Conventional Commits<a class="headerlink" href="#conventional-commits" title="Permanent link"> ¶</a></h2>

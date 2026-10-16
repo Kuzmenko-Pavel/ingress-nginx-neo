@@ -3084,8 +3084,10 @@ released line:</p>
 is the highest release. A release never changes the <code>latest</code> channel.</p>
 <h2 id="the-latest-channel">The latest channel<a class="headerlink" href="#the-latest-channel" title="Permanent link"> ¶</a></h2>
 <p>Every push to <code>main</code> that passes CI publishes the images <code>:latest</code>, the chart <code>0.0.0-latest</code>, the
-documentation version <code>latest</code> and the kubectl plugin as a workflow artifact. Until the first
-release the documentation root points to <code>latest</code>.</p>
+documentation version <code>latest</code> and the kubectl plugin as a workflow artifact. When <code>main</code> already
+has a newer commit at the time of publication, the run skips the publication and the run of that
+commit publishes <code>latest</code> (see <a href="../ci/">CI</a>). Until the first release the documentation root points
+to <code>latest</code>.</p>
 
 
 

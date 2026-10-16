@@ -2999,9 +2999,10 @@ Run it again after a change to rebuild and redeploy. <code>make test-load</code>
 see <a href="../testing/#load-tests">Testing</a>.</p>
 <h2 id="typical-change">Typical change<a class="headerlink" href="#typical-change" title="Permanent link"> ¶</a></h2>
 <ol>
-<li>Create a branch and make the change.</li>
-<li>Run <code>make check</code>; for changes of the controller, the NGINX template or Lua code also run
-   <code>make test-e2e</code> (see <a href="../testing/">Testing</a>).</li>
+<li>Create a branch and write a test that fails without the change, at the level from
+   <a href="../testing/#which-test">Which test</a>.</li>
+<li>Make the change. Run <code>make check</code>. When the change needs an e2e spec, also run
+   <code>make test-e2e FOCUS=...</code> (see <a href="../testing/">Testing</a>).</li>
 <li>Regenerate generated files when their sources changed: <code>make docs-generate</code> (annotation risks,
    command line arguments) and <code>make helm-docs-generate</code> (chart README). Generated files are never
    edited by hand.</li>

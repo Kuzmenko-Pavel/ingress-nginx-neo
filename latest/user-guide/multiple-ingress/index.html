@@ -1356,6 +1356,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#admission-webhooks-with-several-controllers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admission webhooks with several controllers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ingress-class-annotation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2726,6 +2737,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#admission-webhooks-with-several-controllers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admission webhooks with several controllers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ingress-class-annotation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2822,6 +2844,27 @@
 </ol>
 <p>Ingresses without a class are therefore ignored by default. Enable <code>--watch-ingress-without-class</code> on one controller only.</p>
 </div>
+<p>When a second release of the chart is installed without its own values, its IngressClass <code>nginx</code>
+already belongs to the first release. The installation stops with a message which release owns the
+class and which values to set. The check reads the IngressClass from the cluster, so it does not run
+when the chart is rendered without a cluster (<code>helm template</code>, Argo CD by default).</p>
+<h2 id="admission-webhooks-with-several-controllers">Admission webhooks with several controllers<a class="headerlink" href="#admission-webhooks-with-several-controllers" title="Permanent link"> ¶</a></h2>
+<p>Every release of the chart creates a ValidatingWebhookConfiguration with <code>failurePolicy: Fail</code>. By
+default Kubernetes calls the webhook of every release for every Ingress in the cluster, and the
+controller skips an Ingress of another class. When any of the controllers is unavailable (restart,
+upgrade, crash), its webhook does not answer, and Kubernetes rejects the creation and update of all
+Ingresses in the cluster, including those of other classes.</p>
+<p>With <code>controller.admissionWebhooks.matchIngressClass: true</code> the webhook is called only for
+Ingresses of the classes of its release. The class is decided as by the controller above:
+<code>controller.ingressClassResource.name</code> and <code>aliases</code>, the name <code>controller.ingressClass</code> with
+<code>controller.ingressClassByName</code>, the <code>kubernetes.io/ingress.class</code> annotation, an Ingress without a
+class with <code>controller.watchIngressWithoutClass</code>. A controller that is down then blocks only the
+Ingresses of its own class. Enable this value in every release when a cluster runs several
+controllers.</p>
+<p>The condition knows only the classes the chart creates. Ingresses of a class created outside the
+chart with the same <code>controllerValue</code> (for example with <code>controller.ingressClassResource.enabled:
+false</code>) are served by the controller but not validated by the webhook. In this case keep
+<code>matchIngressClass</code> disabled.</p>
 <h2 id="ingress-class-annotation">Ingress class annotation<a class="headerlink" href="#ingress-class-annotation" title="Permanent link"> ¶</a></h2>
 <p>The controller also accepts the <code>kubernetes.io/ingress.class</code> annotation for Ingress controllers that do not support
 IngressClasses. The annotation value must be equal to the <code>--ingress-class</code> flag (default <code>nginx</code>):</p>
