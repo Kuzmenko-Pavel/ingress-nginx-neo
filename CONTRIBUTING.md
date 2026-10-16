@@ -16,6 +16,8 @@ Contributions are welcome as pull requests into `main` of
    `make help` lists all targets; the [developer guide](https://kuzmenko-pavel.github.io/ingress-nginx-neo/latest/developer-guide/getting-started/)
    describes the requirements and the development environment.
 3. Commit, push and open a pull request. CI runs the same targets; the **CI result** check must pass.
+   On pull requests e2e runs on the newest Kubernetes version. When the change depends on the
+   Kubernetes version, add the label `full-e2e` and CI checks every version.
 
 ## Commits
 
