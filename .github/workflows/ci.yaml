@@ -218,6 +218,15 @@ jobs:
       - name: Go and Lua unit tests
         run: make docker-load test-unit test-unit-lua
 
+      - name: Upload test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-reports-unit
+          path: dist/test-reports
+          if-no-files-found: ignore
+          retention-days: 7
+
   generated:
     name: Generated files
     needs: changes
@@ -264,6 +273,15 @@ jobs:
 
       - name: Lint and unit test the chart
         run: make helm-lint helm-test
+
+      - name: Upload test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-reports-helm
+          path: dist/test-reports
+          if-no-files-found: ignore
+          retention-days: 7
 
   docs:
     name: Docs
