@@ -42,14 +42,14 @@ endif
 		test/e2e/run-kind-e2e.sh
 
 .PHONY: test-e2e-chart
-## Install the chart on kind for every ci/*-values.yaml (SKIP_BUILD=1 supported).
+## Install every ci/*-values.yaml on one kind cluster in parallel, check traffic and isolation (SKIP_BUILD=1 supported).
 test-e2e-chart: helm-package $(KIND) $(KUBECTL) $(HELM) $(CERT_MANAGER_MANIFEST)
 ifeq ($(SKIP_BUILD),)
 	$(MAKE) --no-print-directory docker-build IMAGES="controller kube-webhook-certgen custom-error-pages"
 endif
 	$(HELM_ENV) KIND=$(KIND) KUBECTL=$(KUBECTL) HELM=$(HELM) KIND_CLUSTER_NAME=$(PROJECT)-chart \
 	K8S_VERSION=$(K8S_VERSION) CERT_MANAGER_MANIFEST=$(CERT_MANAGER_MANIFEST) \
-	RELEASE_NAME=$(RELEASE_NAME) NAMESPACE=$(NAMESPACE) \
+	NAMESPACE=$(NAMESPACE) \
 	LOAD_IMAGES='$(CONTROLLER_IMAGE):$(IMAGE_TAG) $(CERTGEN_IMAGE):$(IMAGE_TAG) $(ERROR_PAGES_IMAGE):$(IMAGE_TAG)' \
 	IMAGE_REGISTRY=$(REGISTRY_HOST) IMAGE_PREFIX=$(REGISTRY_PATH) IMAGE_TAG=$(IMAGE_TAG) \
 		tools/e2e-chart.sh $(CHART_PACKAGE) $(STAGED_CHART)/ci
