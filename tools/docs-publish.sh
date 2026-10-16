@@ -19,10 +19,13 @@ set -euo pipefail
 DOCS_BRANCH="${DOCS_BRANCH:-gh-pages}"
 DOCS_PUSH="${DOCS_PUSH:-true}"
 
-export GIT_AUTHOR_NAME="github-actions[bot]"
-export GIT_AUTHOR_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
-export GIT_COMMITTER_NAME="${GIT_AUTHOR_NAME}"
-export GIT_COMMITTER_EMAIL="${GIT_AUTHOR_EMAIL}"
+# The CI runner has no git identity; a human publishes under their own.
+if [[ -z "$(git config user.name || true)" ]]; then
+  export GIT_AUTHOR_NAME="github-actions[bot]"
+  export GIT_AUTHOR_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
+  export GIT_COMMITTER_NAME="${GIT_AUTHOR_NAME}"
+  export GIT_COMMITTER_EMAIL="${GIT_AUTHOR_EMAIL}"
+fi
 
 push=()
 if [[ "$DOCS_PUSH" == true ]]; then

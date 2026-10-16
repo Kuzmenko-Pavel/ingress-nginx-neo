@@ -46,6 +46,12 @@ the Makefile pulls (or builds when its sources changed); see [Images](images.md)
 
 ## Adding a make target
 
+The root `Makefile` holds the shared variables (coordinates, versions and channel, tools, images) and
+the shared targets (`help`, `version`, `tools`, `clean`, `check`, internal `print-*`, `ci-result`,
+`publish-guard`). Domain targets live in `make/<domain>.mk` (`code`, `test`, `images`, `helm`,
+`manifests`, `docs`, `release`, `dev`, `security`), included in this order; a new target goes into
+the file of its domain.
+
 A target appears in `make help` when the line directly above it is `## <description>`; a
 description that ends in `| <group>` starts a new group, and the following targets belong to it
 until the next group. Targets without such a line are internal. Recipes longer than a few lines
@@ -97,6 +103,7 @@ See [CI](ci.md) for the checks of a pull request and [Release](release.md) for v
 | `charts/ingress-nginx-neo` | Helm chart |
 | `images/` | base, test and auxiliary images, see [Images](images.md) |
 | `test/` | e2e suite and scripts, unit test entry points |
+| `make/` | Makefile targets by domain, included by the root `Makefile` |
 | `tools/` | pinned tools and the scripts behind the Makefile |
 | `docs/` | this site (MkDocs) |
 

@@ -28,3 +28,7 @@ go test $(go list ./... | grep -vE '/test/e2e|/images/|/docs/examples')
 for module in images/kube-webhook-certgen/rootfs images/custom-error-pages/rootfs images/fastcgi-helloserver/rootfs; do
   (cd "${module}" && go test ./...)
 done
+
+test/channel_test.sh
+tools/release/changelog_test.sh
+tools/release/verify-tag_test.sh

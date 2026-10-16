@@ -41,8 +41,11 @@ jobs:
       images-delivered: ${{ steps.filter.outputs.images-delivered }}
       certgen: ${{ steps.filter.outputs.certgen }}
       docs: ${{ steps.filter.outputs.docs }}
-      ci: ${{ steps.filter.outputs.ci }}
+      e2e: ${{ steps.filter.outputs.e2e }}
+      build-system: ${{ steps.filter.outputs.build-system }}
+      workflow: ${{ steps.filter.outputs.workflow }}
       k8s-versions: ${{ steps.matrix.outputs.k8s-versions }}
+      e2e-variants: ${{ steps.matrix.outputs.e2e-variants }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,6 +65,8 @@ jobs:
               - 'rootfs/**'
             chart:
               - 'charts/**'
+              - 'make/helm.mk'
+              - 'make/manifests.mk'
               - 'tools/manifest-templates/**'
               - 'tools/generate-manifests.sh'
             images-deps:
@@ -82,15 +87,35 @@ jobs:
               - 'docs/**'
               - 'mkdocs.yml'
               - 'charts/**'
-            ci:
-              - '.github/**'
-              - 'Makefile'
-              - 'tools/**'
+              - 'make/docs.mk'
+              - 'tools/docs/**'
+              - 'tools/docs-publish.sh'
+            # The e2e suite, its image and the scripts that build or run it.
+            e2e:
               - 'test/**'
+              - 'make/test.mk'
+              - 'make/images.mk'
+              - 'tools/content-tag.sh'
+              - 'tools/image-exists.sh'
+              - 'tools/e2e-chart.sh'
+            # Shared variables, pinned tools and the Go build of the Makefile.
+            build-system:
+              - 'Makefile'
+              - 'make/code.mk'
+              - 'tools/go.mod'
+              - 'tools/go.sum'
+              - 'tools/versions.env'
+              - 'tools/install.sh'
+              - 'tools/actionlint/**'
+            # Any workflow change runs the whole CI.
+            workflow:
+              - '.github/**'
 
-      - name: Kubernetes versions
+      - name: Test matrices
         id: matrix
-        run: echo "k8s-versions=$(make -s print-k8s-versions)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "k8s-versions=$(make -s print-k8s-versions)" >> "$GITHUB_OUTPUT"
+          echo "e2e-variants=$(make -s print-e2e-variants)" >> "$GITHUB_OUTPUT"
 
   deps:
     name: Dependency images
@@ -233,7 +258,10 @@ jobs:
   docs:
     name: Docs
     needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.docs == 'true' || needs.changes.outputs.ci == 'true'
+    if: >-
+      github.event_name != 'pull_request' ||
+      needs.changes.outputs.docs == 'true' || needs.changes.outputs.build-system == 'true' ||
+      needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -282,7 +310,8 @@ jobs:
       needs.changes.outputs.go == 'true' || needs.changes.outputs.lua == 'true' ||
       needs.changes.outputs.template == 'true' || needs.changes.outputs.chart == 'true' ||
       needs.changes.outputs.images-deps == 'true' || needs.changes.outputs.images-delivered == 'true' ||
-      needs.changes.outputs.ci == 'true'
+      needs.changes.outputs.e2e == 'true' || needs.changes.outputs.build-system == 'true' ||
+      needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -343,7 +372,7 @@ jobs:
       fail-fast: false
       matrix:
         k8s: ${{ fromJSON(needs.changes.outputs.k8s-versions) }}
-        variant: [default, chroot]
+        variant: ${{ fromJSON(needs.changes.outputs.e2e-variants) }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -431,7 +460,10 @@ jobs:
   e2e-certgen:
     name: kube-webhook-certgen e2e
     needs: changes
-    if: github.event_name != 'pull_request' || needs.changes.outputs.certgen == 'true'
+    if: >-
+      github.event_name != 'pull_request' ||
+      needs.changes.outputs.certgen == 'true' || needs.changes.outputs.e2e == 'true' ||
+      needs.changes.outputs.build-system == 'true' || needs.changes.outputs.workflow == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -516,7 +548,7 @@ jobs:
 
       - name: Publish images and chart
         run: >-
-          make publish-guard docker-publish docker-promote docker-sign helm-package helm-publish
+          make docker-publish docker-promote docker-sign helm-package helm-publish
           CHANNEL=latest DOCKER_CACHE=gha
 
       - name: Build the kubectl plugin
