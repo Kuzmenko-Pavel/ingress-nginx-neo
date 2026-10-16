@@ -30,6 +30,13 @@ hash of their pins, so changing a pin installs a new set.
 Optional local overrides of Makefile variables go into a gitignored `.env` file at the repository
 root (for example `REGISTRY=ghcr.io/<you>/ingress-nginx-neo`).
 
+### Optional tools
+
+act runs GitHub Actions workflows locally in Docker. Use it when you change
+`.github/workflows/*`, to see before a push which jobs a pull request runs and how the matrix
+expands. act does not replace CI and does not run the checks themselves, the make targets do. See
+[Running CI workflows locally](local-ci.md).
+
 ## First steps
 
 ```console

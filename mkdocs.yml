@@ -139,6 +139,7 @@ nav:
       - Images: "developer-guide/images.md"
       - Testing: "developer-guide/testing.md"
       - CI: "developer-guide/ci.md"
+      - Running CI locally: "developer-guide/local-ci.md"
       - Release: "developer-guide/release.md"
       - Backporting: "developer-guide/backporting.md"
   - Troubleshooting: "troubleshooting.md"
