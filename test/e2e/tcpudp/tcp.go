@@ -69,6 +69,8 @@ var _ = framework.IngressNginxDescribe("[TCP] tcp-services", func() {
 				return strings.Contains(cfg, fmt.Sprintf(`ngx.var.proxy_upstream_name="tcp-%v-%v-80"`,
 					f.Namespace, framework.EchoService))
 			})
+		// The configuration on disk precedes the reload that opens the port.
+		f.WaitForNginxListening(8080)
 
 		f.HTTPTestClient().
 			GET("/").
