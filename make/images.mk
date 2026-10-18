@@ -222,6 +222,7 @@ docker-build-e2e: $(GINKGO) helm-stage
 	cp test/e2e/settings/ocsp/*.json test/e2e/settings/ocsp/*.db $(E2E_CONTEXT)/
 	cp test/e2e/settings/geoip/GeoLite2-Country-Test.mmdb $(E2E_CONTEXT)/
 	GOOS=linux GOARCH=$(ARCH) CGO_ENABLED=0 $(GINKGO) build -trimpath -o $(CURDIR)/$(E2E_CONTEXT)/e2e.test ./test/e2e
+	tools/run-in-container.sh $(RUNNER_IMAGE) test/e2e/check-shards.sh $(E2E_CONTEXT)/e2e.test $(E2E_SHARDS)
 	docker buildx build --builder $(LOCAL_BUILDER) --load --platform $(PLATFORM) \
 		--build-arg E2E_BASE_IMAGE=$(RUNNER_IMAGE) \
 		--build-arg CFSSL_IMAGE=$(CFSSL_IMAGE) \

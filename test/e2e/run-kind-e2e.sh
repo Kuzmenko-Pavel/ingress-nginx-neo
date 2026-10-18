@@ -13,6 +13,7 @@ set -o pipefail
 : "${NGINX_BASE_IMAGE:?}" "${E2E_ECHO_IMAGE:?}" "${E2E_HTTPBUN_IMAGE:?}" "${E2E_FASTCGI_IMAGE:?}" "${E2E_CFSSL_IMAGE:?}"
 : "${E2E_NODES:?}"
 FOCUS="${FOCUS:-}"
+E2E_SHARD="${E2E_SHARD:-all}"
 E2E_CHECK_LEAKS="${E2E_CHECK_LEAKS:-}"
 DEBUG="${DEBUG:-false}"
 
@@ -66,6 +67,7 @@ status=0
   --image-pull-policy=IfNotPresent \
   --env="E2E_NODES=${E2E_NODES}" \
   --env="FOCUS=${FOCUS}" \
+  --env="E2E_SHARD=${E2E_SHARD}" \
   --env="E2E_CHECK_LEAKS=${E2E_CHECK_LEAKS}" \
   --env="E2E_VARIANT=${E2E_VARIANT}" \
   --env="E2E_IMAGE_REGISTRY=${E2E_IMAGE_REGISTRY}" \

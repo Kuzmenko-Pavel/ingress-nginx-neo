@@ -21,6 +21,11 @@ BGREEN='\e[32m'
 
 E2E_NODES=${E2E_NODES:-5}
 E2E_CHECK_LEAKS=${E2E_CHECK_LEAKS:-""}
+E2E_SHARD=${E2E_SHARD:-all}
+
+# shellcheck source=shards.sh
+source "$(dirname "$0")/shards.sh"
+shard_args "${E2E_SHARD}"
 
 reportFile="report-e2e-test-suite.xml"
 ginkgo_args=(
@@ -33,6 +38,7 @@ ginkgo_args=(
   "--show-node-events"
   "--succinct"
   "--timeout=75m"
+  ${SHARD_ARGS[@]+"${SHARD_ARGS[@]}"}
 )
 
 if [ -n "${FOCUS}" ]; then
@@ -43,7 +49,7 @@ if [ -z "${E2E_CHECK_LEAKS}" ]; then
   ginkgo_args+=("--skip=\[Memory Leak\]")
 fi
 
-echo -e "${BGREEN}Running e2e test suite...${NC}"
+echo -e "${BGREEN}Running e2e test suite (shard ${E2E_SHARD})...${NC}"
 (set -x; ginkgo "${ginkgo_args[@]}" /e2e.test)
 
 # Create configMap out of a compressed report file for extraction later

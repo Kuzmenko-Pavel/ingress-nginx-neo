@@ -27,9 +27,10 @@ E2E_LOAD_IMAGES = $(REGISTRY)/$(E2E_CONTROLLER):$(IMAGE_TAG) $(CERTGEN_IMAGE):$(
 	$(FASTCGI_IMAGE) $(CFSSL_IMAGE)
 
 .PHONY: test-e2e
-## Controller e2e on kind (E2E_VARIANT=default or chroot, K8S_VERSION, FOCUS, E2E_NODES; SKIP_BUILD=1 uses already loaded images).
+## Controller e2e on kind (E2E_VARIANT=default or chroot, K8S_VERSION, FOCUS, E2E_SHARD=1..4 or all, E2E_NODES; SKIP_BUILD=1 uses already loaded images).
 test-e2e: $(KIND) $(KUBECTL)
 	$(if $(filter-out $(E2E_VARIANTS),$(E2E_VARIANT)),$(error E2E_VARIANT must be one of $(E2E_VARIANTS)))
+	$(if $(filter-out all $(E2E_SHARDS),$(E2E_SHARD)),$(error E2E_SHARD must be all or one of $(E2E_SHARDS)))
 	$(MAKE) --no-print-directory docker-build-deps
 ifeq ($(SKIP_BUILD),)
 	$(MAKE) --no-print-directory docker-build IMAGES="$(E2E_CONTROLLER) kube-webhook-certgen custom-error-pages"
@@ -40,7 +41,7 @@ endif
 	E2E_VARIANT=$(E2E_VARIANT) E2E_IMAGE_REGISTRY=$(REGISTRY_HOST) E2E_IMAGE_PREFIX=$(REGISTRY_PATH) E2E_IMAGE_TAG=$(IMAGE_TAG) \
 	NGINX_BASE_IMAGE=$(NGINX_IMAGE) E2E_ECHO_IMAGE=$(ECHO_IMAGE) E2E_HTTPBUN_IMAGE=$(HTTPBUN_IMAGE) \
 	E2E_FASTCGI_IMAGE=$(FASTCGI_IMAGE) E2E_CFSSL_IMAGE=$(CFSSL_IMAGE) \
-	E2E_NODES=$(E2E_NODES) FOCUS='$(FOCUS)' E2E_CHECK_LEAKS=$(E2E_CHECK_LEAKS) \
+	E2E_NODES=$(E2E_NODES) FOCUS='$(FOCUS)' E2E_SHARD=$(E2E_SHARD) E2E_CHECK_LEAKS=$(E2E_CHECK_LEAKS) \
 	REPORTS_DIR=$(CURDIR)/test/junitreports \
 		test/e2e/run-kind-e2e.sh
 
