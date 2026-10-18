@@ -36,7 +36,7 @@ A workflow change can be checked before a push with act, see
 | Docs | `make docs-build docs-publish-check` | groups `docs`, `build-system`, `workflow`; always outside pull requests |
 | Dependency scan | `make security-dependency-scan` | always |
 | Build images | `make docker-load docker-build docker-build-e2e docker-save` | any group except `docs` and `certgen`; always outside pull requests |
-| E2E | `make docker-load test-e2e SKIP_BUILD=1 K8S_VERSION=… E2E_VARIANT=…` | every variant × [Kubernetes versions](#kubernetes-versions) |
+| E2E | `make docker-load test-e2e SKIP_BUILD=1 K8S_VERSION=… E2E_VARIANT=… E2E_SHARD=…` | every variant × [Kubernetes versions](#kubernetes-versions) × [shard](testing.md#shards) |
 | Chart e2e | `make docker-load test-e2e-chart SKIP_BUILD=1 K8S_VERSION=…` | [Kubernetes versions](#kubernetes-versions) |
 | kube-webhook-certgen e2e | `make test-e2e-certgen` | groups `certgen`, `e2e`, `build-system`, `workflow`; always outside pull requests |
 | **CI result** | `make ci-result` | always (not when the run is cancelled) |
@@ -45,7 +45,7 @@ A workflow change can be checked before a push with act, see
 
 The Kubernetes matrix comes from `make -s print-k8s-versions` (on pull requests from
 `make -s print-k8s-versions-pr`), the e2e variants from
-`make -s print-e2e-variants`, the dependency image platforms from `make -s print-deps-platforms`.
+`make -s print-e2e-variants`, the e2e shards from `make -s print-e2e-shards`, the dependency image platforms from `make -s print-deps-platforms`.
 
 **CI result** is the only required status check of `main` and `release-*`: it fails when any job
 failed or was cancelled; skipped jobs count as passed. A release is published only from a commit
