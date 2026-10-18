@@ -143,7 +143,15 @@ The specs are Ginkgo specs in `test/e2e`; `FOCUS` matches their descriptions, fo
    `f.WaitForReload` and the other `Wait*` of `test/e2e/framework` instead of `framework.Sleep` and
    `time.Sleep`. A sleep is either too long, and the spec is slow, or too short, and the spec is
    flaky on a slow runner. It also hides races. When a sleep is really needed (a check that nothing
-   happens within N seconds), a comment next to it states the reason.
+   happens within N seconds), a comment next to it states the reason:
+
+   ```go
+   time.Sleep(5 * time.Second) //nolint:forbidigo // the spec checks that no reload happens within 5s
+   ```
+
+   `make code-lint` reports new and changed calls of `framework.Sleep` and `time.Sleep` in
+   `test/e2e` (except `test/e2e/framework`). An existing call is reported when its line changes,
+   because only the code changed against `main` is checked.
 3. **Self-contained.** The spec creates its own resources and does not depend on other specs or
    their order. The suite runs the specs in parallel and in random order (`--randomize-all`).
 4. **A separate installation only when needed.** `framework.IngressNginxDescribeSerial` runs the specs
