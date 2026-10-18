@@ -2562,6 +2562,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#coverage-and-test-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage and test results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#conventional-commits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2819,6 +2830,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#coverage-and-test-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Coverage and test results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#conventional-commits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2969,8 +2991,8 @@ intent the publishing jobs state explicitly is <code>CHANNEL</code> (see <a href
 </tr>
 <tr>
 <td>E2E</td>
-<td><code>make docker-load test-e2e SKIP_BUILD=1 K8S_VERSION=… E2E_VARIANT=…</code></td>
-<td>every variant × <a href="#kubernetes-versions">Kubernetes versions</a></td>
+<td><code>make docker-load test-e2e SKIP_BUILD=1 K8S_VERSION=… E2E_VARIANT=… E2E_SHARD=…</code></td>
+<td>every variant × <a href="#kubernetes-versions">Kubernetes versions</a> × <a href="../testing/#shards">shard</a></td>
 </tr>
 <tr>
 <td>Chart e2e</td>
@@ -3001,7 +3023,7 @@ intent the publishing jobs state explicitly is <code>CHANNEL</code> (see <a href
 </table>
 <p>The Kubernetes matrix comes from <code>make -s print-k8s-versions</code> (on pull requests from
 <code>make -s print-k8s-versions-pr</code>), the e2e variants from
-<code>make -s print-e2e-variants</code>, the dependency image platforms from <code>make -s print-deps-platforms</code>.</p>
+<code>make -s print-e2e-variants</code>, the e2e shards from <code>make -s print-e2e-shards</code>, the dependency image platforms from <code>make -s print-deps-platforms</code>.</p>
 <p><strong>CI result</strong> is the only required status check of <code>main</code> and <code>release-*</code>: it fails when any job
 failed or was cancelled; skipped jobs count as passed. A release is published only from a commit
 whose CI result passed.</p>
@@ -3104,6 +3126,46 @@ the cheap jobs. Unit tests and lint check them; they do not affect the build or 
   <code>test-reports-helm</code>, also when the tests failed.</li>
 <li>Artifacts are kept for at most 7 days.</li>
 </ul>
+<h2 id="coverage-and-test-results">Coverage and test results<a class="headerlink" href="#coverage-and-test-results" title="Permanent link"> ¶</a></h2>
+<p>CI uploads the reports to <a href="https://codecov.io/gh/Kuzmenko-Pavel/ingress-nginx-neo">Codecov</a>
+(<code>codecov/codecov-action</code>, settings in <code>codecov.yml</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Coverage</th>
+<th>Test results</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unit tests</td>
+<td><code>coverage-go.out</code>, <code>coverage-go-kube-webhook-certgen.out</code>, <code>coverage-go-custom-error-pages.out</code> (flag <code>go</code>), <code>coverage-lua.lcov</code> (flag <code>lua</code>)</td>
+<td><code>unit-go.xml</code>, <code>unit-go-kube-webhook-certgen.xml</code>, <code>unit-go-custom-error-pages.xml</code> (<code>go</code>), <code>unit-lua.xml</code> (<code>lua</code>)</td>
+</tr>
+<tr>
+<td>Helm chart</td>
+<td></td>
+<td><code>unit-helm.xml</code></td>
+</tr>
+<tr>
+<td>E2E</td>
+<td></td>
+<td><code>test/junitreports/*.xml</code></td>
+</tr>
+</tbody>
+</table>
+<p>The flags <code>go</code> and <code>lua</code> split the coverage by language. The test results of helm and e2e have no
+flag, because no coverage is measured for them, and Codecov shows a flag without coverage as 0%.</p>
+<p>Coverage is uploaded only after the tests passed, because the coverage of a failed run is
+incomplete. Test results are uploaded also when the tests failed. The module <code>fastcgi-helloserver</code>
+is not uploaded, it is a helper image of e2e without tests.</p>
+<p>Codecov comments on the pull request with the change of coverage against the base, the coverage of
+the changed files and the failed tests. It also sets the checks <code>codecov/project</code>, which fails when
+the coverage drops by more than 1%, and the informational <code>codecov/patch</code>. The only required check
+stays CI result. The upload uses the secret <code>CODECOV_TOKEN</code>. A pull request from a fork has no
+secrets, and Codecov accepts the upload of a public repository without a token. A failed upload
+does not fail the job (<code>fail_ci_if_error: false</code>), because Codecov is an external service.</p>
 <h2 id="conventional-commits">Conventional Commits<a class="headerlink" href="#conventional-commits" title="Permanent link"> ¶</a></h2>
 <p>Every non-merge commit of a pull request follows
 <a href="https://www.conventionalcommits.org/en/v1.0.0/">Conventional Commits 1.0.0</a>:</p>
@@ -3126,7 +3188,8 @@ prefix.</p>
 commit SHAs; merge commits and rebase merges enabled, squash merges disabled; rulesets on <code>main</code>
 and <code>release-*</code> requiring pull requests and the <strong>CI result</strong> check; tag rules for <code>v*</code> (created by
 release managers only, no update or deletion); the environment <code>release</code> with a required reviewer
-and deployment tags <code>v*</code>; release immutability; GitHub Pages deployed from the <code>gh-pages</code> branch.</p>
+and deployment tags <code>v*</code>; release immutability; GitHub Pages deployed from the <code>gh-pages</code> branch;
+the Codecov app with access to the repository and the Actions secret <code>CODECOV_TOKEN</code>.</p>
 
 
 

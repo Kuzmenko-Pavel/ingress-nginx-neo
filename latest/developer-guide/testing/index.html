@@ -2552,6 +2552,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#shards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shards
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#writing-an-e2e-spec" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2932,6 +2943,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#shards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shards
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#writing-an-e2e-spec" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3240,10 +3262,12 @@ prints the total coverage of every module. The uncovered lines are shown by</p>
 </code></pre></div>
 <p>luacov counts the Lua coverage (<code>busted --coverage</code>), luacov-reporter-lcov writes the LCOV report.</p>
 <p>In CI the jobs Unit tests and Helm chart keep <code>dist/test-reports/</code> as artifacts (see
-<a href="../ci/#caches-and-artifacts">CI</a>).</p>
+<a href="../ci/#caches-and-artifacts">CI</a>) and upload the reports to Codecov, which shows the coverage and
+the failed tests in the pull request (see <a href="../ci/#coverage-and-test-results">CI</a>).</p>
 <h2 id="controller-e2e">Controller e2e<a class="headerlink" href="#controller-e2e" title="Permanent link"> ¶</a></h2>
 <div class="highlight"><pre><span></span><code><span class="go">make test-e2e                                     # all specs, default variant, newest Kubernetes</span>
 <span class="go">make test-e2e E2E_VARIANT=chroot                  # the controller-chroot image</span>
+<span class="go">make test-e2e E2E_SHARD=2                         # one shard of the suite, as a CI job runs it</span>
 <span class="go">make test-e2e FOCUS='default backend' E2E_NODES=4</span>
 <span class="go">make test-e2e K8S_VERSION=$(make -s print-K8S_VERSIONS | cut -d' ' -f1)   # oldest supported Kubernetes</span>
 </code></pre></div>
@@ -3284,6 +3308,11 @@ in <code>test/e2e/framework/images.go</code>.</p>
 <td><code>kindest/node</code> tag with digest</td>
 </tr>
 <tr>
+<td><code>E2E_SHARD</code></td>
+<td><code>all</code></td>
+<td>a shard of the suite from <code>E2E_SHARDS</code> (<code>1</code>…<code>4</code>) or <code>all</code></td>
+</tr>
+<tr>
 <td><code>FOCUS</code></td>
 <td>empty</td>
 <td>Ginkgo focus regular expression</td>
@@ -3307,6 +3336,19 @@ in <code>test/e2e/framework/images.go</code>.</p>
 </table>
 <p>The specs are Ginkgo specs in <code>test/e2e</code>; <code>FOCUS</code> matches their descriptions, for example the
 <code>Describe</code> texts of <a href="https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/test/e2e/defaultbackend">test/e2e/defaultbackend</a>.</p>
+<h3 id="shards">Shards<a class="headerlink" href="#shards" title="Permanent link"> ¶</a></h3>
+<p>CI splits the suite into shards by spec file and runs every shard as a job with its own kind
+cluster, so the e2e result comes after the longest shard instead of the whole suite. Within one job
+the suite already runs in <code>E2E_NODES</code> processes, and more processes on one runner do not make it
+faster, because kind and the controllers share the same CPU.</p>
+<p>The table of the shards is <code>test/e2e-image/shards.sh</code>. Shards 1-3 select files with <code>--focus-file</code>,
+the last shard takes every other file with <code>--skip-file</code>. A new spec file therefore needs no
+registration, it runs in the last shard. <code>make docker-build-e2e</code> (and with it <code>make test-e2e</code>)
+checks the table with <code>test/e2e/check-shards.sh</code>. It runs <code>ginkgo --dry-run</code> for the whole suite and
+for every shard and fails when a spec runs in no shard or in several, or when a shard is empty. To
+balance the shards by time, move a boundary in <code>shards.sh</code>, the check prints the number of specs of
+every shard. <code>E2E_SHARDS</code> in the Makefile lists the shards, CI takes them from
+<code>make -s print-e2e-shards</code>.</p>
 <h3 id="writing-an-e2e-spec">Writing an e2e spec<a class="headerlink" href="#writing-an-e2e-spec" title="Permanent link"> ¶</a></h3>
 <ol>
 <li><strong>Check the behavior with a request.</strong> The spec sends a request (<code>f.HTTPTestClient()</code>) and checks
@@ -3319,21 +3361,26 @@ in <code>test/e2e/framework/images.go</code>.</p>
    <code>f.WaitForReload</code> and the other <code>Wait*</code> of <code>test/e2e/framework</code> instead of <code>framework.Sleep</code> and
    <code>time.Sleep</code>. A sleep is either too long, and the spec is slow, or too short, and the spec is
    flaky on a slow runner. It also hides races. When a sleep is really needed (a check that nothing
-   happens within N seconds), a comment next to it states the reason.</li>
-<li><strong>Self-contained.</strong> The spec creates its own resources and does not depend on other specs or
-   their order. The suite runs the specs in parallel and in random order (<code>--randomize-all</code>).</li>
-<li><strong>A separate installation only when needed.</strong> <code>framework.IngressNginxDescribeSerial</code> runs the specs
+   happens within N seconds), a comment next to it states the reason:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="nx">time</span><span class="p">.</span><span class="nx">Sleep</span><span class="p">(</span><span class="mi">5</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nx">time</span><span class="p">.</span><span class="nx">Second</span><span class="p">)</span><span class="w"> </span><span class="c1">//nolint:forbidigo // the spec checks that no reload happens within 5s</span>
+</code></pre></div>
+<p><code>make code-lint</code> reports new and changed calls of <code>framework.Sleep</code> and <code>time.Sleep</code> in
+   <code>test/e2e</code> (except <code>test/e2e/framework</code>). An existing call is reported when its line changes,
+   because only the code changed against <code>main</code> is checked.
+3. <strong>Self-contained.</strong> The spec creates its own resources and does not depend on other specs or
+   their order. The suite runs the specs in parallel and in random order (<code>--randomize-all</code>).
+4. <strong>A separate installation only when needed.</strong> <code>framework.IngressNginxDescribeSerial</code> runs the specs
    one at a time. A namespace overlay (<code>test/e2e-image/namespace-overlays/&lt;name&gt;/values.yaml</code>, used
    when the name of the framework equals <code>&lt;name&gt;</code>) changes the chart values of the controller of the
    spec. They are needed only when the spec changes global state: controller flags, cluster-scoped
    resources. A comment at the describe states the reason. Serial specs run one at a time and make
-   the whole run longer.</li>
-<li><strong>Time budget.</strong> A spec longer than 60 seconds states the reason in the pull request. Every
-   second of a spec is multiplied by the number of variants and Kubernetes versions in CI.</li>
-<li><strong>A flaky spec does not hide behind a retry.</strong> The suite makes up to two attempts
+   the whole run longer.
+5. <strong>Time budget.</strong> A spec longer than 60 seconds states the reason in the pull request. Every
+   second of a spec is multiplied by the number of variants and Kubernetes versions in CI.
+6. <strong>A flaky spec does not hide behind a retry.</strong> The suite makes up to two attempts
    (<code>--flake-attempts=2</code>). A spec that passes on the second attempt is a defect. It gets an issue
-   and is fixed.</li>
-</ol>
+   and is fixed.</p>
 <h2 id="chart-e2e">Chart e2e<a class="headerlink" href="#chart-e2e" title="Permanent link"> ¶</a></h2>
 <p><code>make test-e2e-chart</code> packages the chart, creates a kind cluster with cert-manager (pinned manifest
 from <code>tools/versions.env</code>) and installs every <code>charts/ingress-nginx-neo/ci/*-values.yaml</code> at the
