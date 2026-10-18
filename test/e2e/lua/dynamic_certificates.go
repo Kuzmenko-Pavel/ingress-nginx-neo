@@ -169,13 +169,8 @@ var _ = framework.IngressNginxDescribe("[Lua] dynamic certificates", func() {
 			ginkgo.By("serving the configured certificate on HTTPS endpoint")
 			ensureHTTPSRequest(f, f.GetURL(framework.HTTPS), host, host)
 
-			log, err := f.NginxLogs()
-			assert.Nil(ginkgo.GinkgoT(), err)
-			assert.NotEmpty(ginkgo.GinkgoT(), log)
-
-			index := strings.Index(log, "id=dummy_log_splitter_foo_bar")
-			assert.GreaterOrEqual(ginkgo.GinkgoT(), index, 0, "log does not contains id=dummy_log_splitter_foo_bar")
-			restOfLogs := log[index:]
+			log := f.WaitForNginxLog("id=dummy_log_splitter_foo_bar")
+			_, restOfLogs, _ := strings.Cut(log, "id=dummy_log_splitter_foo_bar")
 
 			ginkgo.By("skipping Nginx reload")
 			assert.NotContains(ginkgo.GinkgoT(), restOfLogs, logRequireBackendReload)

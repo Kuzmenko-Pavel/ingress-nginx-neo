@@ -211,8 +211,6 @@ var _ = framework.IngressNginxDescribe("[TCP] tcp-services", func() {
 			})
 		assert.NotEqual(ginkgo.GinkgoT(), checksum, newChecksum)
 
-		logs, err := f.NginxLogs()
-		assert.Nil(ginkgo.GinkgoT(), err, "obtaining nginx logs")
-		assert.Contains(ginkgo.GinkgoT(), logs, "Backend successfully reloaded")
+		f.WaitForNginxLog("Backend successfully reloaded")
 	})
 })

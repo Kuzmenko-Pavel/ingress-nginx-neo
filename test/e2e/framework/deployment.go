@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -29,7 +30,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
+
+// controllerPodSelector selects the pods of the controller of a test namespace.
+const controllerPodSelector = "app.kubernetes.io/name=ingress-nginx-neo"
 
 // EchoService name of the deployment for the echo app
 const EchoService = "echo"
@@ -627,6 +632,27 @@ func (f *Framework) UpdateIngressControllerDeployment(fn func(deployment *appsv1
 	err := UpdateDeployment(f.KubeClientSet, f.Namespace, "nginx-ingress-controller", 1, fn)
 	if err != nil {
 		return err
+	}
+
+	// The rollout is complete when the new pod is ready, but the pod of the
+	// previous template keeps syncing until it is gone.
+	err = wait.PollUntilContextTimeout(context.TODO(), Poll, DefaultTimeout, true, func(ctx context.Context) (bool, error) {
+		pods, err := f.KubeClientSet.CoreV1().Pods(f.Namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: controllerPodSelector,
+		})
+		if err != nil {
+			return false, nil
+		}
+		controllers := 0
+		for i := range pods.Items {
+			if strings.HasPrefix(pods.Items[i].Name, "nginx-ingress-controller") {
+				controllers++
+			}
+		}
+		return controllers == 1, nil
+	})
+	if err != nil {
+		return fmt.Errorf("waiting for the previous controller pod to be gone: %w", err)
 	}
 
 	return f.updateIngressNGINXPod()

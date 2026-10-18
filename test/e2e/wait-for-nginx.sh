@@ -97,6 +97,9 @@ controller:
     tcp-services-configmap: $NAMESPACE/tcp-services
     # e2e tests do not require information about ingress status
     update-status: "false"
+    # sync right after a change instead of the default 0.3 syncs per second,
+    # so that the framework waits for a sync and not for the rate limit
+    sync-rate-limit: "10"
   terminationGracePeriodSeconds: 1
   admissionWebhooks:
     enabled: false

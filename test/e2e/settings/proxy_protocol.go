@@ -224,9 +224,7 @@ var _ = framework.DescribeSetting("use-proxy-protocol", func() {
 		_, err = io.ReadAll(conn)
 		assert.Nil(ginkgo.GinkgoT(), err, "unexpected error reading connection data")
 
-		logs, err := f.NginxLogs()
-		assert.Nil(ginkgo.GinkgoT(), err, "obtaining nginx logs")
-		assert.Contains(ginkgo.GinkgoT(), logs, `192.168.0.1`)
+		f.WaitForNginxLog(`192.168.0.1`)
 	})
 
 	ginkgo.Context("when use-forwarded-headers setting is true", func() {

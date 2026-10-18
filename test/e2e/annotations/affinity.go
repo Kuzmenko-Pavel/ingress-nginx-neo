@@ -321,9 +321,7 @@ var _ = framework.DescribeAnnotation("affinity session-cookie-name", func() {
 			Expect().
 			Status(http.StatusOK)
 
-		logs, err := f.NginxLogs()
-		assert.Nil(ginkgo.GinkgoT(), err, "obtaining nginx logs")
-		assert.Contains(ginkgo.GinkgoT(), logs, `session-cookie-path should be set when use-regex is true`)
+		f.WaitForNginxLog(`session-cookie-path should be set when use-regex is true`)
 	})
 
 	ginkgo.It("should not set affinity across all server locations when using separate ingresses", func() {
