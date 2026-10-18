@@ -46,6 +46,7 @@ jobs:
       workflow: ${{ steps.filter.outputs.workflow }}
       k8s-versions: ${{ steps.matrix.outputs.k8s-versions }}
       e2e-variants: ${{ steps.matrix.outputs.e2e-variants }}
+      e2e-shards: ${{ steps.matrix.outputs.e2e-shards }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -126,6 +127,7 @@ jobs:
             echo "k8s-versions=$(make -s print-k8s-versions-pr)" >> "$GITHUB_OUTPUT"
           fi
           echo "e2e-variants=$(make -s print-e2e-variants)" >> "$GITHUB_OUTPUT"
+          echo "e2e-shards=$(make -s print-e2e-shards)" >> "$GITHUB_OUTPUT"
 
   deps:
     name: Dependency images
@@ -438,7 +440,7 @@ jobs:
           retention-days: 3
 
   e2e:
-    name: E2E (${{ matrix.variant }}, ${{ matrix.k8s.name }})
+    name: E2E (${{ matrix.variant }}, ${{ matrix.k8s.name }}, shard ${{ matrix.shard }})
     needs: [changes, deps, build]
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -450,6 +452,7 @@ jobs:
       matrix:
         k8s: ${{ fromJSON(needs.changes.outputs.k8s-versions) }}
         variant: ${{ fromJSON(needs.changes.outputs.e2e-variants) }}
+        shard: ${{ fromJSON(needs.changes.outputs.e2e-shards) }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -489,13 +492,13 @@ jobs:
       - name: Run e2e
         run: >-
           make docker-load test-e2e SKIP_BUILD=1
-          K8S_VERSION=${{ matrix.k8s.version }} E2E_VARIANT=${{ matrix.variant }}
+          K8S_VERSION=${{ matrix.k8s.version }} E2E_VARIANT=${{ matrix.variant }} E2E_SHARD=${{ matrix.shard }}
 
       - name: Upload junit report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: e2e-test-reports-${{ matrix.variant }}-${{ matrix.k8s.name }}
+          name: e2e-test-reports-${{ matrix.variant }}-${{ matrix.k8s.name }}-shard-${{ matrix.shard }}
           path: test/junitreports/*.xml
           if-no-files-found: ignore
           retention-days: 7
@@ -507,7 +510,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: test_results
           directory: test/junitreports
-          name: e2e-${{ matrix.variant }}-${{ matrix.k8s.name }}
+          name: e2e-${{ matrix.variant }}-${{ matrix.k8s.name }}-shard-${{ matrix.shard }}
 
   e2e-chart:
     name: Chart e2e (${{ matrix.k8s.name }})

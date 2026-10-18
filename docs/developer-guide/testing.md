@@ -98,6 +98,7 @@ the failed tests in the pull request (see [CI](ci.md#coverage-and-test-results))
 ```console
 make test-e2e                                     # all specs, default variant, newest Kubernetes
 make test-e2e E2E_VARIANT=chroot                  # the controller-chroot image
+make test-e2e E2E_SHARD=2                         # one shard of the suite, as a CI job runs it
 make test-e2e FOCUS='default backend' E2E_NODES=4
 make test-e2e K8S_VERSION=$(make -s print-K8S_VERSIONS | cut -d' ' -f1)   # oldest supported Kubernetes
 ```
@@ -124,6 +125,7 @@ in `test/e2e/framework/images.go`.
 |----------|---------|---------|
 | `E2E_VARIANT` | `default` | `default` or `chroot` |
 | `K8S_VERSION` | newest entry of `K8S_VERSIONS` | `kindest/node` tag with digest |
+| `E2E_SHARD` | `all` | a shard of the suite from `E2E_SHARDS` (`1`…`4`) or `all` |
 | `FOCUS` | empty | Ginkgo focus regular expression |
 | `E2E_NODES` | `7` | parallel Ginkgo processes |
 | `E2E_CHECK_LEAKS` | empty | non-empty runs the memory leak specs |
@@ -131,6 +133,22 @@ in `test/e2e/framework/images.go`.
 
 The specs are Ginkgo specs in `test/e2e`; `FOCUS` matches their descriptions, for example the
 `Describe` texts of [test/e2e/defaultbackend](https://github.com/Kuzmenko-Pavel/ingress-nginx-neo/tree/main/test/e2e/defaultbackend).
+
+### Shards
+
+CI splits the suite into shards by spec file and runs every shard as a job with its own kind
+cluster, so the e2e result comes after the longest shard instead of the whole suite. Within one job
+the suite already runs in `E2E_NODES` processes, and more processes on one runner do not make it
+faster, because kind and the controllers share the same CPU.
+
+The table of the shards is `test/e2e-image/shards.sh`. Shards 1-3 select files with `--focus-file`,
+the last shard takes every other file with `--skip-file`. A new spec file therefore needs no
+registration, it runs in the last shard. `make docker-build-e2e` (and with it `make test-e2e`)
+checks the table with `test/e2e/check-shards.sh`. It runs `ginkgo --dry-run` for the whole suite and
+for every shard and fails when a spec runs in no shard or in several, or when a shard is empty. To
+balance the shards by time, move a boundary in `shards.sh`, the check prints the number of specs of
+every shard. `E2E_SHARDS` in the Makefile lists the shards, CI takes them from
+`make -s print-e2e-shards`.
 
 ### Writing an e2e spec
 

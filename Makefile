@@ -246,6 +246,9 @@ DIGESTS_FILE := $(DIST)/digests.env
 
 E2E_VARIANTS := default chroot
 E2E_VARIANT ?= default
+# Shards of the e2e suite (test/e2e-image/shards.sh); CI runs one job per shard.
+E2E_SHARDS := 1 2 3 4
+E2E_SHARD ?= all
 FOCUS ?=
 E2E_NODES ?= 7
 E2E_CHECK_LEAKS ?=
@@ -277,7 +280,7 @@ help:
 			printf "  %s%-" width "s%s %s%s%s\n", yellow, substr($$1, 1, index($$1, ":") - 1), reset, green, text, reset; \
 		} \
 		{ last = $$0 }' $(MAKEFILE_LIST)
-	@printf '\nOptional variables: K8S_VERSION, E2E_VARIANT (%s), FOCUS, TEST_ARGS (extra go test arguments of test-unit); make version shows the channel and versions.\n\n' '$(E2E_VARIANTS)'
+	@printf '\nOptional variables: K8S_VERSION, E2E_VARIANT (%s), E2E_SHARD, FOCUS, TEST_ARGS (extra go test arguments of test-unit); make version shows the channel and versions.\n\n' '$(E2E_VARIANTS)'
 
 .PHONY: version
 ## Print VERSION, CHANNEL (and why) and derived IMAGE_TAG/CHART_VERSION/APP_VERSION/DOCS_VERSION.
@@ -343,6 +346,10 @@ print-deps-missing:
 .PHONY: print-e2e-variants
 print-e2e-variants:
 	@printf '%s\n' $(E2E_VARIANTS) | jq -R . | jq -cs .
+
+.PHONY: print-e2e-shards
+print-e2e-shards:
+	@printf '%s\n' $(E2E_SHARDS) | jq -R . | jq -cs .
 
 .PHONY: print-scan-images
 print-scan-images:
