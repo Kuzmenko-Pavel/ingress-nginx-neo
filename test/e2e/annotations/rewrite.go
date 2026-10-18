@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/stretchr/testify/assert"
 
 	"k8s.io/ingress-nginx/test/e2e/framework"
 )
@@ -59,10 +58,7 @@ var _ = framework.DescribeAnnotation("rewrite-target use-regex enable-rewrite-lo
 			Expect().
 			Status(http.StatusOK)
 
-		logs, err := f.NginxLogs()
-		assert.Nil(ginkgo.GinkgoT(), err)
-		assert.Contains(ginkgo.GinkgoT(), logs, `"(?i)/something" matches "/something", client:`)
-		assert.Contains(ginkgo.GinkgoT(), logs, `rewritten data: "/", args: "",`)
+		f.WaitForNginxLog(`"(?i)/something" matches "/something", client:`, `rewritten data: "/", args: "",`)
 	})
 
 	ginkgo.It("should use correct longest path match", func() {

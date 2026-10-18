@@ -18,6 +18,7 @@ package defaultbackend
 
 import (
 	"net/http"
+	"time"
 
 	"k8s.io/ingress-nginx/test/e2e/framework/httpexpect"
 
@@ -94,9 +95,7 @@ var _ = framework.IngressNginxDescribe("[Default Backend]", func() {
 			Expect().
 			Status(http.StatusNotFound)
 
-		logs, err := f.NginxLogs()
-		assert.Nil(ginkgo.GinkgoT(), err, "obtaining nginx logs")
-		assert.Contains(ginkgo.GinkgoT(), logs, "/somethingOne")
+		f.WaitForNginxLog("/somethingOne")
 	})
 
 	ginkgo.It("disables access logging for default backend", func() {
@@ -110,6 +109,8 @@ var _ = framework.IngressNginxDescribe("[Default Backend]", func() {
 			Expect().
 			Status(http.StatusNotFound)
 
+		// The chroot variant ships the access log with a delay, and no later line marks it.
+		framework.Sleep(3 * time.Second) //nolint:forbidigo // a check that a log line is absent
 		logs, err := f.NginxLogs()
 		assert.Nil(ginkgo.GinkgoT(), err, "obtaining nginx logs")
 		assert.NotContains(ginkgo.GinkgoT(), logs, "/somethingTwo")

@@ -99,16 +99,15 @@ func (f *Framework) EnsureIngress(ingress *networking.Ingress) *networking.Ingre
 
 // UpdateIngress updates an Ingress object and returns the updated object.
 func (f *Framework) UpdateIngress(ingress *networking.Ingress) *networking.Ingress {
-	err := updateIngressWithRetries(f.KubeClientSet, ingress.Namespace, ingress)
-	assert.Nil(ginkgo.GinkgoT(), err, "updating ingress")
+	f.WaitForReload(func() {
+		err := updateIngressWithRetries(f.KubeClientSet, ingress.Namespace, ingress)
+		assert.Nil(ginkgo.GinkgoT(), err, "updating ingress")
+	})
 
 	ing := f.GetIngress(ingress.Namespace, ingress.Name)
 	if ing.Annotations == nil {
 		ing.Annotations = make(map[string]string)
 	}
-
-	// updating an ingress requires a reload.
-	Sleep(1 * time.Second)
 
 	return ing
 }
@@ -258,7 +257,7 @@ func getIngressNGINXPod(ns string, kubeClientSet kubernetes.Interface) (*core.Po
 	defer cancel()
 	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, DefaultTimeout, true, func(_ context.Context) (bool, error) {
 		l, err := kubeClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: "app.kubernetes.io/name=ingress-nginx-neo",
+			LabelSelector: controllerPodSelector,
 		})
 		if err != nil {
 			return false, nil

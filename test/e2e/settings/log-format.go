@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/stretchr/testify/assert"
 	"k8s.io/ingress-nginx/test/e2e/framework"
 )
 
@@ -95,9 +94,7 @@ var _ = framework.DescribeSetting("log-format-*", func() {
 				Expect().
 				Status(http.StatusOK)
 
-			logs, err := f.NginxLogs()
-			assert.Nil(ginkgo.GinkgoT(), err, "obtaining nginx logs")
-			assert.Contains(ginkgo.GinkgoT(), logs, `{"my_header1":"Here is \"header1\" with json escape", "my_header2":""}`)
+			f.WaitForNginxLog(`{"my_header1":"Here is \"header1\" with json escape", "my_header2":""}`)
 		})
 
 		ginkgo.It("log-format default escape", func() {
@@ -118,9 +115,7 @@ var _ = framework.DescribeSetting("log-format-*", func() {
 				Expect().
 				Status(http.StatusOK)
 
-			logs, err := f.NginxLogs()
-			assert.Nil(ginkgo.GinkgoT(), err, "obtaining nginx logs")
-			assert.Contains(ginkgo.GinkgoT(), logs, `{"my_header3":"Here is \x22header3\x22 with default escape", "my_header4":"-"}`)
+			f.WaitForNginxLog(`{"my_header3":"Here is \x22header3\x22 with default escape", "my_header4":"-"}`)
 		})
 
 		ginkgo.It("log-format-escape-none enabled", func() {
@@ -141,9 +136,7 @@ var _ = framework.DescribeSetting("log-format-*", func() {
 				Expect().
 				Status(http.StatusOK)
 
-			logs, err := f.NginxLogs()
-			assert.Nil(ginkgo.GinkgoT(), err, "obtaining nginx logs")
-			assert.Contains(ginkgo.GinkgoT(), logs, `{"my_header5":"Here is "header5" with none escape", "my_header6":""}`)
+			f.WaitForNginxLog(`{"my_header5":"Here is "header5" with none escape", "my_header6":""}`)
 		})
 	})
 })

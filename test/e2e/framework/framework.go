@@ -272,7 +272,6 @@ func (f *Framework) WaitForNginxServer(name string, matcher func(cfg string) boo
 	//nolint:staticcheck // TODO: will replace it since wait.Poll is deprecated
 	err := wait.Poll(Poll, DefaultTimeout, f.matchNginxConditions(name, matcher))
 	assert.Nil(ginkgo.GinkgoT(), err, "waiting for nginx server condition/s")
-	Sleep(1 * time.Second)
 }
 
 // WaitForNginxConfiguration waits until the nginx configuration contains a particular configuration
@@ -281,7 +280,6 @@ func (f *Framework) WaitForNginxConfiguration(matcher func(cfg string) bool) {
 	//nolint:staticcheck // TODO: will replace it since wait.Poll is deprecated
 	err := wait.Poll(Poll, DefaultTimeout, f.matchNginxConditions("", matcher))
 	assert.Nil(ginkgo.GinkgoT(), err, "waiting for nginx server condition/s")
-	Sleep(1 * time.Second)
 }
 
 // WaitForLuaConfiguration waits until the nginx configuration contains a particular configuration
@@ -290,7 +288,6 @@ func (f *Framework) WaitForLuaConfiguration(matcher func(jsonCfg map[string]inte
 	//nolint:staticcheck // TODO: will replace it since wait.Poll is deprecated
 	err := wait.Poll(Poll, DefaultTimeout, f.matchLuaConditions(matcher))
 	assert.Nil(ginkgo.GinkgoT(), err, "waiting for nginx lua configuration condition/s")
-	Sleep(1 * time.Second)
 }
 
 // WaitForNginxCustomConfiguration waits until the nginx configuration given part (from, to) contains a particular configuration
@@ -307,6 +304,29 @@ func (f *Framework) NginxLogs() (string, error) {
 	}
 
 	return "", fmt.Errorf("no nginx ingress controller pod is running (logs)")
+}
+
+// WaitForNginxLog waits until the logs of the controller pod contain every
+// substring and returns the logs. The logs of the chroot variant reach the pod
+// log with a delay, so a check of a log line waits for it.
+func (f *Framework) WaitForNginxLog(substrings ...string) string {
+	var logs string
+	//nolint:staticcheck // TODO: will replace it since wait.Poll is deprecated
+	err := wait.Poll(Poll, DefaultTimeout, func() (bool, error) {
+		var err error
+		logs, err = f.NginxLogs()
+		if err != nil {
+			return false, nil
+		}
+		for _, s := range substrings {
+			if !strings.Contains(logs, s) {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	assert.Nil(ginkgo.GinkgoT(), err, "waiting for %q in the nginx logs", substrings)
+	return logs
 }
 
 func (f *Framework) matchNginxConditions(name string, matcher func(cfg string) bool) wait.ConditionFunc {
@@ -470,11 +490,13 @@ func (f *Framework) WaitForReload(fn func()) {
 
 	count := 0
 	//nolint:staticcheck // TODO: will replace it since wait.Poll is deprecated
-	err := wait.Poll(1*time.Second, DefaultTimeout, func() (bool, error) {
+	err := wait.Poll(Poll, DefaultTimeout, func() (bool, error) {
 		reloads := getReloadCount(f.pod, f.Namespace, f.KubeClientSet)
-		// most of the cases reload the ingress controller
-		// in cases where the value is not modified we could wait forever
-		if count > 5 && reloads == initialReloadCount {
+		// Most changes reload NGINX. A change applied without a reload (backends
+		// through Lua) creates no RELOAD event, so a few polls without one end the
+		// wait. The e2e controller syncs without delay (sync-rate-limit in
+		// wait-for-nginx.sh), so the sync starts before the window closes.
+		if count >= 3 && reloads == initialReloadCount {
 			return true, nil
 		}
 
@@ -557,7 +579,7 @@ func (f *Framework) newHTTPTestClient(config *tls.Config, setIngressURL bool) *h
 // WaitForNginxListening waits until NGINX starts accepting connections on a port
 func (f *Framework) WaitForNginxListening(port int) {
 	err := waitForPodsReady(f.KubeClientSet, DefaultTimeout, 1, f.Namespace, &metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=ingress-nginx-neo",
+		LabelSelector: controllerPodSelector,
 	})
 	assert.Nil(ginkgo.GinkgoT(), err, "waiting for ingress pods to be ready")
 
@@ -675,12 +697,7 @@ func UpdateIngress(kubeClientSet kubernetes.Interface, namespace, name string, u
 	}
 
 	_, err = kubeClientSet.NetworkingV1().Ingresses(namespace).Update(context.TODO(), ingress, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-
-	Sleep(1 * time.Second)
-	return nil
+	return err
 }
 
 // NewSingleIngressWithTLS creates a simple ingress rule with TLS spec included

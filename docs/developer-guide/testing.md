@@ -119,7 +119,9 @@ variant (`E2E_VARIANT=default|chroot`) and the references of the helper images (
 `E2E_HTTPBUN_IMAGE`, `E2E_FASTCGI_IMAGE`, `E2E_CFSSL_IMAGE`, `NGINX_BASE_IMAGE`). The suite fails
 at start when one of them is missing. Namespace overlays in `test/e2e-image/namespace-overlays`
 adjust the chart values for specific specs. Third-party images of the suite are pinned by digest
-in `test/e2e/framework/images.go`.
+in `test/e2e/framework/images.go`. The e2e controller syncs its configuration right after a change
+(`sync-rate-limit: "10"` in `wait-for-nginx.sh` and the overlays, 0.3 per second by default), so the
+waits of the framework wait for the sync itself and not for the pause of the rate limit.
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
@@ -158,11 +160,20 @@ every shard. `E2E_SHARDS` in the Makefile lists the shards, CI takes them from
    a thousand times slower. The model is `test/e2e/annotations/approot.go`. It creates an Ingress
    with `app-root: /foo`, sends a request to `/` and expects `302` with
    `Location: http://approot.bar.com/foo`.
-2. **Wait for a condition, not for time.** `f.WaitForNginxServer`, `f.WaitForNginxConfiguration`,
-   `f.WaitForReload` and the other `Wait*` of `test/e2e/framework` instead of `framework.Sleep` and
-   `time.Sleep`. A sleep is either too long, and the spec is slow, or too short, and the spec is
-   flaky on a slow runner. It also hides races. When a sleep is really needed (a check that nothing
-   happens within N seconds), a comment next to it states the reason:
+2. **Wait for a condition, not for time.** The helpers of `test/e2e/framework` poll a condition
+   every 500 ms (`framework.Poll`):
+   - the NGINX configuration on disk: `f.WaitForNginxServer`, `f.WaitForNginxConfiguration`,
+     `f.WaitForLuaConfiguration`. The reload of NGINX can still run after the file is written, so
+     the spec then checks the behavior with a request
+   - the reload after a change: `f.EnsureIngress`, `f.UpdateIngress`, `f.SetNginxConfigMapData` and
+     `f.UpdateNginxConfigMapData` wait for it themselves (`f.WaitForReload`)
+   - an open port: `f.WaitForNginxListening`
+   - a line in the controller log: `f.WaitForNginxLog`, the logs of the chroot variant arrive with a
+     delay
+
+   They replace `framework.Sleep` and `time.Sleep`. A sleep is either too long, and the spec is slow,
+   or too short, and the spec is flaky on a slow runner. It also hides races. When a sleep is really
+   needed (a check that nothing happens within N seconds), a comment next to it states the reason:
 
    ```go
    time.Sleep(5 * time.Second) //nolint:forbidigo // the spec checks that no reload happens within 5s
@@ -178,7 +189,8 @@ every shard. `E2E_SHARDS` in the Makefile lists the shards, CI takes them from
    when the name of the framework equals `<name>`) changes the chart values of the controller of the
    spec. They are needed only when the spec changes global state: controller flags, cluster-scoped
    resources. A comment at the describe states the reason. Serial specs run one at a time and make
-   the whole run longer.
+   the whole run longer. An overlay replaces the values as a whole, so it repeats the common e2e
+   settings of `wait-for-nginx.sh`, `sync-rate-limit` among them.
 5. **Time budget.** A spec longer than 60 seconds states the reason in the pull request. Every
    second of a spec is multiplied by the number of variants and Kubernetes versions in CI.
 6. **A flaky spec does not hide behind a retry.** The suite makes up to two attempts

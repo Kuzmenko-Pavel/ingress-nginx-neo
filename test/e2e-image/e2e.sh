@@ -29,7 +29,6 @@ shard_args "${E2E_SHARD}"
 
 reportFile="report-e2e-test-suite.xml"
 ginkgo_args=(
-  "--fail-fast"
   "--flake-attempts=2"
   "--junit-report=${reportFile}"
   "--nodes=${E2E_NODES}"

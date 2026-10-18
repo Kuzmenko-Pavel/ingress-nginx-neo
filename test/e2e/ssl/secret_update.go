@@ -120,8 +120,6 @@ var _ = framework.IngressNginxDescribe("[SSL] secret update", func() {
 		assert.Equal(ginkgo.GinkgoT(), cert.Subject.CommonName, "Kubernetes Ingress Controller Fake Certificate")
 
 		// verify the log contains a warning about invalid certificate
-		logs, err := f.NginxLogs()
-		assert.Nil(ginkgo.GinkgoT(), err, "obtaining nginx logs")
-		assert.Contains(ginkgo.GinkgoT(), logs, fmt.Sprintf("%v/invalid-ssl\" contains no keypair or CA certificate", f.Namespace))
+		f.WaitForNginxLog(fmt.Sprintf("%v/invalid-ssl\" contains no keypair or CA certificate", f.Namespace))
 	})
 })
