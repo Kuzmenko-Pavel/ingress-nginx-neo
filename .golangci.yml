@@ -16,6 +16,7 @@ linters:
     - errcheck
     - errchkjson
     - errname
+    - forbidigo
     - ginkgolinter
     - gocheckcompilerdirectives
     - goconst
@@ -56,6 +57,14 @@ linters:
     errcheck:
       check-type-assertions: true
       check-blank: true
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: ^time\.Sleep$
+          msg: wait for a condition (f.WaitForNginxServer, f.WaitForReload or another Wait* helper of test/e2e/framework); a needed sleep takes //nolint:forbidigo // <reason>
+        - pattern: ^framework\.Sleep$
+          pkg: ^k8s\.io/ingress-nginx/test/e2e/framework$
+          msg: wait for a condition (f.WaitForNginxServer, f.WaitForReload or another Wait* helper of test/e2e/framework); a needed sleep takes //nolint:forbidigo // <reason>
     gocritic:
       enabled-checks:
         - badLock
@@ -145,6 +154,13 @@ linters:
       allow-unused: false
   exclusions:
     generated: lax
+    rules:
+      # Sleeps are forbidden in e2e specs only; elsewhere they back retries and shutdowns.
+      - linters: [forbidigo]
+        path-except: ^test/e2e/
+      # The framework implements the wait helpers.
+      - linters: [forbidigo]
+        path: ^test/e2e/framework/
     presets:
       - comments
       - common-false-positives
