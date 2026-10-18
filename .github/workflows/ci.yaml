@@ -227,6 +227,45 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      # Coverage of a failed run is incomplete, so it is uploaded only after passing tests.
+      - name: Upload Go coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: >-
+            dist/test-reports/coverage-go.out,dist/test-reports/coverage-go-kube-webhook-certgen.out,dist/test-reports/coverage-go-custom-error-pages.out
+          flags: go
+          disable_search: true
+
+      - name: Upload Lua coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: dist/test-reports/coverage-lua.lcov
+          flags: lua
+          disable_search: true
+
+      - name: Upload Go test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
+          files: >-
+            dist/test-reports/unit-go.xml,dist/test-reports/unit-go-kube-webhook-certgen.xml,dist/test-reports/unit-go-custom-error-pages.xml
+          flags: go
+          disable_search: true
+
+      - name: Upload Lua test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
+          files: dist/test-reports/unit-lua.xml
+          flags: lua
+          disable_search: true
+
   generated:
     name: Generated files
     needs: changes
@@ -282,6 +321,16 @@ jobs:
           path: dist/test-reports
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
+          files: dist/test-reports/unit-helm.xml
+          name: helm
+          disable_search: true
 
   docs:
     name: Docs
@@ -450,6 +499,15 @@ jobs:
           path: test/junitreports/*.xml
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          report_type: test_results
+          directory: test/junitreports
+          name: e2e-${{ matrix.variant }}-${{ matrix.k8s.name }}
 
   e2e-chart:
     name: Chart e2e (${{ matrix.k8s.name }})

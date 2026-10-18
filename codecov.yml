@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Codecov: a comment with the coverage diff and the failed tests on every pull
+# request, and a status check that fails when the project coverage drops by
+# more than 1%. CI uploads the reports of dist/test-reports (see
+# docs/developer-guide/ci.md).
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        informational: true
+# Go writes import paths into the coverage profile. Codecov matches them to
+# the repository by their tail, which fails for main.go of custom-error-pages.
+fixes:
+  - "k8s.io/ingress-nginx/custom-error-pages/::images/custom-error-pages/rootfs/"
+comment:
+  layout: "diff, flags, files"
+  # Codecov shows only the coverage of the changed lines by default; the
+  # comment also shows the change of the project coverage against the base.
+  hide_project_coverage: false

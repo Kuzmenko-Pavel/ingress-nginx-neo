@@ -123,6 +123,31 @@ the cheap jobs. Unit tests and lint check them; they do not affect the build or 
   `test-reports-helm`, also when the tests failed.
 - Artifacts are kept for at most 7 days.
 
+## Coverage and test results
+
+CI uploads the reports to [Codecov](https://codecov.io/gh/Kuzmenko-Pavel/ingress-nginx-neo)
+(`codecov/codecov-action`, settings in `codecov.yml`):
+
+| Job | Coverage | Test results |
+|-----|----------|--------------|
+| Unit tests | `coverage-go.out`, `coverage-go-kube-webhook-certgen.out`, `coverage-go-custom-error-pages.out` (flag `go`), `coverage-lua.lcov` (flag `lua`) | `unit-go.xml`, `unit-go-kube-webhook-certgen.xml`, `unit-go-custom-error-pages.xml` (`go`), `unit-lua.xml` (`lua`) |
+| Helm chart | | `unit-helm.xml` |
+| E2E | | `test/junitreports/*.xml` |
+
+The flags `go` and `lua` split the coverage by language. The test results of helm and e2e have no
+flag, because no coverage is measured for them, and Codecov shows a flag without coverage as 0%.
+
+Coverage is uploaded only after the tests passed, because the coverage of a failed run is
+incomplete. Test results are uploaded also when the tests failed. The module `fastcgi-helloserver`
+is not uploaded, it is a helper image of e2e without tests.
+
+Codecov comments on the pull request with the change of coverage against the base, the coverage of
+the changed files and the failed tests. It also sets the checks `codecov/project`, which fails when
+the coverage drops by more than 1%, and the informational `codecov/patch`. The only required check
+stays CI result. The upload uses the secret `CODECOV_TOKEN`. A pull request from a fork has no
+secrets, and Codecov accepts the upload of a public repository without a token. A failed upload
+does not fail the job (`fail_ci_if_error: false`), because Codecov is an external service.
+
 ## Conventional Commits
 
 Every non-merge commit of a pull request follows
@@ -153,4 +178,5 @@ The workflows expect: workflow permissions "Read repository contents"; actions p
 commit SHAs; merge commits and rebase merges enabled, squash merges disabled; rulesets on `main`
 and `release-*` requiring pull requests and the **CI result** check; tag rules for `v*` (created by
 release managers only, no update or deletion); the environment `release` with a required reviewer
-and deployment tags `v*`; release immutability; GitHub Pages deployed from the `gh-pages` branch.
+and deployment tags `v*`; release immutability; GitHub Pages deployed from the `gh-pages` branch;
+the Codecov app with access to the repository and the Actions secret `CODECOV_TOKEN`.

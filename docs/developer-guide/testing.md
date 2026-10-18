@@ -90,7 +90,8 @@ go tool cover -html=dist/test-reports/coverage-go.out
 luacov counts the Lua coverage (`busted --coverage`), luacov-reporter-lcov writes the LCOV report.
 
 In CI the jobs Unit tests and Helm chart keep `dist/test-reports/` as artifacts (see
-[CI](ci.md#caches-and-artifacts)).
+[CI](ci.md#caches-and-artifacts)) and upload the reports to Codecov, which shows the coverage and
+the failed tests in the pull request (see [CI](ci.md#coverage-and-test-results)).
 
 ## Controller e2e
 
