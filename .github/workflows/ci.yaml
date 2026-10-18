@@ -329,7 +329,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: test_results
           files: dist/test-reports/unit-helm.xml
-          flags: helm
+          name: helm
           disable_search: true
 
   docs:
@@ -507,7 +507,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           report_type: test_results
           directory: test/junitreports
-          flags: e2e
           name: e2e-${{ matrix.variant }}-${{ matrix.k8s.name }}
 
   e2e-chart:

@@ -131,8 +131,11 @@ CI uploads the reports to [Codecov](https://codecov.io/gh/Kuzmenko-Pavel/ingress
 | Job | Coverage | Test results |
 |-----|----------|--------------|
 | Unit tests | `coverage-go.out`, `coverage-go-kube-webhook-certgen.out`, `coverage-go-custom-error-pages.out` (flag `go`), `coverage-lua.lcov` (flag `lua`) | `unit-go.xml`, `unit-go-kube-webhook-certgen.xml`, `unit-go-custom-error-pages.xml` (`go`), `unit-lua.xml` (`lua`) |
-| Helm chart | | `unit-helm.xml` (`helm`) |
-| E2E | | `test/junitreports/*.xml` (`e2e`) |
+| Helm chart | | `unit-helm.xml` |
+| E2E | | `test/junitreports/*.xml` |
+
+The flags `go` and `lua` split the coverage by language. The test results of helm and e2e have no
+flag, because no coverage is measured for them, and Codecov shows a flag without coverage as 0%.
 
 Coverage is uploaded only after the tests passed, because the coverage of a failed run is
 incomplete. Test results are uploaded also when the tests failed. The module `fastcgi-helloserver`

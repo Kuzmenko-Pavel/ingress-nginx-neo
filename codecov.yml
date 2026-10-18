@@ -13,6 +13,10 @@ coverage:
     patch:
       default:
         informational: true
+# Go writes import paths into the coverage profile. Codecov matches them to
+# the repository by their tail, which fails for main.go of custom-error-pages.
+fixes:
+  - "k8s.io/ingress-nginx/custom-error-pages/::images/custom-error-pages/rootfs/"
 comment:
   layout: "diff, flags, files"
   # Codecov shows only the coverage of the changed lines by default; the
