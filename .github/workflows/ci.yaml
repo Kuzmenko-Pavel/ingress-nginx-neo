@@ -88,6 +88,8 @@ jobs:
               - 'docs/**'
               - 'mkdocs.yml'
               - 'charts/**'
+              # the examples of annotations.md (tools/docs/golden_examples.py)
+              - 'internal/ingress/controller/testdata/golden/**'
               - 'make/docs.mk'
               - 'tools/docs/**'
               - 'tools/docs-publish.sh'

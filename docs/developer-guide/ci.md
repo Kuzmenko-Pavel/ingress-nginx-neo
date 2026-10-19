@@ -104,7 +104,7 @@ them. Pushes and manual runs have no filters and run everything.
 | `images-deps` | `images/` of the dependency images (`nginx`, `test-runner`, `e2e-test-echo`, `httpbun`, `fastcgi-helloserver`, `cfssl`) |
 | `images-delivered` | `rootfs/**`, `images/kube-webhook-certgen/**`, `images/custom-error-pages/**` |
 | `certgen` | `images/kube-webhook-certgen/**`, `tools/e2e-certgen.sh` |
-| `docs` | `docs/**`, `mkdocs.yml`, `charts/**`, `make/docs.mk`, `tools/docs/**`, `tools/docs-publish.sh` |
+| `docs` | `docs/**`, `mkdocs.yml`, `charts/**`, `internal/ingress/controller/testdata/golden/**` (the examples of `annotations.md`), `make/docs.mk`, `tools/docs/**`, `tools/docs-publish.sh` |
 | `e2e` | `test/**`, `make/test.mk`, `make/images.mk`, `tools/content-tag.sh`, `tools/image-exists.sh`, `tools/e2e-chart.sh` |
 | `build-system` | `Makefile`, `make/code.mk`, `tools/go.mod`, `tools/go.sum`, `tools/versions.env`, `tools/install.sh`, `tools/actionlint/**` |
 | `workflow` | `.github/**`, any workflow change runs the whole CI |
