@@ -158,6 +158,11 @@ Canary rules are evaluated in order of precedence. Precedence is as follows:
 
 Currently a maximum of one canary ingress can be applied per Ingress rule.
 
+<!-- golden: canary-weight -->
+<!-- golden: canary-by-header -->
+<!-- golden: canary-by-header-pattern -->
+<!-- golden: canary-by-cookie -->
+
 ### Rewrite
 
 In some scenarios the exposed URL in the backend service differs from the specified path in the Ingress rule. Without a rewrite any request will return 404.
@@ -167,6 +172,9 @@ If the Application Root is exposed in a different path and needs to be redirecte
 
 !!! example
     Please check the [rewrite](../../examples/rewrite/README.md) example.
+
+<!-- golden: rewrite-target -->
+<!-- golden: app-root -->
 
 ### Session Affinity
 
@@ -183,6 +191,9 @@ The annotation `nginx.ingress.kubernetes.io/affinity-canary-behavior` defines th
 !!! example
     Please check the [affinity](../../examples/affinity/cookie/README.md) example.
 
+<!-- golden: affinity -->
+<!-- golden: affinity-canary-behavior -->
+
 #### Cookie affinity
 
 If you use the ``cookie`` affinity type you can also specify the name of the cookie that will be used to route the requests with the annotation `nginx.ingress.kubernetes.io/session-cookie-name`. The default is to create a cookie named 'INGRESSCOOKIE'.
@@ -198,6 +209,8 @@ Use `nginx.ingress.kubernetes.io/session-cookie-expires` to control the cookie e
 Use `nginx.ingress.kubernetes.io/session-cookie-path` to control the cookie path when use-regex is set to true.
 
 Use `nginx.ingress.kubernetes.io/session-cookie-change-on-failure` to control the cookie change after request failure.
+
+<!-- golden: affinity-session-cookie -->
 
 ### Authentication
 
@@ -233,6 +246,9 @@ nginx.ingress.kubernetes.io/auth-realm: "realm string"
 !!! example
     Please check the [auth](../../examples/auth/basic/README.md) example.
 
+<!-- golden: auth-basic -->
+<!-- golden: auth-basic-map -->
+
 ### Custom NGINX upstream hashing
 
 NGINX supports load balancing by client-server mapping based on [consistent hashing](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#hash) for a given key. The key can contain text, variables or any combination thereof. This feature allows for request stickiness other than client IP or cookies. The [ketama](https://www.last.fm/user/RJ/journal/2007/04/10/rz_libketama_-_a_consistent_hashing_algo_for_memcache_clients) consistent hashing method will be used which ensures only a few keys would be remapped to different servers on upstream group changes.
@@ -247,14 +263,20 @@ To enable consistent hashing for a backend:
 
 Please check the [chashsubset](../../examples/chashsubset/deployment.yaml) example.
 
+<!-- golden: upstream-hash-by -->
+
 ### Custom NGINX load balancing
 
 This is similar to [`load-balance` in ConfigMap](./configmap.md#load-balance), but configures load balancing algorithm per ingress.
 >Note that `nginx.ingress.kubernetes.io/upstream-hash-by` takes preference over this. If this and `nginx.ingress.kubernetes.io/upstream-hash-by` are not set then we fallback to using globally configured load balancing algorithm.
 
+<!-- golden: load-balance -->
+
 ### Custom NGINX upstream vhost
 
 This configuration setting allows you to control the value for host in the following statement: `proxy_set_header Host $host`, which forms part of the location block.  This is useful if you need to call the upstream server by something other than `$host`.
+
+<!-- golden: upstream-vhost -->
 
 ### Client Certificate Authentication
 
@@ -293,6 +315,8 @@ The following headers are sent to the upstream service according to the `auth-tl
 
     Only Authenticated Origin Pulls are allowed and can be configured by following their tutorial: [https://support.cloudflare.com/hc/en-us/articles/204494148-Setting-up-NGINX-to-use-TLS-Authenticated-Origin-Pulls](https://web.archive.org/web/20200907143649/https://support.cloudflare.com/hc/en-us/articles/204899617-Setting-up-NGINX-to-use-TLS-Authenticated-Origin-Pulls#section5)
 
+<!-- golden: auth-tls -->
+
 ### Backend Certificate Authentication
 
 It is possible to authenticate to a proxied HTTPS backend with certificate using additional annotations in Ingress Rule.
@@ -313,6 +337,8 @@ It is possible to authenticate to a proxied HTTPS backend with certificate using
 * `nginx.ingress.kubernetes.io/proxy-ssl-server-name`:
   Enables passing of the server name through TLS Server Name Indication extension (SNI, RFC 6066) when establishing a connection with the proxied HTTPS server.
 
+<!-- golden: proxy-ssl -->
+
 ### Configuration snippet
 
 Using this annotation you can add additional configuration to the NGINX location. For example:
@@ -324,6 +350,8 @@ nginx.ingress.kubernetes.io/configuration-snippet: |
 
 Be aware this can be dangerous in multi-tenant clusters, as it can lead to people with otherwise limited permissions being able to retrieve all secrets on the cluster. The recommended mitigation for this threat is to disable this feature, so it may not work for you. See CVE-2021-25742 and the [related issue on github](https://github.com/kubernetes/ingress-nginx/issues/7837) for more information.
 
+<!-- golden: configuration-snippet -->
+
 ### Custom HTTP Errors
 
 Like the [`custom-http-errors`](./configmap.md#custom-http-errors) value in the ConfigMap, this annotation will set NGINX `proxy-intercept-errors`, but only for the NGINX location associated with this ingress. If a [default backend annotation](#default-backend) is specified on the ingress, the errors will be routed to that annotation's default backend service (instead of the global default backend).
@@ -334,6 +362,9 @@ Example usage:
 ```
 nginx.ingress.kubernetes.io/custom-http-errors: "404,415"
 ```
+
+<!-- golden: custom-http-errors -->
+<!-- golden: disable-proxy-intercept-errors -->
 
 ### Custom Headers
 This annotation is of the form `nginx.ingress.kubernetes.io/custom-headers: <namespace>/<custom headers configmap>` to specify a namespace and configmap name that contains custom headers. This annotation uses `more_set_headers` nginx directive.
@@ -358,11 +389,16 @@ metadata:
 !!! attention
   First define the allowed response headers in [global-allowed-response-headers](configmap.md#global-allowed-response-headers).
 
+<!-- golden: custom-headers -->
+
 ### Default Backend
 
 This annotation is of the form `nginx.ingress.kubernetes.io/default-backend: <svc name>` to specify a custom default backend.  This `<svc name>` is a reference to a service inside of the same namespace in which you are applying this annotation. This annotation overrides the global default backend. In case the service has [multiple ports](https://kubernetes.io/docs/concepts/services-networking/service/#multi-port-services), the first one is the one which will receive the backend traffic. 
 
 This service will be used to handle the response when the configured service in the Ingress rule does not have any active endpoints. It will also be used to handle the error responses if both this annotation and the [custom-http-errors annotation](#custom-http-errors) are set.
+
+<!-- golden: default-backend -->
+<!-- golden: custom-http-errors-default-backend -->
 
 ### Enable CORS
 
@@ -416,6 +452,9 @@ CORS can be controlled with the following annotations:
 !!! note
     For more information please see [https://enable-cors.org](https://enable-cors.org/server_nginx.html)
 
+<!-- golden: cors -->
+<!-- golden: cors-custom -->
+
 ### HTTP2 Push Preload.
 
 Enables automatic conversion of preload links specified in the “Link” response header fields into push requests.
@@ -423,6 +462,8 @@ Enables automatic conversion of preload links specified in the “Link” respon
 !!! example
 
     * `nginx.ingress.kubernetes.io/http2-push-preload: "true"`
+
+<!-- golden: http2-push-preload -->
 
 ### Server Alias
 
@@ -435,6 +476,8 @@ This will create a server with the same configuration, but adding new values to 
     place over the alias configuration.
 
 For more information please see [the `server_name` documentation](https://nginx.org/en/docs/http/ngx_http_core_module.html#server_name).
+
+<!-- golden: server-alias -->
 
 ### Server snippet
 
@@ -460,6 +503,8 @@ metadata:
 !!! attention
     This annotation can be used only once per host.
 
+<!-- golden: server-snippet -->
+
 ### Client Body Buffer Size
 
 Sets buffer size for reading client request body per location. In case the request body is larger than the buffer,
@@ -479,6 +524,8 @@ applied to each location provided in the ingress rule.
     * `nginx.ingress.kubernetes.io/client-body-buffer-size: 1M` # 1 megabyte
 
 For more information please see [https://nginx.org](https://nginx.org/en/docs/http/ngx_http_core_module.html#client_body_buffer_size)
+
+<!-- golden: client-body-buffer-size -->
 
 ### External Authentication
 
@@ -537,6 +584,12 @@ nginx.ingress.kubernetes.io/auth-snippet: |
 !!! example
     Please check the [external-auth](../../examples/auth/external-auth/README.md) example.
 
+<!-- golden: auth-url -->
+<!-- golden: auth-url-cache -->
+<!-- golden: auth-url-keepalive -->
+<!-- golden: auth-proxy-set-headers -->
+<!-- golden: auth-snippet -->
+
 #### Global External Authentication
 
 By default the controller redirects all requests to an existing service that provides authentication if `global-auth-url` is set in the controller ConfigMap. If you want to disable this behavior for that Ingress, you can use the `nginx.ingress.kubernetes.io/enable-global-auth: "false"` annotation.
@@ -546,6 +599,8 @@ By default the controller redirects all requests to an existing service that pro
 
 !!! note
     For more information please see [global-auth-url](./configmap.md#global-auth-url).
+
+<!-- golden: enable-global-auth -->
 
 ### Rate Limiting
 
@@ -570,6 +625,11 @@ To configure settings globally for all Ingress rules, the `limit-rate-after` and
 
 The client IP address will be set based on the use of [PROXY protocol](./configmap.md#use-proxy-protocol) or from the `X-Forwarded-For` header value when [use-forwarded-headers](./configmap.md#use-forwarded-headers) is enabled.
 
+<!-- golden: limit-rps -->
+<!-- golden: limit-rpm -->
+<!-- golden: limit-connections -->
+<!-- golden: limit-rate -->
+
 ### Permanent Redirect
 
 This annotation allows to return a permanent redirect (Return Code 301) instead of sending data to the upstream.  For example `nginx.ingress.kubernetes.io/permanent-redirect: https://www.google.com` would redirect everything to Google.
@@ -578,12 +638,16 @@ This annotation allows to return a permanent redirect (Return Code 301) instead 
 
 This annotation allows you to modify the status code used for permanent redirects.  For example `nginx.ingress.kubernetes.io/permanent-redirect-code: '308'` would return your permanent-redirect with a 308.
 
+<!-- golden: permanent-redirect -->
+
 ### Temporal Redirect
 This annotation allows you to return a temporal redirect (Return Code 302) instead of sending data to the upstream. For example `nginx.ingress.kubernetes.io/temporal-redirect: https://www.google.com` would redirect everything to Google with a Return Code of 302 (Moved Temporarily)
 
 ### Temporal Redirect Code
 
 This annotation allows you to modify the status code used for temporal redirects.  For example `nginx.ingress.kubernetes.io/temporal-redirect-code: '307'` would return your temporal-redirect with a 307.
+
+<!-- golden: temporal-redirect -->
 
 ### SSL Passthrough
 
@@ -599,6 +663,8 @@ the User guide.
     Because SSL Passthrough works on layer 4 of the OSI model (TCP) and not on the layer 7 (HTTP), using SSL Passthrough
     invalidates all the other annotations set on an Ingress object.
 
+<!-- golden: ssl-passthrough -->
+
 ### Service Upstream
 
 By default the controller uses a list of all endpoints (Pod IP/port) in the NGINX upstream configuration.
@@ -606,6 +672,8 @@ By default the controller uses a list of all endpoints (Pod IP/port) in the NGIN
 The `nginx.ingress.kubernetes.io/service-upstream` annotation disables that behavior and instead uses a single upstream in NGINX, the service's Cluster IP and port.
 
 This can be desirable for things like zero-downtime deployments . See issue [#257](https://github.com/kubernetes/ingress-nginx/issues/257).
+
+<!-- golden: service-upstream -->
 
 #### Known Issues
 
@@ -628,6 +696,12 @@ This can be achieved by using the `nginx.ingress.kubernetes.io/force-ssl-redirec
 
 To preserve the trailing slash in the URI with `ssl-redirect`, set `nginx.ingress.kubernetes.io/preserve-trailing-slash: "true"` annotation for that particular resource.
 
+<!-- golden: ssl-redirect-false -->
+<!-- golden: force-ssl-redirect -->
+<!-- golden: preserve-trailing-slash -->
+<!-- golden: use-port-in-redirects -->
+<!-- golden: relative-redirects -->
+
 ### Redirect from/to www
 
 In some scenarios, it is required to redirect from `www.domain.com` to `domain.com` or vice versa, which way the redirect is performed depends on the configured `host` value in the Ingress object.
@@ -642,6 +716,8 @@ To enable this feature use the annotation `nginx.ingress.kubernetes.io/from-to-w
 !!! attention
     For HTTPS to HTTPS redirects is mandatory the SSL Certificate defined in the Secret, located in the TLS section of Ingress, contains both FQDN in the common name of the certificate.
 
+<!-- golden: from-to-www-redirect -->
+
 ### Denylist source range
 
 You can specify blocked client IP source ranges through the `nginx.ingress.kubernetes.io/denylist-source-range` annotation.
@@ -651,6 +727,8 @@ To configure this setting globally for all Ingress rules, the `denylist-source-r
 
 !!! note
     Adding an annotation to an Ingress rule overrides any global restriction.
+
+<!-- golden: denylist-source-range -->
 
 
 ### Whitelist source range
@@ -662,6 +740,8 @@ To configure this setting globally for all Ingress rules, the `whitelist-source-
 
 !!! note
     Adding an annotation to an Ingress rule overrides any global restriction.
+
+<!-- golden: allowlist-source-range -->
 
 ### Custom timeouts
 
@@ -684,6 +764,11 @@ If you indicate [Backend Protocol](#backend-protocol) as `GRPC` or `GRPCS`, the 
 
 Note: All timeout values are unitless and in seconds e.g. `nginx.ingress.kubernetes.io/proxy-read-timeout: "120"` sets a valid 120 seconds proxy read timeout.
 
+<!-- golden: proxy-timeouts -->
+<!-- golden: proxy-timeouts-invalid -->
+<!-- golden: proxy-next-upstream -->
+<!-- golden: proxy-request-buffering-off -->
+
 ### Proxy redirect
 
 The annotations `nginx.ingress.kubernetes.io/proxy-redirect-from` and `nginx.ingress.kubernetes.io/proxy-redirect-to` will set the first and second parameters of NGINX's proxy_redirect directive respectively. It is possible to
@@ -693,6 +778,10 @@ Setting "off" or "default" in the annotation `nginx.ingress.kubernetes.io/proxy-
 otherwise, both annotations must be used in unison. Note that each annotation must be a string without spaces.
 
 By default the value of each annotation is "off".
+
+<!-- golden: proxy-redirect-off -->
+<!-- golden: proxy-redirect-default -->
+<!-- golden: proxy-redirect-from-to -->
 
 ### Custom max body size
 
@@ -704,6 +793,9 @@ To use custom values in an Ingress rule define these annotation:
 ```yaml
 nginx.ingress.kubernetes.io/proxy-body-size: 8m
 ```
+
+<!-- golden: proxy-body-size -->
+<!-- golden: proxy-body-size-invalid -->
 
 ### Proxy cookie domain
 
@@ -718,6 +810,8 @@ To configure this setting globally for all Ingress rules, the `proxy-cookie-doma
 Sets a text that [should be changed in the path attribute](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_cookie_path) of the "Set-Cookie" header fields of a proxied server response.
 
 To configure this setting globally for all Ingress rules, the `proxy-cookie-path` value may be set in the [NGINX ConfigMap](./configmap.md#proxy-cookie-path).
+
+<!-- golden: proxy-cookies -->
 
 ### Proxy buffering
 
@@ -761,6 +855,8 @@ To configure this setting globally, set `proxy-busy-buffers-size` in the [Config
 nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "16k"
 ```
 
+<!-- golden: proxy-buffering -->
+
 ### Proxy max temp file size
 
 When [`buffering`](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_buffering) of responses from the proxied server is enabled, and the whole response does not fit into the buffers set by the [`proxy_buffer_size`](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_buffer_size) and [`proxy_buffers`](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_buffers) directives, a part of the response can be saved to a temporary file. This directive sets the maximum `size` of the temporary file setting the [`proxy_max_temp_file_size`](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_max_temp_file_size). The size of data written to the temporary file at a time is set by the [`proxy_temp_file_write_size`](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_temp_file_write_size) directive.
@@ -772,6 +868,8 @@ To use custom values in an Ingress rule, define this annotation:
 nginx.ingress.kubernetes.io/proxy-max-temp-file-size: "1024m"
 ```
 
+<!-- golden: proxy-max-temp-file-size -->
+
 ### Proxy HTTP version
 
 Using this annotation sets the [`proxy_http_version`](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_http_version) that the Nginx reverse proxy will use to communicate with the backend.
@@ -780,6 +878,8 @@ By default this is set to "1.1".
 ```yaml
 nginx.ingress.kubernetes.io/proxy-http-version: "1.0"
 ```
+
+<!-- golden: proxy-http-version -->
 
 ### SSL ciphers
 
@@ -797,6 +897,8 @@ The following annotation will set the `ssl_prefer_server_ciphers` directive at t
 nginx.ingress.kubernetes.io/ssl-prefer-server-ciphers: "true"
 ```
 
+<!-- golden: ssl-ciphers -->
+
 ### Connection proxy header
 
 Using this annotation will override the default connection header set by NGINX.
@@ -805,6 +907,8 @@ To use custom values in an Ingress rule, define the annotation:
 ```yaml
 nginx.ingress.kubernetes.io/connection-proxy-header: "keep-alive"
 ```
+
+<!-- golden: connection-proxy-header -->
 
 ### Enable Access Log
 
@@ -823,6 +927,8 @@ Note that rewrite logs are sent to the error_log file at the notice level. To en
 ```yaml
 nginx.ingress.kubernetes.io/enable-rewrite-log: "true"
 ```
+
+<!-- golden: logs -->
 
 ### Enable Opentelemetry
 
@@ -845,12 +951,16 @@ sometimes need to be overridden to enable it or disable it for a specific ingres
 nginx.ingress.kubernetes.io/opentelemetry-trust-incoming-span: "true"
 ```
 
+<!-- golden: opentelemetry -->
+
 ### X-Forwarded-Prefix Header
 To add the non-standard `X-Forwarded-Prefix` header to the upstream request with a string value, the following annotation can be used:
 
 ```yaml
 nginx.ingress.kubernetes.io/x-forwarded-prefix: "/path"
 ```
+
+<!-- golden: x-forwarded-prefix -->
 
 ### ModSecurity
 
@@ -893,6 +1003,9 @@ nginx.ingress.kubernetes.io/modsecurity-snippet: |
   Include /etc/nginx/owasp-modsecurity-crs/nginx-modsecurity.conf
 ```
 
+<!-- golden: modsecurity -->
+<!-- golden: modsecurity-snippet -->
+
 ### Backend Protocol
 
 Using `backend-protocol` annotations is possible to indicate how NGINX should communicate with the backend service. 
@@ -905,6 +1018,9 @@ Example:
 ```yaml
 nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
 ```
+
+<!-- golden: backend-protocol-https -->
+<!-- golden: backend-protocol-grpc -->
 
 ### Use Regex
 
@@ -937,6 +1053,8 @@ By default, a request would need to satisfy all authentication requirements in o
 nginx.ingress.kubernetes.io/satisfy: "any"
 ```
 
+<!-- golden: satisfy -->
+
 ### Mirror
 
 Enables a request to be mirrored to a mirror backend. Responses by mirror backends are ignored. This feature is useful, to see how requests will react in "test" backends.
@@ -966,6 +1084,8 @@ The request sent to the mirror is linked to the original request. If you have a 
 
 For more information on the mirror module see [ngx_http_mirror_module](https://nginx.org/en/docs/http/ngx_http_mirror_module.html)
 
+<!-- golden: mirror -->
+
 
 ### Stream snippet
 
@@ -982,3 +1102,5 @@ metadata:
         proxy_pass 127.0.0.1:80;
       }
 ```
+
+<!-- golden: stream-snippet -->

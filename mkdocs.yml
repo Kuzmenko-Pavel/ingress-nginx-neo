@@ -65,6 +65,7 @@ plugins:
 
 hooks:
   - tools/docs/release_version.py
+  - tools/docs/golden_examples.py
 
 extra:
   version:
