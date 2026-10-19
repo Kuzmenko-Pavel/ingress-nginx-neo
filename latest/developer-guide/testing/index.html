@@ -3279,6 +3279,12 @@ change of the template that changes the configuration updates the golden files w
 command, and the diff of <code>server.conf</code> in the pull request shows how nginx.conf changes. A golden
 test does not check that NGINX accepts the configuration and how it handles a request, that needs
 an e2e spec with a request.</p>
+<p>The golden cases appear in the documentation of the annotations. A line <code>&lt;!-- golden: &lt;case&gt; --&gt;</code>
+in the section of an annotation (in <code>annotations.md</code> or on another page) becomes a collapsed example
+when the site is built: the annotations of the case, the data of <code>configmap.yaml</code> when there is one,
+and the changes of nginx.conf and of the backends against the base. The MkDocs hook
+<code>tools/docs/golden_examples.py</code> does it. A new case gets a marker in the section of its annotation.
+A marker of a case that does not exist stops <code>make docs-build</code>.</p>
 <h2 id="test-reports-and-coverage">Test reports and coverage<a class="headerlink" href="#test-reports-and-coverage" title="Permanent link"> ¶</a></h2>
 <p><code>make test-unit</code>, <code>make test-unit-lua</code> and <code>make helm-test</code> write reports to <code>dist/test-reports/</code>
 (<code>TEST_REPORTS</code>, a directory inside the repository, because the tests run in a container with the

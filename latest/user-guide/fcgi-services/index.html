@@ -3196,6 +3196,21 @@ X-Powered-By: PHP/8.3.8
 <p><code>nginx.ingress.kubernetes.io/backend-protocol: "FCGI"</code></p>
 </blockquote>
 <p><strong>This enables the <em>FastCGI</em> mode for all paths defined in the <em>Ingress</em> object</strong></p>
+<details class="example">
+<summary>What <code>fastcgi</code> changes</summary>
+<p>Annotations:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">nginx.ingress.kubernetes.io/backend-protocol</span><span class="p">:</span><span class="w"> </span><span class="s">"FCGI"</span>
+<span class="nt">nginx.ingress.kubernetes.io/fastcgi-index</span><span class="p">:</span><span class="w"> </span><span class="s">"index.php"</span>
+<span class="nt">nginx.ingress.kubernetes.io/fastcgi-params-configmap</span><span class="p">:</span><span class="w"> </span><span class="s">"fastcgi-params"</span>
+</code></pre></div>
+<p>Server blocks of nginx.conf, against an Ingress without annotations:</p>
+<div class="highlight"><pre><span></span><code><span class="gd">-proxy_pass http://upstream_balancer;</span>
+<span class="gi">+include /etc/nginx/fastcgi_params;</span>
+<span class="gi">+fastcgi_index "index.php";</span>
+<span class="gi">+fastcgi_param SCRIPT_FILENAME "/example/index.php";</span>
+<span class="gi">+fastcgi_pass upstream_balancer;</span>
+</code></pre></div>
+</details>
 <h3 id="the-nginxingresskubernetesiofastcgi-index-annotation">The <code>nginx.ingress.kubernetes.io/fastcgi-index</code> Annotation<a class="headerlink" href="#the-nginxingresskubernetesiofastcgi-index-annotation" title="Permanent link"> ¶</a></h3>
 <p>To specify an index file, the <code>fastcgi-index</code> annotation value can optionally be set.  In the example below, the value is set to <code>index.php</code>.  This annotation corresponds to <a href="https://nginx.org/en/docs/http/ngx_http_fastcgi_module.html#fastcgi_index">the <em>NGINX</em> <code>fastcgi_index</code> directive</a>.</p>
 <blockquote>
