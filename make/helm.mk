@@ -30,7 +30,14 @@ helm-lint: helm-stage $(HELM) $(KUBECONFORM)
 ## helm-unittest; JUnit in dist/test-reports.
 helm-test: $(HELM_UNITTEST)
 	mkdir -p $(TEST_REPORTS)
-	$(HELM_UNITTEST) --file 'tests/**/*_test.yaml' --output-type JUnit --output-file $(TEST_REPORTS)/unit-helm.xml $(CHART_DIR)
+	$(HELM_UNITTEST) --file 'tests/**/*_test.yaml' --output-type JUnit --output-file $(TEST_REPORTS)/unit-helm.xml \
+		$(HELM_TEST_ARGS) $(CHART_DIR)
+	@# helm-unittest writes a missing snapshot and passes, so a snapshot that is not committed is not reviewed.
+	@new=$$(git ls-files --others --exclude-standard -- $(CHART_DIR)/tests | grep /__snapshot__/ || true); \
+	if [ -n "$$new" ]; then \
+		printf 'new snapshot files are not committed: review them and commit them with the change\n%s\n' "$$new" >&2; \
+		exit 1; \
+	fi
 
 .PHONY: helm-template
 ## Render the staged chart into dist/rendered/.

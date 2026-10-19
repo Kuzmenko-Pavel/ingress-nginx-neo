@@ -1,0 +1,40 @@
+# NOTES.txt is the message users see after the installation, the snapshots show
+# its change in the review.
+# Update the snapshots with: make helm-test HELM_TEST_ARGS=--update-snapshot
+suite: NOTES
+templates:
+  - NOTES.txt
+release:
+  name: ingress-nginx-neo
+  namespace: ingress-nginx-neo
+
+tests:
+  - it: should tell how to watch the load balancer of a Service of type "LoadBalancer"
+    asserts:
+      - matchRegexRaw:
+          pattern: kubectl get service --namespace ingress-nginx-neo ingress-nginx-neo-controller --output wide --watch
+      - matchSnapshotRaw: {}
+
+  - it: should tell how to reach the node ports of a Service of type "NodePort"
+    set:
+      controller.service.type: NodePort
+      controller.service.nodePorts.http: 30080
+    asserts:
+      - matchRegexRaw:
+          pattern: export HTTP_NODE_PORT=30080
+      - matchSnapshotRaw: {}
+
+  - it: should tell how to port-forward to a Service of type "ClusterIP"
+    set:
+      controller.service.type: ClusterIP
+    asserts:
+      - matchRegexRaw:
+          pattern: kubectl port-forward --namespace ingress-nginx-neo
+      - matchSnapshotRaw: {}
+
+  - it: should use the IngressClass of the release in the example Ingress
+    set:
+      controller.ingressClassResource.name: custom-nginx
+    asserts:
+      - matchRegexRaw:
+          pattern: "ingressClassName: custom-nginx"

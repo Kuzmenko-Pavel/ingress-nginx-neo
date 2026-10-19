@@ -1,0 +1,253 @@
+# The documented configurations of ci/ (helm lint and chart e2e install them).
+# Every test checks what the configuration is for and snapshots the templates
+# it changes, so the review of a pull request shows how their render changes.
+# Update the snapshots with: make helm-test HELM_TEST_ARGS=--update-snapshot
+suite: CI values
+templates:
+  - admission-webhooks/cert-manager.yaml
+  - admission-webhooks/validating-webhook.yaml
+  - controller-configmap.yaml
+  - controller-configmap-addheaders.yaml
+  - controller-configmap-proxyheaders.yaml
+  - controller-configmap-tcp.yaml
+  - controller-configmap-udp.yaml
+  - controller-daemonset.yaml
+  - controller-deployment.yaml
+  - controller-hpa.yaml
+  - controller-ingressclass.yaml
+  - controller-service.yaml
+  - controller-service-internal.yaml
+  - controller-service-metrics.yaml
+# The render does not depend on Chart.yaml, the local Helm or the tested
+# Kubernetes versions: the oldest supported Kubernetes version.
+chart:
+  version: 1.2.3
+  appVersion: v1.2.3
+capabilities:
+  majorVersion: 1
+  minorVersion: 34
+release:
+  name: ingress-nginx-neo
+  namespace: ingress-nginx-neo
+
+tests:
+  - it: admission-webhooks-cert-manager-values.yaml issues the webhook certificate with cert-manager
+    values:
+      - ../ci/admission-webhooks-cert-manager-values.yaml
+    asserts:
+      - containsDocument:
+          kind: Certificate
+          apiVersion: cert-manager.io/v1
+          name: ingress-nginx-neo-admission
+          any: true
+        template: admission-webhooks/cert-manager.yaml
+      - exists:
+          path: metadata.annotations["cert-manager.io/inject-ca-from"]
+        template: admission-webhooks/validating-webhook.yaml
+      - matchSnapshot: {}
+        template: admission-webhooks/cert-manager.yaml
+      - matchSnapshot: {}
+        template: admission-webhooks/validating-webhook.yaml
+      - matchSnapshot: {}
+        template: controller-deployment.yaml
+
+  - it: controller-configmap-values.yaml sets a key of the NGINX configuration
+    values:
+      - ../ci/controller-configmap-values.yaml
+    asserts:
+      - equal:
+          path: data["use-proxy-protocol"]
+          value: "true"
+        template: controller-configmap.yaml
+      - matchSnapshot: {}
+        template: controller-configmap.yaml
+
+  - it: controller-configmap-addheaders-values.yaml adds response headers from a ConfigMap
+    values:
+      - ../ci/controller-configmap-addheaders-values.yaml
+    asserts:
+      - equal:
+          path: data["X-Frame-Options"]
+          value: deny
+        template: controller-configmap-addheaders.yaml
+      - equal:
+          path: data["add-headers"]
+          value: ingress-nginx-neo/ingress-nginx-neo-custom-add-headers
+        template: controller-configmap.yaml
+      - matchSnapshot: {}
+        template: controller-configmap.yaml
+      - matchSnapshot: {}
+        template: controller-configmap-addheaders.yaml
+
+  - it: controller-configmap-proxyheaders-values.yaml sends headers from a ConfigMap to the backends
+    values:
+      - ../ci/controller-configmap-proxyheaders-values.yaml
+    asserts:
+      - equal:
+          path: data["X-Forwarded-Proto"]
+          value: https
+        template: controller-configmap-proxyheaders.yaml
+      - equal:
+          path: data["proxy-set-headers"]
+          value: ingress-nginx-neo/ingress-nginx-neo-custom-proxy-headers
+        template: controller-configmap.yaml
+      - matchSnapshot: {}
+        template: controller-configmap.yaml
+      - matchSnapshot: {}
+        template: controller-configmap-proxyheaders.yaml
+
+  - it: controller-daemonset-values.yaml runs the controller as a DaemonSet
+    values:
+      - ../ci/controller-daemonset-values.yaml
+    asserts:
+      - isKind:
+          of: DaemonSet
+        template: controller-daemonset.yaml
+      - hasDocuments:
+          count: 0
+        template: controller-deployment.yaml
+      - matchSnapshot: {}
+        template: controller-daemonset.yaml
+
+  - it: controller-daemonset-metrics-values.yaml runs a DaemonSet with metrics
+    values:
+      - ../ci/controller-daemonset-metrics-values.yaml
+    asserts:
+      - isKind:
+          of: DaemonSet
+        template: controller-daemonset.yaml
+      - isKind:
+          of: Service
+        template: controller-service-metrics.yaml
+      - matchSnapshot: {}
+        template: controller-daemonset.yaml
+      - matchSnapshot: {}
+        template: controller-service-metrics.yaml
+
+  - it: controller-daemonset-podannotations-values.yaml annotates the pods of a DaemonSet
+    values:
+      - ../ci/controller-daemonset-podannotations-values.yaml
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+        template: controller-daemonset.yaml
+      - matchSnapshot: {}
+        template: controller-daemonset.yaml
+
+  - it: controller-deployment-values.yaml runs the controller as a Deployment
+    values:
+      - ../ci/controller-deployment-values.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+        template: controller-deployment.yaml
+      - hasDocuments:
+          count: 0
+        template: controller-daemonset.yaml
+      - matchSnapshot: {}
+        template: controller-deployment.yaml
+
+  - it: controller-deployment-metrics-values.yaml runs a Deployment with metrics
+    values:
+      - ../ci/controller-deployment-metrics-values.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+        template: controller-deployment.yaml
+      - isKind:
+          of: Service
+        template: controller-service-metrics.yaml
+      - matchSnapshot: {}
+        template: controller-deployment.yaml
+      - matchSnapshot: {}
+        template: controller-service-metrics.yaml
+
+  - it: controller-deployment-podannotations-values.yaml annotates the pods of a Deployment
+    values:
+      - ../ci/controller-deployment-podannotations-values.yaml
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+        template: controller-deployment.yaml
+      - matchSnapshot: {}
+        template: controller-deployment.yaml
+
+  - it: controller-hpa-values.yaml scales the Deployment of the controller with an HPA
+    values:
+      - ../ci/controller-hpa-values.yaml
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef
+          value:
+            apiVersion: apps/v1
+            kind: Deployment
+            name: ingress-nginx-neo-controller
+        template: controller-hpa.yaml
+      - notExists:
+          path: spec.replicas
+        template: controller-deployment.yaml
+      - matchSnapshot: {}
+        template: controller-hpa.yaml
+      - matchSnapshot: {}
+        template: controller-deployment.yaml
+
+  - it: controller-ingressclass-values.yaml creates its own default IngressClass
+    values:
+      - ../ci/controller-ingressclass-values.yaml
+    asserts:
+      - equal:
+          path: metadata.name
+          value: custom-nginx
+        template: controller-ingressclass.yaml
+      - equal:
+          path: spec.controller
+          value: k8s.io/custom-nginx
+        template: controller-ingressclass.yaml
+      - equal:
+          path: metadata.annotations["ingressclass.kubernetes.io/is-default-class"]
+          value: "true"
+        template: controller-ingressclass.yaml
+      - matchSnapshot: {}
+        template: controller-ingressclass.yaml
+      - matchSnapshot: {}
+        template: controller-deployment.yaml
+
+  - it: controller-service-internal-values.yaml adds an internal Service
+    values:
+      - ../ci/controller-service-internal-values.yaml
+    asserts:
+      - equal:
+          path: metadata.name
+          value: ingress-nginx-neo-controller-internal
+        template: controller-service-internal.yaml
+      - equal:
+          path: metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-internal"]
+          value: "true"
+        template: controller-service-internal.yaml
+      - matchSnapshot: {}
+        template: controller-service-internal.yaml
+
+  - it: controller-service-values.yaml exposes TCP and UDP services on node ports
+    values:
+      - ../ci/controller-service-values.yaml
+    asserts:
+      - equal:
+          path: spec.type
+          value: NodePort
+        template: controller-service.yaml
+      - equal:
+          path: data["9000"]
+          value: default/test:8080
+        template: controller-configmap-tcp.yaml
+      - equal:
+          path: data["9001"]
+          value: default/test:8080
+        template: controller-configmap-udp.yaml
+      - matchSnapshot: {}
+        template: controller-service.yaml
+      - matchSnapshot: {}
+        template: controller-configmap-tcp.yaml
+      - matchSnapshot: {}
+        template: controller-configmap-udp.yaml

@@ -1,0 +1,102 @@
+suite: Controller > Role
+templates:
+  - controller-role.yaml
+
+tests:
+  - it: should create a Role if `rbac.create` is true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Role
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ingress-nginx-neo
+
+  - it: should not create a Role if `rbac.create` is false
+    set:
+      rbac.create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should allow the controller to hold the leader election Lease of the release
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - coordination.k8s.io
+            resources:
+              - leases
+            resourceNames:
+              - RELEASE-NAME-ingress-nginx-neo-leader
+            verbs:
+              - get
+              - update
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - coordination.k8s.io
+            resources:
+              - leases
+            verbs:
+              - create
+
+  - it: should name the leader election Lease after `controller.electionID`
+    set:
+      controller.electionID: custom-leader
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - coordination.k8s.io
+            resources:
+              - leases
+            resourceNames:
+              - custom-leader
+            verbs:
+              - get
+              - update
+
+  - it: should allow the controller to read IngressClasses
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - networking.k8s.io
+            resources:
+              - ingressclasses
+            verbs:
+              - get
+              - list
+              - watch
+
+  - it: should allow the controller to update the Ingress status by default
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - networking.k8s.io
+            resources:
+              - ingresses/status
+            verbs:
+              - update
+
+  - it: should not allow the controller to update the Ingress status if `controller.extraArgs.update-status` is "false"
+    set:
+      controller.extraArgs.update-status: "false"
+    asserts:
+      - notContains:
+          path: rules
+          content:
+            apiGroups:
+              - networking.k8s.io
+            resources:
+              - ingresses/status
+            verbs:
+              - update

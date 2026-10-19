@@ -1,0 +1,1552 @@
+admission-webhooks-cert-manager-values.yaml issues the webhook certificate with cert-manager:
+  1: |
+    apiVersion: cert-manager.io/v1
+    kind: Issuer
+    metadata:
+      name: ingress-nginx-neo-self-signed-issuer
+      namespace: ingress-nginx-neo
+    spec:
+      selfSigned: {}
+  2: |
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    metadata:
+      name: ingress-nginx-neo-root-cert
+      namespace: ingress-nginx-neo
+    spec:
+      commonName: ca.webhook.ingress-nginx
+      duration: 43800h0m0s
+      isCA: true
+      issuerRef:
+        name: ingress-nginx-neo-self-signed-issuer
+      secretName: ingress-nginx-neo-root-cert
+      subject:
+        organizations:
+          - ingress-nginx
+  3: |
+    apiVersion: cert-manager.io/v1
+    kind: Issuer
+    metadata:
+      name: ingress-nginx-neo-root-issuer
+      namespace: ingress-nginx-neo
+    spec:
+      ca:
+        secretName: ingress-nginx-neo-root-cert
+  4: |
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    metadata:
+      name: ingress-nginx-neo-admission
+      namespace: ingress-nginx-neo
+    spec:
+      dnsNames:
+        - ingress-nginx-neo-controller-admission
+        - ingress-nginx-neo-controller-admission.ingress-nginx-neo
+        - ingress-nginx-neo-controller-admission.ingress-nginx-neo.svc
+      duration: 8760h0m0s
+      issuerRef:
+        name: ingress-nginx-neo-root-issuer
+      secretName: ingress-nginx-neo-admission
+      subject:
+        organizations:
+          - ingress-nginx-admission
+  5: |
+    apiVersion: admissionregistration.k8s.io/v1
+    kind: ValidatingWebhookConfiguration
+    metadata:
+      annotations:
+        cert-manager.io/inject-ca-from: ingress-nginx-neo/ingress-nginx-neo-admission
+        certmanager.k8s.io/inject-ca-from: ingress-nginx-neo/ingress-nginx-neo-admission
+      labels:
+        app.kubernetes.io/component: admission-webhook
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-admission
+    webhooks:
+      - admissionReviewVersions:
+          - v1
+        clientConfig:
+          service:
+            name: ingress-nginx-neo-controller-admission
+            namespace: ingress-nginx-neo
+            path: /networking/v1/ingresses
+            port: 443
+        failurePolicy: Fail
+        matchPolicy: Equivalent
+        name: validate.nginx.ingress.kubernetes.io
+        rules:
+          - apiGroups:
+              - networking.k8s.io
+            apiVersions:
+              - v1
+            operations:
+              - CREATE
+              - UPDATE
+            resources:
+              - ingresses
+        sideEffects: None
+  6: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+    spec:
+      minReadySeconds: 0
+      replicas: 1
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/instance: ingress-nginx-neo
+          app.kubernetes.io/name: ingress-nginx-neo
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: controller
+            app.kubernetes.io/instance: ingress-nginx-neo
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: ingress-nginx-neo
+            app.kubernetes.io/part-of: ingress-nginx-neo
+            app.kubernetes.io/version: v1.2.3
+            helm.sh/chart: ingress-nginx-neo-1.2.3
+        spec:
+          automountServiceAccountToken: true
+          containers:
+            - args:
+                - /nginx-ingress-controller
+                - --publish-service=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --election-id=ingress-nginx-neo-leader
+                - --controller-class=k8s.io/ingress-nginx
+                - --ingress-class=nginx
+                - --configmap=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --validating-webhook=:8443
+                - --validating-webhook-certificate=/usr/local/certificates/cert
+                - --validating-webhook-key=/usr/local/certificates/key
+              env:
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: LD_PRELOAD
+                  value: /usr/local/lib/libmimalloc.so
+              image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v1.2.3
+              imagePullPolicy: IfNotPresent
+              lifecycle:
+                preStop:
+                  exec:
+                    command:
+                      - /wait-shutdown
+              livenessProbe:
+                failureThreshold: 5
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              name: controller
+              ports:
+                - containerPort: 80
+                  name: http
+                  protocol: TCP
+                - containerPort: 443
+                  name: https
+                  protocol: TCP
+                - containerPort: 8443
+                  name: webhook
+                  protocol: TCP
+              readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 90Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  add:
+                    - NET_BIND_SERVICE
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+                runAsGroup: 82
+                runAsNonRoot: true
+                runAsUser: 101
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - mountPath: /usr/local/certificates/
+                  name: webhook-cert
+                  readOnly: true
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            kubernetes.io/os: linux
+          serviceAccountName: ingress-nginx-neo
+          terminationGracePeriodSeconds: 300
+          volumes:
+            - name: webhook-cert
+              secret:
+                items:
+                  - key: tls.crt
+                    path: cert
+                  - key: tls.key
+                    path: key
+                secretName: ingress-nginx-neo-admission
+controller-configmap-addheaders-values.yaml adds response headers from a ConfigMap:
+  1: |
+    apiVersion: v1
+    data:
+      add-headers: ingress-nginx-neo/ingress-nginx-neo-custom-add-headers
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+  2: |
+    apiVersion: v1
+    data:
+      X-Frame-Options: deny
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-custom-add-headers
+      namespace: ingress-nginx-neo
+controller-configmap-proxyheaders-values.yaml sends headers from a ConfigMap to the backends:
+  1: |
+    apiVersion: v1
+    data:
+      proxy-set-headers: ingress-nginx-neo/ingress-nginx-neo-custom-proxy-headers
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+  2: |
+    apiVersion: v1
+    data:
+      X-Forwarded-Proto: https
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-custom-proxy-headers
+      namespace: ingress-nginx-neo
+controller-configmap-values.yaml sets a key of the NGINX configuration:
+  1: |
+    apiVersion: v1
+    data:
+      use-proxy-protocol: "true"
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+controller-daemonset-metrics-values.yaml runs a DaemonSet with metrics:
+  1: |
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+    spec:
+      minReadySeconds: 0
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/instance: ingress-nginx-neo
+          app.kubernetes.io/name: ingress-nginx-neo
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: controller
+            app.kubernetes.io/instance: ingress-nginx-neo
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: ingress-nginx-neo
+            app.kubernetes.io/part-of: ingress-nginx-neo
+            app.kubernetes.io/version: v1.2.3
+            helm.sh/chart: ingress-nginx-neo-1.2.3
+        spec:
+          automountServiceAccountToken: true
+          containers:
+            - args:
+                - /nginx-ingress-controller
+                - --publish-service=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --election-id=ingress-nginx-neo-leader
+                - --controller-class=k8s.io/ingress-nginx
+                - --ingress-class=nginx
+                - --configmap=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --validating-webhook=:8443
+                - --validating-webhook-certificate=/usr/local/certificates/cert
+                - --validating-webhook-key=/usr/local/certificates/key
+                - --enable-metrics=true
+              env:
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: LD_PRELOAD
+                  value: /usr/local/lib/libmimalloc.so
+              image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v1.2.3
+              imagePullPolicy: IfNotPresent
+              lifecycle:
+                preStop:
+                  exec:
+                    command:
+                      - /wait-shutdown
+              livenessProbe:
+                failureThreshold: 5
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              name: controller
+              ports:
+                - containerPort: 80
+                  name: http
+                  protocol: TCP
+                - containerPort: 443
+                  name: https
+                  protocol: TCP
+                - containerPort: 10254
+                  name: metrics
+                  protocol: TCP
+                - containerPort: 8443
+                  name: webhook
+                  protocol: TCP
+              readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 90Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  add:
+                    - NET_BIND_SERVICE
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+                runAsGroup: 82
+                runAsNonRoot: true
+                runAsUser: 101
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - mountPath: /usr/local/certificates/
+                  name: webhook-cert
+                  readOnly: true
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            kubernetes.io/os: linux
+          serviceAccountName: ingress-nginx-neo
+          terminationGracePeriodSeconds: 300
+          volumes:
+            - name: webhook-cert
+              secret:
+                secretName: ingress-nginx-neo-admission
+  2: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller-metrics
+      namespace: ingress-nginx-neo
+    spec:
+      ports:
+        - name: metrics
+          port: 10254
+          protocol: TCP
+          targetPort: metrics
+      selector:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/name: ingress-nginx-neo
+      type: ClusterIP
+controller-daemonset-podannotations-values.yaml annotates the pods of a DaemonSet:
+  1: |
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+    spec:
+      minReadySeconds: 0
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/instance: ingress-nginx-neo
+          app.kubernetes.io/name: ingress-nginx-neo
+      template:
+        metadata:
+          annotations:
+            prometheus.io/path: /metrics
+            prometheus.io/port: "10254"
+            prometheus.io/scheme: http
+            prometheus.io/scrape: "true"
+          labels:
+            app.kubernetes.io/component: controller
+            app.kubernetes.io/instance: ingress-nginx-neo
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: ingress-nginx-neo
+            app.kubernetes.io/part-of: ingress-nginx-neo
+            app.kubernetes.io/version: v1.2.3
+            helm.sh/chart: ingress-nginx-neo-1.2.3
+        spec:
+          automountServiceAccountToken: true
+          containers:
+            - args:
+                - /nginx-ingress-controller
+                - --publish-service=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --election-id=ingress-nginx-neo-leader
+                - --controller-class=k8s.io/ingress-nginx
+                - --ingress-class=nginx
+                - --configmap=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --validating-webhook=:8443
+                - --validating-webhook-certificate=/usr/local/certificates/cert
+                - --validating-webhook-key=/usr/local/certificates/key
+              env:
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: LD_PRELOAD
+                  value: /usr/local/lib/libmimalloc.so
+              image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v1.2.3
+              imagePullPolicy: IfNotPresent
+              lifecycle:
+                preStop:
+                  exec:
+                    command:
+                      - /wait-shutdown
+              livenessProbe:
+                failureThreshold: 5
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              name: controller
+              ports:
+                - containerPort: 80
+                  name: http
+                  protocol: TCP
+                - containerPort: 443
+                  name: https
+                  protocol: TCP
+                - containerPort: 8443
+                  name: webhook
+                  protocol: TCP
+              readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 90Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  add:
+                    - NET_BIND_SERVICE
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+                runAsGroup: 82
+                runAsNonRoot: true
+                runAsUser: 101
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - mountPath: /usr/local/certificates/
+                  name: webhook-cert
+                  readOnly: true
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            kubernetes.io/os: linux
+          serviceAccountName: ingress-nginx-neo
+          terminationGracePeriodSeconds: 300
+          volumes:
+            - name: webhook-cert
+              secret:
+                secretName: ingress-nginx-neo-admission
+controller-daemonset-values.yaml runs the controller as a DaemonSet:
+  1: |
+    apiVersion: apps/v1
+    kind: DaemonSet
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+    spec:
+      minReadySeconds: 0
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/instance: ingress-nginx-neo
+          app.kubernetes.io/name: ingress-nginx-neo
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: controller
+            app.kubernetes.io/instance: ingress-nginx-neo
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: ingress-nginx-neo
+            app.kubernetes.io/part-of: ingress-nginx-neo
+            app.kubernetes.io/version: v1.2.3
+            helm.sh/chart: ingress-nginx-neo-1.2.3
+        spec:
+          automountServiceAccountToken: true
+          containers:
+            - args:
+                - /nginx-ingress-controller
+                - --publish-service=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --election-id=ingress-nginx-neo-leader
+                - --controller-class=k8s.io/ingress-nginx
+                - --ingress-class=nginx
+                - --configmap=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --validating-webhook=:8443
+                - --validating-webhook-certificate=/usr/local/certificates/cert
+                - --validating-webhook-key=/usr/local/certificates/key
+              env:
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: LD_PRELOAD
+                  value: /usr/local/lib/libmimalloc.so
+              image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v1.2.3
+              imagePullPolicy: IfNotPresent
+              lifecycle:
+                preStop:
+                  exec:
+                    command:
+                      - /wait-shutdown
+              livenessProbe:
+                failureThreshold: 5
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              name: controller
+              ports:
+                - containerPort: 80
+                  name: http
+                  protocol: TCP
+                - containerPort: 443
+                  name: https
+                  protocol: TCP
+                - containerPort: 8443
+                  name: webhook
+                  protocol: TCP
+              readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 90Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  add:
+                    - NET_BIND_SERVICE
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+                runAsGroup: 82
+                runAsNonRoot: true
+                runAsUser: 101
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - mountPath: /usr/local/certificates/
+                  name: webhook-cert
+                  readOnly: true
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            kubernetes.io/os: linux
+          serviceAccountName: ingress-nginx-neo
+          terminationGracePeriodSeconds: 300
+          volumes:
+            - name: webhook-cert
+              secret:
+                secretName: ingress-nginx-neo-admission
+controller-deployment-metrics-values.yaml runs a Deployment with metrics:
+  1: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+    spec:
+      minReadySeconds: 0
+      replicas: 1
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/instance: ingress-nginx-neo
+          app.kubernetes.io/name: ingress-nginx-neo
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: controller
+            app.kubernetes.io/instance: ingress-nginx-neo
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: ingress-nginx-neo
+            app.kubernetes.io/part-of: ingress-nginx-neo
+            app.kubernetes.io/version: v1.2.3
+            helm.sh/chart: ingress-nginx-neo-1.2.3
+        spec:
+          automountServiceAccountToken: true
+          containers:
+            - args:
+                - /nginx-ingress-controller
+                - --publish-service=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --election-id=ingress-nginx-neo-leader
+                - --controller-class=k8s.io/ingress-nginx
+                - --ingress-class=nginx
+                - --configmap=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --validating-webhook=:8443
+                - --validating-webhook-certificate=/usr/local/certificates/cert
+                - --validating-webhook-key=/usr/local/certificates/key
+                - --enable-metrics=true
+              env:
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: LD_PRELOAD
+                  value: /usr/local/lib/libmimalloc.so
+              image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v1.2.3
+              imagePullPolicy: IfNotPresent
+              lifecycle:
+                preStop:
+                  exec:
+                    command:
+                      - /wait-shutdown
+              livenessProbe:
+                failureThreshold: 5
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              name: controller
+              ports:
+                - containerPort: 80
+                  name: http
+                  protocol: TCP
+                - containerPort: 443
+                  name: https
+                  protocol: TCP
+                - containerPort: 10254
+                  name: metrics
+                  protocol: TCP
+                - containerPort: 8443
+                  name: webhook
+                  protocol: TCP
+              readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 90Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  add:
+                    - NET_BIND_SERVICE
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+                runAsGroup: 82
+                runAsNonRoot: true
+                runAsUser: 101
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - mountPath: /usr/local/certificates/
+                  name: webhook-cert
+                  readOnly: true
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            kubernetes.io/os: linux
+          serviceAccountName: ingress-nginx-neo
+          terminationGracePeriodSeconds: 300
+          volumes:
+            - name: webhook-cert
+              secret:
+                secretName: ingress-nginx-neo-admission
+  2: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller-metrics
+      namespace: ingress-nginx-neo
+    spec:
+      ports:
+        - name: metrics
+          port: 10254
+          protocol: TCP
+          targetPort: metrics
+      selector:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/name: ingress-nginx-neo
+      type: ClusterIP
+controller-deployment-podannotations-values.yaml annotates the pods of a Deployment:
+  1: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+    spec:
+      minReadySeconds: 0
+      replicas: 1
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/instance: ingress-nginx-neo
+          app.kubernetes.io/name: ingress-nginx-neo
+      template:
+        metadata:
+          annotations:
+            prometheus.io/path: /metrics
+            prometheus.io/port: "10254"
+            prometheus.io/scheme: http
+            prometheus.io/scrape: "true"
+          labels:
+            app.kubernetes.io/component: controller
+            app.kubernetes.io/instance: ingress-nginx-neo
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: ingress-nginx-neo
+            app.kubernetes.io/part-of: ingress-nginx-neo
+            app.kubernetes.io/version: v1.2.3
+            helm.sh/chart: ingress-nginx-neo-1.2.3
+        spec:
+          automountServiceAccountToken: true
+          containers:
+            - args:
+                - /nginx-ingress-controller
+                - --publish-service=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --election-id=ingress-nginx-neo-leader
+                - --controller-class=k8s.io/ingress-nginx
+                - --ingress-class=nginx
+                - --configmap=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --validating-webhook=:8443
+                - --validating-webhook-certificate=/usr/local/certificates/cert
+                - --validating-webhook-key=/usr/local/certificates/key
+              env:
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: LD_PRELOAD
+                  value: /usr/local/lib/libmimalloc.so
+              image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v1.2.3
+              imagePullPolicy: IfNotPresent
+              lifecycle:
+                preStop:
+                  exec:
+                    command:
+                      - /wait-shutdown
+              livenessProbe:
+                failureThreshold: 5
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              name: controller
+              ports:
+                - containerPort: 80
+                  name: http
+                  protocol: TCP
+                - containerPort: 443
+                  name: https
+                  protocol: TCP
+                - containerPort: 8443
+                  name: webhook
+                  protocol: TCP
+              readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 90Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  add:
+                    - NET_BIND_SERVICE
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+                runAsGroup: 82
+                runAsNonRoot: true
+                runAsUser: 101
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - mountPath: /usr/local/certificates/
+                  name: webhook-cert
+                  readOnly: true
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            kubernetes.io/os: linux
+          serviceAccountName: ingress-nginx-neo
+          terminationGracePeriodSeconds: 300
+          volumes:
+            - name: webhook-cert
+              secret:
+                secretName: ingress-nginx-neo-admission
+controller-deployment-values.yaml runs the controller as a Deployment:
+  1: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+    spec:
+      minReadySeconds: 0
+      replicas: 1
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/instance: ingress-nginx-neo
+          app.kubernetes.io/name: ingress-nginx-neo
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: controller
+            app.kubernetes.io/instance: ingress-nginx-neo
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: ingress-nginx-neo
+            app.kubernetes.io/part-of: ingress-nginx-neo
+            app.kubernetes.io/version: v1.2.3
+            helm.sh/chart: ingress-nginx-neo-1.2.3
+        spec:
+          automountServiceAccountToken: true
+          containers:
+            - args:
+                - /nginx-ingress-controller
+                - --publish-service=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --election-id=ingress-nginx-neo-leader
+                - --controller-class=k8s.io/ingress-nginx
+                - --ingress-class=nginx
+                - --configmap=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --validating-webhook=:8443
+                - --validating-webhook-certificate=/usr/local/certificates/cert
+                - --validating-webhook-key=/usr/local/certificates/key
+              env:
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: LD_PRELOAD
+                  value: /usr/local/lib/libmimalloc.so
+              image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v1.2.3
+              imagePullPolicy: IfNotPresent
+              lifecycle:
+                preStop:
+                  exec:
+                    command:
+                      - /wait-shutdown
+              livenessProbe:
+                failureThreshold: 5
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              name: controller
+              ports:
+                - containerPort: 80
+                  name: http
+                  protocol: TCP
+                - containerPort: 443
+                  name: https
+                  protocol: TCP
+                - containerPort: 8443
+                  name: webhook
+                  protocol: TCP
+              readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 90Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  add:
+                    - NET_BIND_SERVICE
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+                runAsGroup: 82
+                runAsNonRoot: true
+                runAsUser: 101
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - mountPath: /usr/local/certificates/
+                  name: webhook-cert
+                  readOnly: true
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            kubernetes.io/os: linux
+          serviceAccountName: ingress-nginx-neo
+          terminationGracePeriodSeconds: 300
+          volumes:
+            - name: webhook-cert
+              secret:
+                secretName: ingress-nginx-neo-admission
+controller-hpa-values.yaml scales the Deployment of the controller with an HPA:
+  1: |
+    apiVersion: autoscaling/v2beta2
+    kind: HorizontalPodAutoscaler
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+    spec:
+      behavior:
+        scaleDown:
+          policies:
+            - periodSeconds: 180
+              type: Pods
+              value: 1
+          stabilizationWindowSeconds: 300
+      maxReplicas: 11
+      metrics:
+        - resource:
+            name: memory
+            target:
+              averageUtilization: 50
+              type: Utilization
+          type: Resource
+        - resource:
+            name: cpu
+            target:
+              averageUtilization: 50
+              type: Utilization
+          type: Resource
+      minReplicas: 1
+      scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: ingress-nginx-neo-controller
+  2: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+    spec:
+      minReadySeconds: 0
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/instance: ingress-nginx-neo
+          app.kubernetes.io/name: ingress-nginx-neo
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: controller
+            app.kubernetes.io/instance: ingress-nginx-neo
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: ingress-nginx-neo
+            app.kubernetes.io/part-of: ingress-nginx-neo
+            app.kubernetes.io/version: v1.2.3
+            helm.sh/chart: ingress-nginx-neo-1.2.3
+        spec:
+          automountServiceAccountToken: true
+          containers:
+            - args:
+                - /nginx-ingress-controller
+                - --publish-service=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --election-id=ingress-nginx-neo-leader
+                - --controller-class=k8s.io/ingress-nginx
+                - --ingress-class=nginx
+                - --configmap=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --validating-webhook=:8443
+                - --validating-webhook-certificate=/usr/local/certificates/cert
+                - --validating-webhook-key=/usr/local/certificates/key
+              env:
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: LD_PRELOAD
+                  value: /usr/local/lib/libmimalloc.so
+              image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v1.2.3
+              imagePullPolicy: IfNotPresent
+              lifecycle:
+                preStop:
+                  exec:
+                    command:
+                      - /wait-shutdown
+              livenessProbe:
+                failureThreshold: 5
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              name: controller
+              ports:
+                - containerPort: 80
+                  name: http
+                  protocol: TCP
+                - containerPort: 443
+                  name: https
+                  protocol: TCP
+                - containerPort: 8443
+                  name: webhook
+                  protocol: TCP
+              readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 90Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  add:
+                    - NET_BIND_SERVICE
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+                runAsGroup: 82
+                runAsNonRoot: true
+                runAsUser: 101
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - mountPath: /usr/local/certificates/
+                  name: webhook-cert
+                  readOnly: true
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            kubernetes.io/os: linux
+          serviceAccountName: ingress-nginx-neo
+          terminationGracePeriodSeconds: 300
+          volumes:
+            - name: webhook-cert
+              secret:
+                secretName: ingress-nginx-neo-admission
+controller-ingressclass-values.yaml creates its own default IngressClass:
+  1: |
+    apiVersion: networking.k8s.io/v1
+    kind: IngressClass
+    metadata:
+      annotations:
+        ingressclass.kubernetes.io/is-default-class: "true"
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: custom-nginx
+    spec:
+      controller: k8s.io/custom-nginx
+  2: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+    spec:
+      minReadySeconds: 0
+      replicas: 1
+      revisionHistoryLimit: 10
+      selector:
+        matchLabels:
+          app.kubernetes.io/component: controller
+          app.kubernetes.io/instance: ingress-nginx-neo
+          app.kubernetes.io/name: ingress-nginx-neo
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: controller
+            app.kubernetes.io/instance: ingress-nginx-neo
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: ingress-nginx-neo
+            app.kubernetes.io/part-of: ingress-nginx-neo
+            app.kubernetes.io/version: v1.2.3
+            helm.sh/chart: ingress-nginx-neo-1.2.3
+        spec:
+          automountServiceAccountToken: true
+          containers:
+            - args:
+                - /nginx-ingress-controller
+                - --publish-service=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --election-id=ingress-nginx-neo-leader
+                - --controller-class=k8s.io/custom-nginx
+                - --ingress-class=nginx
+                - --configmap=$(POD_NAMESPACE)/ingress-nginx-neo-controller
+                - --validating-webhook=:8443
+                - --validating-webhook-certificate=/usr/local/certificates/cert
+                - --validating-webhook-key=/usr/local/certificates/key
+                - --watch-ingress-without-class=true
+              env:
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: LD_PRELOAD
+                  value: /usr/local/lib/libmimalloc.so
+              image: ghcr.io/kuzmenko-pavel/ingress-nginx-neo/controller:v1.2.3
+              imagePullPolicy: IfNotPresent
+              lifecycle:
+                preStop:
+                  exec:
+                    command:
+                      - /wait-shutdown
+              livenessProbe:
+                failureThreshold: 5
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              name: controller
+              ports:
+                - containerPort: 80
+                  name: http
+                  protocol: TCP
+                - containerPort: 443
+                  name: https
+                  protocol: TCP
+                - containerPort: 8443
+                  name: webhook
+                  protocol: TCP
+              readinessProbe:
+                failureThreshold: 3
+                httpGet:
+                  path: /healthz
+                  port: 10254
+                  scheme: HTTP
+                initialDelaySeconds: 10
+                periodSeconds: 10
+                successThreshold: 1
+                timeoutSeconds: 1
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 90Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  add:
+                    - NET_BIND_SERVICE
+                  drop:
+                    - ALL
+                readOnlyRootFilesystem: false
+                runAsGroup: 82
+                runAsNonRoot: true
+                runAsUser: 101
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - mountPath: /usr/local/certificates/
+                  name: webhook-cert
+                  readOnly: true
+          dnsPolicy: ClusterFirst
+          nodeSelector:
+            kubernetes.io/os: linux
+          serviceAccountName: ingress-nginx-neo
+          terminationGracePeriodSeconds: 300
+          volumes:
+            - name: webhook-cert
+              secret:
+                secretName: ingress-nginx-neo-admission
+controller-service-internal-values.yaml adds an internal Service:
+  1: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        external-dns.alpha.kubernetes.io/hostname: internal.example.com
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller-internal
+      namespace: ingress-nginx-neo
+    spec:
+      ipFamilies:
+        - IPv4
+      ipFamilyPolicy: SingleStack
+      ports:
+        - appProtocol: http
+          name: http
+          port: 80
+          protocol: TCP
+          targetPort: http
+        - appProtocol: https
+          name: https
+          port: 443
+          protocol: TCP
+          targetPort: https
+      selector:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/name: ingress-nginx-neo
+      type: ClusterIP
+controller-service-values.yaml exposes TCP and UDP services on node ports:
+  1: |
+    apiVersion: v1
+    kind: Service
+    metadata:
+      annotations: null
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        external-dns.alpha.kubernetes.io/hostname: external.example.com
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-controller
+      namespace: ingress-nginx-neo
+    spec:
+      ipFamilies:
+        - IPv4
+      ipFamilyPolicy: SingleStack
+      ports:
+        - appProtocol: http
+          name: http
+          port: 80
+          protocol: TCP
+          targetPort: http
+        - appProtocol: https
+          name: https
+          port: 443
+          protocol: TCP
+          targetPort: https
+        - name: port-9000-tcp
+          nodePort: 30090
+          port: 9000
+          protocol: TCP
+          targetPort: port-9000-tcp
+        - name: port-9001-udp
+          nodePort: 30091
+          port: 9001
+          protocol: UDP
+          targetPort: port-9001-udp
+      selector:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/name: ingress-nginx-neo
+      type: NodePort
+  2: |
+    apiVersion: v1
+    data:
+      "9000": default/test:8080
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-tcp
+      namespace: ingress-nginx-neo
+  3: |
+    apiVersion: v1
+    data:
+      "9001": default/test:8080
+    kind: ConfigMap
+    metadata:
+      labels:
+        app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx-neo
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: ingress-nginx-neo
+        app.kubernetes.io/part-of: ingress-nginx-neo
+        app.kubernetes.io/version: v1.2.3
+        helm.sh/chart: ingress-nginx-neo-1.2.3
+      name: ingress-nginx-neo-udp
+      namespace: ingress-nginx-neo

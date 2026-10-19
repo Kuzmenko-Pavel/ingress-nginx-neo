@@ -1,0 +1,105 @@
+suite: ClusterRole
+templates:
+  - clusterrole.yaml
+
+tests:
+  - it: should create a ClusterRole if `rbac.create` is true and `rbac.scope` is false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ClusterRole
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ingress-nginx-neo
+
+  - it: should not create a ClusterRole if `rbac.create` is false
+    set:
+      rbac.create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not create a ClusterRole if `rbac.scope` and `controller.scope.enabled` are true
+    set:
+      rbac.scope: true
+      controller.scope.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should fail if `rbac.scope` is true and `controller.scope.enabled` is false
+    set:
+      rbac.scope: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "Invalid configuration: 'rbac.scope' should be equal to 'controller.scope.enabled' (true/false)."
+
+  - it: should allow the controller to watch namespaces cluster-wide if `controller.scope.enabled` is false
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - ""
+            resources:
+              - configmaps
+              - endpoints
+              - nodes
+              - pods
+              - secrets
+              - namespaces
+            verbs:
+              - list
+              - watch
+
+  - it: should allow the controller to get only its namespace if `controller.scope.enabled` is true
+    set:
+      controller.scope.enabled: true
+      controller.scope.namespace: ingress
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - ""
+            resources:
+              - namespaces
+            resourceNames:
+              - ingress
+            verbs:
+              - get
+
+  - it: should allow the controller to read IngressClasses and EndpointSlices and update the Ingress status
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - networking.k8s.io
+            resources:
+              - ingressclasses
+            verbs:
+              - get
+              - list
+              - watch
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - discovery.k8s.io
+            resources:
+              - endpointslices
+            verbs:
+              - list
+              - watch
+              - get
+      - contains:
+          path: rules
+          content:
+            apiGroups:
+              - networking.k8s.io
+            resources:
+              - ingresses/status
+            verbs:
+              - update
