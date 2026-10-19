@@ -112,6 +112,13 @@ command, and the diff of `server.conf` in the pull request shows how nginx.conf 
 test does not check that NGINX accepts the configuration and how it handles a request, that needs
 an e2e spec with a request.
 
+The golden cases appear in the documentation of the annotations. A line `<!-- golden: <case> -->`
+in the section of an annotation (in `annotations.md` or on another page) becomes a collapsed example
+when the site is built: the annotations of the case, the data of `configmap.yaml` when there is one,
+and the changes of nginx.conf and of the backends against the base. The MkDocs hook
+`tools/docs/golden_examples.py` does it. A new case gets a marker in the section of its annotation.
+A marker of a case that does not exist stops `make docs-build`.
+
 ## Test reports and coverage
 
 `make test-unit`, `make test-unit-lua` and `make helm-test` write reports to `dist/test-reports/`

@@ -247,6 +247,8 @@ To enable FastCGI, the `nginx.ingress.kubernetes.io/backend-protocol` annotation
 
 **This enables the _FastCGI_ mode for all paths defined in the _Ingress_ object**
 
+<!-- golden: fastcgi -->
+
 ### The `nginx.ingress.kubernetes.io/fastcgi-index` Annotation
 
 To specify an index file, the `fastcgi-index` annotation value can optionally be set.  In the example below, the value is set to `index.php`.  This annotation corresponds to [the _NGINX_ `fastcgi_index` directive](https://nginx.org/en/docs/http/ngx_http_fastcgi_module.html#fastcgi_index).
