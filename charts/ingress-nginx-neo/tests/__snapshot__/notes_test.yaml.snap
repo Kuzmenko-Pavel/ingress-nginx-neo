@@ -1,0 +1,139 @@
+should tell how to port-forward to a Service of type "ClusterIP":
+  1: |
+    |
+      The ingress-nginx controller has been installed.
+      Get the application URL by running these commands:
+        export POD_NAME="$(kubectl get pods --namespace ingress-nginx-neo --selector app.kubernetes.io/name=ingress-nginx-neo,app.kubernetes.io/instance=ingress-nginx-neo,app.kubernetes.io/component=controller --output jsonpath="{.items[0].metadata.name}")"
+        kubectl port-forward --namespace ingress-nginx-neo "${POD_NAME}" 8080:80
+        echo "Visit http://127.0.0.1:8080 to access your application."
+
+      An example Ingress that makes use of the controller:
+
+        apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        metadata:
+          name: example
+          namespace: foo
+        spec:
+          ingressClassName: nginx
+          rules:
+            - host: www.example.com
+              http:
+                paths:
+                  - pathType: Prefix
+                    backend:
+                      service:
+                        name: exampleService
+                        port:
+                          number: 80
+                    path: /
+          # This section is only required if TLS is to be enabled for the Ingress
+          tls:
+            - hosts:
+              - www.example.com
+              secretName: example-tls
+
+      If TLS is enabled for the Ingress, a Secret containing the certificate and key must also be provided:
+
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: example-tls
+          namespace: foo
+        data:
+          tls.crt: <base64 encoded cert>
+          tls.key: <base64 encoded key>
+        type: kubernetes.io/tls
+should tell how to reach the node ports of a Service of type "NodePort":
+  1: |
+    |
+      The ingress-nginx controller has been installed.
+      Get the application URL by running these commands:
+        export HTTP_NODE_PORT=30080
+        export HTTPS_NODE_PORT=$(kubectl get service --namespace ingress-nginx-neo ingress-nginx-neo-controller --output jsonpath="{.spec.ports[1].nodePort}")
+        export NODE_IP="$(kubectl get nodes --output jsonpath="{.items[0].status.addresses[1].address}")"
+
+        echo "Visit http://${NODE_IP}:${HTTP_NODE_PORT} to access your application via HTTP."
+        echo "Visit https://${NODE_IP}:${HTTPS_NODE_PORT} to access your application via HTTPS."
+
+      An example Ingress that makes use of the controller:
+
+        apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        metadata:
+          name: example
+          namespace: foo
+        spec:
+          ingressClassName: nginx
+          rules:
+            - host: www.example.com
+              http:
+                paths:
+                  - pathType: Prefix
+                    backend:
+                      service:
+                        name: exampleService
+                        port:
+                          number: 80
+                    path: /
+          # This section is only required if TLS is to be enabled for the Ingress
+          tls:
+            - hosts:
+              - www.example.com
+              secretName: example-tls
+
+      If TLS is enabled for the Ingress, a Secret containing the certificate and key must also be provided:
+
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: example-tls
+          namespace: foo
+        data:
+          tls.crt: <base64 encoded cert>
+          tls.key: <base64 encoded key>
+        type: kubernetes.io/tls
+should tell how to watch the load balancer of a Service of type "LoadBalancer":
+  1: |
+    |
+      The ingress-nginx controller has been installed.
+      It may take a few minutes for the load balancer IP to be available.
+      You can watch the status by running 'kubectl get service --namespace ingress-nginx-neo ingress-nginx-neo-controller --output wide --watch'
+
+      An example Ingress that makes use of the controller:
+
+        apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        metadata:
+          name: example
+          namespace: foo
+        spec:
+          ingressClassName: nginx
+          rules:
+            - host: www.example.com
+              http:
+                paths:
+                  - pathType: Prefix
+                    backend:
+                      service:
+                        name: exampleService
+                        port:
+                          number: 80
+                    path: /
+          # This section is only required if TLS is to be enabled for the Ingress
+          tls:
+            - hosts:
+              - www.example.com
+              secretName: example-tls
+
+      If TLS is enabled for the Ingress, a Secret containing the certificate and key must also be provided:
+
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: example-tls
+          namespace: foo
+        data:
+          tls.crt: <base64 encoded cert>
+          tls.key: <base64 encoded key>
+        type: kubernetes.io/tls

@@ -1,0 +1,38 @@
+# The installation with the default values, every template it renders.
+# Update the snapshots with: make helm-test HELM_TEST_ARGS=--update-snapshot
+suite: Defaults
+templates:
+  - admission-webhooks/job-patch/clusterrole.yaml
+  - admission-webhooks/job-patch/clusterrolebinding.yaml
+  - admission-webhooks/job-patch/job-createSecret.yaml
+  - admission-webhooks/job-patch/job-patchWebhook.yaml
+  - admission-webhooks/job-patch/role.yaml
+  - admission-webhooks/job-patch/rolebinding.yaml
+  - admission-webhooks/job-patch/serviceaccount.yaml
+  - admission-webhooks/validating-webhook.yaml
+  - clusterrole.yaml
+  - clusterrolebinding.yaml
+  - controller-configmap.yaml
+  - controller-deployment.yaml
+  - controller-ingressclass.yaml
+  - controller-poddisruptionbudget.yaml
+  - controller-role.yaml
+  - controller-rolebinding.yaml
+  - controller-service.yaml
+  - controller-service-webhook.yaml
+  - controller-serviceaccount.yaml
+# The same pinned render as tests/ci_values_test.yaml.
+chart:
+  version: 1.2.3
+  appVersion: v1.2.3
+capabilities:
+  majorVersion: 1
+  minorVersion: 34
+release:
+  name: ingress-nginx-neo
+  namespace: ingress-nginx-neo
+
+tests:
+  - it: renders the default installation
+    asserts:
+      - matchSnapshot: {}
