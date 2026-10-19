@@ -2540,6 +2540,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#chart-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chart tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#test-reports-and-coverage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2942,6 +2953,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#chart-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chart tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#test-reports-and-coverage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3193,7 +3215,7 @@ cluster. e2e checks what happens only on the path of a request through NGINX and
 </tr>
 <tr>
 <td>chart templates and values</td>
-<td>helm-unittest (<code>charts/ingress-nginx-neo/tests</code>)</td>
+<td>helm-unittest (<code>charts/ingress-nginx-neo/tests</code>): explicit checks of the contract and a snapshot of the render (see <a href="#chart-tests">Chart tests</a>)</td>
 <td>a new installation mode appears. It gets a values file in <code>charts/ingress-nginx-neo/ci/</code>, and chart e2e checks it</td>
 <td>templates are checked by rendering, chart e2e checks that the configuration installs and works</td>
 </tr>
@@ -3285,6 +3307,34 @@ when the site is built: the annotations of the case, the data of <code>configmap
 and the changes of nginx.conf and of the backends against the base. The MkDocs hook
 <code>tools/docs/golden_examples.py</code> does it. A new case gets a marker in the section of its annotation.
 A marker of a case that does not exist stops <code>make docs-build</code>.</p>
+<h2 id="chart-tests">Chart tests<a class="headerlink" href="#chart-tests" title="Permanent link"> ¶</a></h2>
+<p><code>make helm-test</code> runs helm-unittest for <code>charts/ingress-nginx-neo/tests</code>. The tests are of two kinds,
+and both are needed:</p>
+<ul>
+<li>explicit checks (<code>equal</code>, <code>hasDocuments</code>, <code>contains</code>, <code>failedTemplate</code> and others) fix the
+  contract: the name of a resource, an object under a condition, a required field, a refusal of
+  wrong values. Such a check fails with the name of the contract, and it cannot be updated together
+  with a snapshot</li>
+<li>snapshots (<code>matchSnapshot</code>) keep the rendered manifests in <code>tests/__snapshot__/*.snap</code>. In a
+  review they show what changed in the render, including what the explicit checks do not look at.
+  An update of a snapshot accepts any change, so a snapshot does not replace the contract</li>
+</ul>
+<p><code>tests/ci_values_test.yaml</code> renders every configuration of <code>charts/ingress-nginx-neo/ci/</code> (the same
+ones <code>make helm-lint</code> and chart e2e install), checks what it exists for and snapshots the templates
+it changes. <code>tests/defaults_test.yaml</code> snapshots the whole installation with the default values,
+<code>tests/notes_test.yaml</code> snapshots <code>NOTES.txt</code>. The render of these suites does not depend on the
+environment: chart version <code>1.2.3</code>, Kubernetes 1.34 (the oldest supported version), release
+<code>ingress-nginx-neo</code> in the namespace <code>ingress-nginx-neo</code>. A new file in <code>ci/</code> gets a test in
+<code>ci_values_test.yaml</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="go">make helm-test                                      # all chart tests</span>
+<span class="go">make helm-test HELM_TEST_ARGS=--update-snapshot     # rewrite the snapshots</span>
+<span class="go">git diff charts/ingress-nginx-neo/tests             # review how the render changed</span>
+</code></pre></div>
+<p>A change of a template that changes the render updates the snapshots with the same command, and the
+diff of the <code>.snap</code> files is committed together with the template. helm-unittest writes a missing
+snapshot and counts the test as passed, so <code>make helm-test</code> fails when <code>tests/__snapshot__</code> has
+files that git does not track: a new snapshot has to be reviewed and added to the commit. The
+snapshots do not go into the chart package (<code>.helmignore</code>).</p>
 <h2 id="test-reports-and-coverage">Test reports and coverage<a class="headerlink" href="#test-reports-and-coverage" title="Permanent link"> ¶</a></h2>
 <p><code>make test-unit</code>, <code>make test-unit-lua</code> and <code>make helm-test</code> write reports to <code>dist/test-reports/</code>
 (<code>TEST_REPORTS</code>, a directory inside the repository, because the tests run in a container with the
