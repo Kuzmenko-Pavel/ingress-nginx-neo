@@ -2,8 +2,9 @@
 #
 # Unit and e2e tests. Included by the root Makefile.
 
-# Read by test/test.sh and test/test-lua.sh in the runner container.
-export TEST_REPORTS TEST_ARGS
+# Read by test/test.sh and test/test-lua.sh in the runner container;
+# UPDATE_GOLDEN=1 rewrites the golden files of the Go tests.
+export TEST_REPORTS TEST_ARGS UPDATE_GOLDEN
 
 .PHONY: test-unit
 ## Go unit tests: root module (excluding test/e2e, images, docs/examples) + images/{kube-webhook-certgen,custom-error-pages,fastcgi-helloserver}/rootfs; JUnit and coverage in dist/test-reports. | Test
