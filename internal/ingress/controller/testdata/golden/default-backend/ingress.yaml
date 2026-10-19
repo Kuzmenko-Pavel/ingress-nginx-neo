@@ -1,0 +1,48 @@
+# default-backend serves the Ingress when its Service has no endpoints
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/default-backend: "errors"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: errors
+  namespace: default
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: errors-golden
+  namespace: default
+  labels:
+    kubernetes.io/service-name: errors
+addressType: IPv4
+endpoints:
+  - addresses:
+      - 10.0.0.1
+    conditions:
+      ready: true
+ports:
+  - port: 8080
+    protocol: TCP

@@ -1,0 +1,23 @@
+# x-forwarded-prefix sends X-Forwarded-Prefix with the path of rewrite-target
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
+    nginx.ingress.kubernetes.io/x-forwarded-prefix: "/api"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80

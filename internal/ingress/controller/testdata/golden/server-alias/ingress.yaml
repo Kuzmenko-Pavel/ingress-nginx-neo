@@ -1,0 +1,21 @@
+# server-alias adds names to server_name
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/server-alias: "proxy.bar.com, *.proxy.foo.com"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80

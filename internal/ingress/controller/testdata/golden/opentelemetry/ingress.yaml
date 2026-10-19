@@ -1,0 +1,23 @@
+# enable-opentelemetry with an operation name and untrusted incoming spans
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/enable-opentelemetry: "true"
+    nginx.ingress.kubernetes.io/opentelemetry-operation-name: "golden-operation"
+    nginx.ingress.kubernetes.io/opentelemetry-trust-incoming-span: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80

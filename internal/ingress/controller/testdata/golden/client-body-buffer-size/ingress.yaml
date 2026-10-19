@@ -1,0 +1,21 @@
+# client-body-buffer-size sets client_body_buffer_size
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/client-body-buffer-size: "16k"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80
