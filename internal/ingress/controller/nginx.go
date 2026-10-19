@@ -951,6 +951,20 @@ func updateStreamConfiguration(tcpEndpoints, udpEndpoints []ingress.L4Service) e
 }
 
 func configureBackends(rawBackends []*ingress.Backend) error {
+	statusCode, _, err := nginx.NewPostStatusRequest("/configuration/backends", "application/json", luaBackends(rawBackends))
+	if err != nil {
+		return err
+	}
+
+	if statusCode != http.StatusCreated {
+		return fmt.Errorf("unexpected error code: %d", statusCode)
+	}
+
+	return nil
+}
+
+// luaBackends returns the backends with the fields the Lua balancer uses.
+func luaBackends(rawBackends []*ingress.Backend) []*ingress.Backend {
 	backends := make([]*ingress.Backend, len(rawBackends))
 
 	for i, backend := range rawBackends {
@@ -983,16 +997,7 @@ func configureBackends(rawBackends []*ingress.Backend) error {
 		backends[i] = luaBackend
 	}
 
-	statusCode, _, err := nginx.NewPostStatusRequest("/configuration/backends", "application/json", backends)
-	if err != nil {
-		return err
-	}
-
-	if statusCode != http.StatusCreated {
-		return fmt.Errorf("unexpected error code: %d", statusCode)
-	}
-
-	return nil
+	return backends
 }
 
 type sslConfiguration struct {

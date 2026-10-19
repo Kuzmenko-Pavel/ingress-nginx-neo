@@ -29,7 +29,7 @@ cluster. e2e checks what happens only on the path of a request through NGINX and
 
 | What changes | Required test | e2e is needed as well when | Why |
 |--------------|---------------|----------------------------|-----|
-| parsing of an annotation or a ConfigMap key (`internal/ingress/annotations/*`, `internal/ingress/controller/config`) | Go unit: parsing, default value, errors, risk level. A golden case when the annotation changes nginx.conf | the annotation changes the handling of requests. One spec per behavior, not per value | the parser is a pure function, every branch is checked in milliseconds. e2e only confirms that the behavior reaches the traffic |
+| parsing of an annotation or a ConfigMap key (`internal/ingress/annotations/*`, `internal/ingress/controller/config`) | Go unit: parsing, default value, errors, risk level. A golden case with the annotation | the annotation changes the handling of requests. One spec per behavior, not per value | the parser is a pure function, every branch is checked in milliseconds. e2e only confirms that the behavior reaches the traffic |
 | the template `rootfs/etc/nginx/template/nginx.tmpl` | golden test of the configuration (`internal/ingress/controller/testdata/golden`), Go unit of the template functions (`internal/ingress/controller/template`) | the behavior of a request or a response changes | which line ends up in nginx.conf is decided by rendering, not by the cluster |
 | Lua (`rootfs/etc/nginx/lua`) | busted test `*_test.lua` | the synchronization of the configuration or the balancing on a running NGINX changes | busted checks the Lua logic, e2e is needed only for the integration with NGINX |
 | store, synchronization, admission (`internal/ingress/controller/store`, `internal/admission`) | Go unit, envtest where a real API server is needed (as in the store tests) | an end-to-end path changes, for example admission rejects an Ingress | envtest gives a real kube-apiserver without NGINX and a cluster |
@@ -67,23 +67,30 @@ make test-unit TEST_ARGS='-run TestStore -v'
 
 ## Golden tests of the rendered configuration
 
-`TestGolden` (`internal/ingress/controller/golden_test.go`) checks which nginx.conf an Ingress
-produces, without a cluster. Every case is a directory `internal/ingress/controller/testdata/golden/<case>/`:
+`TestGolden` (`internal/ingress/controller/golden_test.go`) checks which nginx.conf and which
+backends of the Lua balancer an Ingress produces, without a cluster. Every case is a directory
+`internal/ingress/controller/testdata/golden/<case>/`:
 
-- `ingress.yaml`: an Ingress with annotations and the objects its annotations reference (ConfigMap,
-  Secret, Service, EndpointSlice). Without an API server the objects get no defaults, so a Secret
-  sets `data` in base64 and ports set `protocol`
+- `ingress.yaml`: one or several Ingresses with annotations (a canary is a second Ingress of the
+  same host) and the objects the annotations reference (ConfigMap, Secret, Service, EndpointSlice).
+  Without an API server the objects get no defaults, so a Secret sets `data` in base64 and ports
+  set `protocol`
 - `configmap.yaml`, optional: the ConfigMap of the controller, for example
   `allow-snippet-annotations` and `annotations-risk-level: Critical` for the snippet annotations
-- `server.conf`: the golden file. The server blocks of the Ingress `## start server <host>` …
-  `## end server <host>` without trailing spaces and empty lines. They are followed by the section
-  `## outside of the server blocks` with the lines of nginx.conf outside of the server blocks that
-  the Ingress adds (`+`) or removes (`-`): rate limit zones, upstreams of the external
-  authentication, `load_module`, stream snippets. Without such lines there is no section
+- `server.conf`: the golden file of nginx.conf. The server blocks of the Ingress
+  `## start server <host>` … `## end server <host>` without trailing spaces and empty lines. They are
+  followed by the section `## outside of the server blocks` with the lines of nginx.conf outside of
+  the server blocks that the Ingress adds (`+`) or removes (`-`): rate limit zones, upstreams of the
+  external authentication, `load_module`, stream snippets. Without such lines there is no section
+- `backends.json`: the golden file of the backends. `backends` is what the controller sends to the
+  Lua balancer (`/configuration/backends`), `passthroughBackends` are the backends of the TCP proxy
+  of SSL passthrough, when there are any. It shows the annotations that write nothing to nginx.conf:
+  canary, `load-balance`, session affinity, `upstream-hash-by`, `service-upstream`,
+  `ssl-passthrough`
 
 The test passes the Ingress through the same code as the controller: parsing of the annotations
 with the configuration of `configmap.yaml` (without it, the defaults of an empty ConfigMap),
-building of the servers and locations (`getConfiguration`) and rendering of the real
+building of the servers, locations and backends (`getConfiguration`) and rendering of the real
 `rootfs/etc/nginx/template/nginx.tmpl`. The objects of the case reach the controller instead of the
 store of a cluster, the certificate files of a Secret get the same names as in the store. The lines
 outside of the server blocks are compared with the configuration rendered without the Ingress and
@@ -96,10 +103,10 @@ make test-unit TEST_ARGS='-run TestGolden'                    # only the golden 
 make test-unit TEST_ARGS='-run TestGolden' UPDATE_GOLDEN=1    # rewrite the golden files
 ```
 
-A new case is a directory with `ingress.yaml`, a run with `UPDATE_GOLDEN=1` creates `server.conf`. A
-case checks one annotation or a group of related annotations. The cases `default` and `default-tls`
-without annotations are the base: the diff of the `server.conf` of a case and of its base shows
-only the lines of its annotations. A
+A new case is a directory with `ingress.yaml`, a run with `UPDATE_GOLDEN=1` creates `server.conf`
+and `backends.json`. A case checks one annotation or a group of related annotations. The cases
+`default` and `default-tls` without annotations are the base: the diff of the golden files of a
+case and of its base shows only the changes of its annotations. A
 change of the template that changes the configuration updates the golden files with the same
 command, and the diff of `server.conf` in the pull request shows how nginx.conf changes. A golden
 test does not check that NGINX accepts the configuration and how it handles a request, that needs
