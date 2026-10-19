@@ -102,8 +102,8 @@ func (r *goldenResolver) GetAuthCertificate(key string) (*resolver.AuthSSLCert, 
 	return cert, nil
 }
 
-// goldenStore gives the controller the configuration and the EndpointSlices
-// of the case, as the store reads them from the cluster.
+// goldenStore gives the controller the configuration, the Services and the
+// EndpointSlices of the case, as the store reads them from the cluster.
 type goldenStore struct {
 	store.Storer
 	r *goldenResolver
@@ -117,15 +117,30 @@ func (s *goldenStore) GetDefaultBackend() defaults.Backend {
 	return s.r.cfg.Backend
 }
 
+func (s *goldenStore) GetService(key string) (*corev1.Service, error) {
+	return s.r.GetService(key)
+}
+
 func (s *goldenStore) GetServiceEndpointsSlices(key string) ([]*discoveryv1.EndpointSlice, error) {
 	return s.r.endpointSlices[key], nil
 }
 
-// TestGolden renders every testdata/golden/<case>/ingress.yaml through the code
-// of the controller (annotations, servers and locations, nginx.tmpl) and
-// compares the server blocks with testdata/golden/<case>/server.conf. The lines
-// the Ingress changes outside of the server blocks (rate limit zones, auth
-// upstreams, stream snippets) follow them. UPDATE_GOLDEN=1 rewrites the files.
+// goldenBackends is the configuration the controller passes outside of
+// nginx.conf: the backends of the Lua balancer and the backends of the TCP
+// proxy of SSL passthrough.
+type goldenBackends struct {
+	Backends            []*ingress.Backend               `json:"backends"`
+	PassthroughBackends []*ingress.SSLPassthroughBackend `json:"passthroughBackends,omitempty"`
+}
+
+// TestGolden renders the Ingresses of every testdata/golden/<case>/ingress.yaml
+// through the code of the controller (annotations, servers and locations,
+// backends, nginx.tmpl). It compares the server blocks with
+// testdata/golden/<case>/server.conf, followed by the lines the Ingresses change
+// outside of the server blocks (rate limit zones, auth upstreams, stream
+// snippets), and the backends the controller passes to Lua and to the TCP
+// proxy of SSL passthrough with testdata/golden/<case>/backends.json.
+// UPDATE_GOLDEN=1 rewrites the files.
 func TestGolden(t *testing.T) {
 	tpl, err := ngx_template.NewTemplate(filepath.Join("..", "..", "..", "rootfs", "etc", "nginx", "template", "nginx.tmpl"))
 	if err != nil {
@@ -145,11 +160,15 @@ func TestGolden(t *testing.T) {
 
 	for _, dir := range cases {
 		t.Run(filepath.Base(dir), func(t *testing.T) {
-			ing, r := readGoldenCase(t, dir)
+			ings, r := readGoldenCase(t, dir)
 
-			parsed, err := annotations.NewAnnotationExtractor(r).Extract(ing)
-			if err != nil {
-				t.Fatalf("parsing the annotations: %v", err)
+			ingresses := make([]*ingress.Ingress, 0, len(ings))
+			for _, ing := range ings {
+				parsed, err := annotations.NewAnnotationExtractor(r).Extract(ing)
+				if err != nil {
+					t.Fatalf("parsing the annotations of %s: %v", ing.Name, err)
+				}
+				ingresses = append(ingresses, &ingress.Ingress{Ingress: *ing, ParsedAnnotations: parsed})
 			}
 
 			n := newDynamicNginxController(t, testConfigMap)
@@ -157,31 +176,40 @@ func TestGolden(t *testing.T) {
 			n.t = tpl
 			// the defaults of the command line arguments
 			n.cfg.ListenPorts = &ngx_config.ListenPorts{HTTP: 80, HTTPS: 443, Health: 10254, Default: 8181, SSLProxy: 442}
-			render := func(ingresses []*ingress.Ingress) string {
+			render := func(ingresses []*ingress.Ingress) (string, *ingress.Configuration) {
 				_, _, cfg := n.getConfiguration(ingresses)
 				conf, err := n.generateTemplate(r.cfg, *cfg)
 				if err != nil {
 					t.Fatalf("rendering nginx.tmpl: %v", err)
 				}
-				return normalizeConf(strings.ReplaceAll(string(conf), authDir, clusterAuthDir))
+				return normalizeConf(strings.ReplaceAll(string(conf), authDir, clusterAuthDir)), cfg
 			}
 
-			servers, rest := splitServers(render([]*ingress.Ingress{{Ingress: *ing, ParsedAnnotations: parsed}}))
+			conf, cfg := render(ingresses)
+			servers, rest := splitServers(conf)
 			if servers == "" {
-				t.Fatal("no server block of the Ingress in the rendered configuration")
+				t.Fatal("no server block of the Ingresses in the rendered configuration")
 			}
-			_, base := splitServers(render(nil))
+			base, _ := render(nil)
+			_, base = splitServers(base)
+			compareGolden(t, filepath.Join(dir, "server.conf"), servers+outsideChanges(t, base, rest))
 
-			got := servers + outsideChanges(t, base, rest)
-			compareGolden(t, filepath.Join(dir, "server.conf"), got)
+			backends, err := json.MarshalIndent(goldenBackends{
+				Backends:            luaBackends(cfg.Backends),
+				PassthroughBackends: cfg.PassthroughBackends,
+			}, "", "  ")
+			if err != nil {
+				t.Fatalf("encoding the backends: %v", err)
+			}
+			compareGolden(t, filepath.Join(dir, "backends.json"), string(backends)+"\n")
 		})
 	}
 }
 
-// readGoldenCase reads the Ingress of the case with the objects its
+// readGoldenCase reads the Ingresses of the case with the objects their
 // annotations reference (ingress.yaml) and the data of the ConfigMap of the
 // controller (configmap.yaml, optional).
-func readGoldenCase(t *testing.T, dir string) (*networking.Ingress, *goldenResolver) {
+func readGoldenCase(t *testing.T, dir string) ([]*networking.Ingress, *goldenResolver) {
 	t.Helper()
 
 	r := &goldenResolver{
@@ -190,7 +218,7 @@ func readGoldenCase(t *testing.T, dir string) (*networking.Ingress, *goldenResol
 		services:       map[string]*corev1.Service{},
 		endpointSlices: map[string][]*discoveryv1.EndpointSlice{},
 	}
-	var ing *networking.Ingress
+	var ings []*networking.Ingress
 
 	for _, doc := range readGoldenYAML(t, filepath.Join(dir, "ingress.yaml")) {
 		var meta metav1.TypeMeta
@@ -207,11 +235,9 @@ func readGoldenCase(t *testing.T, dir string) (*networking.Ingress, *goldenResol
 
 		switch meta.Kind {
 		case "Ingress":
-			if ing != nil {
-				t.Fatal("ingress.yaml: more than one Ingress")
-			}
-			ing = &networking.Ingress{}
+			ing := &networking.Ingress{}
 			decode(ing)
+			ings = append(ings, ing)
 		case "ConfigMap":
 			cm := &corev1.ConfigMap{}
 			r.configMaps[decode(cm)] = cm
@@ -230,7 +256,7 @@ func readGoldenCase(t *testing.T, dir string) (*networking.Ingress, *goldenResol
 			t.Fatalf("ingress.yaml: unexpected kind %q", meta.Kind)
 		}
 	}
-	if ing == nil {
+	if len(ings) == 0 {
 		t.Fatal("ingress.yaml: no Ingress")
 	}
 
@@ -245,7 +271,7 @@ func readGoldenCase(t *testing.T, dir string) (*networking.Ingress, *goldenResol
 	}
 	r.cfg = ngx_template.ReadConfig(data)
 
-	return ing, r
+	return ings, r
 }
 
 // readGoldenYAML returns the documents of a YAML file as JSON, none when the
