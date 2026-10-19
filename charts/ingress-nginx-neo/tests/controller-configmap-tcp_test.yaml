@@ -1,0 +1,37 @@
+suite: Controller > ConfigMap > TCP
+templates:
+  - controller-configmap-tcp.yaml
+
+tests:
+  - it: should not create a ConfigMap if `tcp` is empty
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should create a ConfigMap with the services of `tcp`
+    set:
+      tcp:
+        "53": kube-system/kube-dns:53
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ingress-nginx-neo-tcp
+      - equal:
+          path: data
+          value:
+            "53": kube-system/kube-dns:53
+
+  - it: should create a ConfigMap with annotations if `controller.tcp.annotations` is set
+    set:
+      tcp:
+        "53": kube-system/kube-dns:53
+      controller.tcp.annotations:
+        example.com/owner: dns
+    asserts:
+      - equal:
+          path: metadata.annotations["example.com/owner"]
+          value: dns
