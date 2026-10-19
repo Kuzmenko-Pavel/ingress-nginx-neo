@@ -1,0 +1,76 @@
+{
+  "backends": [
+    {
+      "name": "default-echo-80",
+      "service": {
+        "metadata": {},
+        "spec": {},
+        "status": {
+          "loadBalancer": {}
+        }
+      },
+      "port": 80,
+      "sslPassthrough": false,
+      "sessionAffinityConfig": {
+        "name": "cookie",
+        "mode": "persistent",
+        "cookieSessionAffinity": {
+          "name": "golden",
+          "expires": "3600",
+          "maxage": "3600",
+          "locations": {
+            "proxy.foo.com": [
+              "/"
+            ]
+          },
+          "secure": true,
+          "path": "/app",
+          "domain": "foo.com",
+          "samesite": "None",
+          "conditional_samesite_none": true,
+          "change_on_failure": true
+        }
+      },
+      "upstreamHashByConfig": {
+        "upstream-hash-by-subset-size": 3
+      },
+      "noServer": false,
+      "trafficShapingPolicy": {
+        "weight": 0,
+        "weightTotal": 0,
+        "header": "",
+        "headerValue": "",
+        "headerPattern": "",
+        "cookie": ""
+      }
+    },
+    {
+      "name": "upstream-default-backend",
+      "port": 0,
+      "sslPassthrough": false,
+      "endpoints": [
+        {
+          "address": "127.0.0.1",
+          "port": "8181"
+        }
+      ],
+      "sessionAffinityConfig": {
+        "name": "",
+        "mode": "",
+        "cookieSessionAffinity": {
+          "name": ""
+        }
+      },
+      "upstreamHashByConfig": {},
+      "noServer": false,
+      "trafficShapingPolicy": {
+        "weight": 0,
+        "weightTotal": 0,
+        "header": "",
+        "headerValue": "",
+        "headerPattern": "",
+        "cookie": ""
+      }
+    }
+  ]
+}
