@@ -33,7 +33,7 @@ cluster. e2e checks what happens only on the path of a request through NGINX and
 | the template `rootfs/etc/nginx/template/nginx.tmpl` | golden test of the configuration (`internal/ingress/controller/testdata/golden`), Go unit of the template functions (`internal/ingress/controller/template`) | the behavior of a request or a response changes | which line ends up in nginx.conf is decided by rendering, not by the cluster |
 | Lua (`rootfs/etc/nginx/lua`) | busted test `*_test.lua` | the synchronization of the configuration or the balancing on a running NGINX changes | busted checks the Lua logic, e2e is needed only for the integration with NGINX |
 | store, synchronization, admission (`internal/ingress/controller/store`, `internal/admission`) | Go unit, envtest where a real API server is needed (as in the store tests) | an end-to-end path changes, for example admission rejects an Ingress | envtest gives a real kube-apiserver without NGINX and a cluster |
-| chart templates and values | helm-unittest (`charts/ingress-nginx-neo/tests`) | a new installation mode appears. It gets a values file in `charts/ingress-nginx-neo/ci/`, and chart e2e checks it | templates are checked by rendering, chart e2e checks that the configuration installs and works |
+| chart templates and values | helm-unittest (`charts/ingress-nginx-neo/tests`): explicit checks of the contract and a snapshot of the render (see [Chart tests](#chart-tests)) | a new installation mode appears. It gets a values file in `charts/ingress-nginx-neo/ci/`, and chart e2e checks it | templates are checked by rendering, chart e2e checks that the configuration installs and works |
 | a controller flag | Go unit on the parsing of the flag (`pkg/flags`) | the flag changes the handling of requests | |
 | kubectl plugin (`cmd/plugin`) | Go unit | no | the plugin does not handle traffic |
 | a bug fix | a test that reproduces the bug at the lowest level where it shows | the bug shows only on traffic | the test fails without the fix and so proves both the bug and the fix |
@@ -118,6 +118,39 @@ when the site is built: the annotations of the case, the data of `configmap.yaml
 and the changes of nginx.conf and of the backends against the base. The MkDocs hook
 `tools/docs/golden_examples.py` does it. A new case gets a marker in the section of its annotation.
 A marker of a case that does not exist stops `make docs-build`.
+
+## Chart tests
+
+`make helm-test` runs helm-unittest for `charts/ingress-nginx-neo/tests`. The tests are of two kinds,
+and both are needed:
+
+- explicit checks (`equal`, `hasDocuments`, `contains`, `failedTemplate` and others) fix the
+  contract: the name of a resource, an object under a condition, a required field, a refusal of
+  wrong values. Such a check fails with the name of the contract, and it cannot be updated together
+  with a snapshot
+- snapshots (`matchSnapshot`) keep the rendered manifests in `tests/__snapshot__/*.snap`. In a
+  review they show what changed in the render, including what the explicit checks do not look at.
+  An update of a snapshot accepts any change, so a snapshot does not replace the contract
+
+`tests/ci_values_test.yaml` renders every configuration of `charts/ingress-nginx-neo/ci/` (the same
+ones `make helm-lint` and chart e2e install), checks what it exists for and snapshots the templates
+it changes. `tests/defaults_test.yaml` snapshots the whole installation with the default values,
+`tests/notes_test.yaml` snapshots `NOTES.txt`. The render of these suites does not depend on the
+environment: chart version `1.2.3`, Kubernetes 1.34 (the oldest supported version), release
+`ingress-nginx-neo` in the namespace `ingress-nginx-neo`. A new file in `ci/` gets a test in
+`ci_values_test.yaml`.
+
+```console
+make helm-test                                      # all chart tests
+make helm-test HELM_TEST_ARGS=--update-snapshot     # rewrite the snapshots
+git diff charts/ingress-nginx-neo/tests             # review how the render changed
+```
+
+A change of a template that changes the render updates the snapshots with the same command, and the
+diff of the `.snap` files is committed together with the template. helm-unittest writes a missing
+snapshot and counts the test as passed, so `make helm-test` fails when `tests/__snapshot__` has
+files that git does not track: a new snapshot has to be reviewed and added to the commit. The
+snapshots do not go into the chart package (`.helmignore`).
 
 ## Test reports and coverage
 
