@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-nginx-controller
+  namespace: default
+data:
+  global-auth-url: "http://auth.default.svc.cluster.local/verify"

@@ -280,7 +280,7 @@ help:
 			printf "  %s%-" width "s%s %s%s%s\n", yellow, substr($$1, 1, index($$1, ":") - 1), reset, green, text, reset; \
 		} \
 		{ last = $$0 }' $(MAKEFILE_LIST)
-	@printf '\nOptional variables: K8S_VERSION, E2E_VARIANT (%s), E2E_SHARD, FOCUS, TEST_ARGS (extra go test arguments of test-unit); make version shows the channel and versions.\n\n' '$(E2E_VARIANTS)'
+	@printf '\nOptional variables: K8S_VERSION, E2E_VARIANT (%s), E2E_SHARD, FOCUS, TEST_ARGS (extra go test arguments of test-unit), UPDATE_GOLDEN=1 (rewrite golden files); make version shows the channel and versions.\n\n' '$(E2E_VARIANTS)'
 
 .PHONY: version
 ## Print VERSION, CHANNEL (and why) and derived IMAGE_TAG/CHART_VERSION/APP_VERSION/DOCS_VERSION.

@@ -1,0 +1,22 @@
+# temporal-redirect with temporal-redirect-code
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/temporal-redirect: "https://www.foo.com/tmp"
+    nginx.ingress.kubernetes.io/temporal-redirect-code: "307"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80

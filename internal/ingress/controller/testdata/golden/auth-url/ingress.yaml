@@ -1,0 +1,27 @@
+# auth-url with the options of the external authentication
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/auth-url: "http://auth.default.svc.cluster.local/verify"
+    nginx.ingress.kubernetes.io/auth-method: "GET"
+    nginx.ingress.kubernetes.io/auth-signin: "https://auth.foo.com/start"
+    nginx.ingress.kubernetes.io/auth-signin-redirect-param: "rd"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-User, X-Email"
+    nginx.ingress.kubernetes.io/auth-request-redirect: "/"
+    nginx.ingress.kubernetes.io/auth-always-set-cookie: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80

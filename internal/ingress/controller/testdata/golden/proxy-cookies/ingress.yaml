@@ -1,0 +1,22 @@
+# The e2e spec "proxy-* should setup proxy cookies" (test/e2e/annotations/proxy.go)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-cookie-domain: "localhost example.org"
+    nginx.ingress.kubernetes.io/proxy-cookie-path: "/one/ /"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80

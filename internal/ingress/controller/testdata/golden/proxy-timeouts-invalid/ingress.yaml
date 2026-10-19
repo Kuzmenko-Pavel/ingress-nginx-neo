@@ -1,0 +1,23 @@
+# The e2e spec "proxy-* should not set invalid proxy timeouts" (test/e2e/annotations/proxy.go)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "50k"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "20k"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "20k"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80

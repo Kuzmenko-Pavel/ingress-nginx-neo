@@ -4,7 +4,7 @@
 # Run a command inside a container image with the repository mounted at /src.
 # Go build and module caches live in .cache/container/ so repeated runs are fast.
 # /etc/ingress-controller is a fresh writable directory, as in the controller
-# image. TEST_REPORTS and TEST_ARGS are passed through when set.
+# image. TEST_REPORTS, TEST_ARGS and UPDATE_GOLDEN are passed through when set.
 #
 # Usage: tools/run-in-container.sh <image> <command> [args...]
 
@@ -38,6 +38,7 @@ docker run --rm ${tty[@]+"${tty[@]}"} ${user[@]+"${user[@]}"} \
   --env GOFLAGS=-buildvcs=false \
   --env TEST_REPORTS \
   --env TEST_ARGS \
+  --env UPDATE_GOLDEN \
   --volume "${root}:/src" \
   --volume "${cache}:/cache" \
   --volume "${controller_dir}:/etc/ingress-controller" \

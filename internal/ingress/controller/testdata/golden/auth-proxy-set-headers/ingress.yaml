@@ -1,0 +1,30 @@
+# auth-proxy-set-headers sends the headers of a ConfigMap to the authentication
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/auth-url: "http://auth.default.svc.cluster.local/verify"
+    nginx.ingress.kubernetes.io/auth-proxy-set-headers: "default/auth-headers"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-headers
+  namespace: default
+data:
+  X-Golden: auth

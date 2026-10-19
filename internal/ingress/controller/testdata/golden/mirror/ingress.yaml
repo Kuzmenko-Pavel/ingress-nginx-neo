@@ -1,0 +1,23 @@
+# mirror-* mirror the requests to another target
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/mirror-target: "https://mirror.foo.com$request_uri"
+    nginx.ingress.kubernetes.io/mirror-host: "mirror.foo.com"
+    nginx.ingress.kubernetes.io/mirror-request-body: "off"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80

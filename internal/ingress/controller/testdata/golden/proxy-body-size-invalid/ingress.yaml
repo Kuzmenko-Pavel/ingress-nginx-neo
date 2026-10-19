@@ -1,0 +1,21 @@
+# The e2e spec "proxy-* should not set proxy client-max-body-size to incorrect value" (test/e2e/annotations/proxy.go)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "15r"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80

@@ -1,0 +1,23 @@
+# An Ingress with a TLS section and without annotations
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: proxy.foo.com
+  namespace: default
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - proxy.foo.com
+      secretName: proxy.foo.com
+  rules:
+    - host: proxy.foo.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: echo
+                port:
+                  number: 80
