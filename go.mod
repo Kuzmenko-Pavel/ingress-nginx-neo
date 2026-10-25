@@ -1,8 +1,6 @@
 module k8s.io/ingress-nginx
 
-go 1.26.1
-
-toolchain go1.26.9
+go 1.26.9
 
 require (
 	dario.cat/mergo v1.0.2
@@ -18,7 +16,7 @@ require (
 	github.com/ncabatoff/process-exporter v0.8.7
 	github.com/onsi/ginkgo/v2 v2.33.1
 	github.com/opencontainers/cgroups v0.1.0
-	github.com/pires/go-proxyproto v0.15.0
+	github.com/pires/go-proxyproto v0.16.0
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
