@@ -3,7 +3,7 @@ ARG CFSSL_IMAGE
 FROM ${E2E_BASE_IMAGE} AS BASE
 FROM ${CFSSL_IMAGE} AS cfssl
 
-FROM alpine:3.24.2
+FROM alpine:3.24.3
 
 RUN apk update \
 	&& apk upgrade && apk add -U --no-cache \
